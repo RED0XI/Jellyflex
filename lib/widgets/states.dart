@@ -75,10 +75,14 @@ class RowsSkeleton extends StatelessWidget {
 
 /// Fehleransicht mit "Erneut versuchen".
 class ErrorView extends StatelessWidget {
-  const ErrorView({super.key, required this.message, required this.onRetry});
+  const ErrorView({super.key, required this.message, required this.onRetry, this.secondaryLabel, this.onSecondary});
 
   final String message;
   final VoidCallback onRetry;
+
+  /// Optionaler zweiter Knopf (z. B. Downloads ansehen ohne Verbindung).
+  final String? secondaryLabel;
+  final VoidCallback? onSecondary;
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +100,14 @@ class ErrorView extends StatelessWidget {
               style: const TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 20),
-            GlassButton(label: 'Erneut versuchen', icon: Icons.refresh_rounded, onPressed: onRetry),
+            Wrap(
+              spacing: 12,
+              children: [
+                GlassButton(label: 'Erneut versuchen', icon: Icons.refresh_rounded, onPressed: onRetry),
+                if (secondaryLabel != null && onSecondary != null)
+                  GlassButton(label: secondaryLabel!, icon: Icons.download_done_rounded, onPressed: onSecondary),
+              ],
+            ),
           ],
         ),
       ),

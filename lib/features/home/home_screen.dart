@@ -81,6 +81,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: ErrorView(
                         message: 'Die Startseite konnte nicht geladen werden.\n$e',
                         onRetry: () => ref.invalidate(homeProvider),
+                        // Ohne Verbindung: heruntergeladene Titel gehen trotzdem.
+                        secondaryLabel: 'Downloads ansehen',
+                        onSecondary: () => context.push('/downloads'),
                       ),
                     ),
                   ],
@@ -255,6 +258,7 @@ class _TopNav extends ConsumerWidget {
             const SizedBox(width: 40),
             const _NavLink(label: 'Startseite', active: true),
             for (final lib in libraries) _NavLink(label: lib.name, onTap: () => openLibrary(context, lib)),
+            _NavLink(label: 'Downloads', onTap: () => context.push('/downloads')),
             const Spacer(),
             IconButton(
               tooltip: 'Suchen (Strg+F)',

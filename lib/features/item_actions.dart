@@ -2,12 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/downloads.dart';
 import '../core/models.dart';
 import '../core/session.dart';
 import '../theme.dart';
 import 'details/details_screen.dart';
 
-enum _ItemAction { play, playFromStart, details, series, markPlayed, markUnplayed, favorite, unfavorite, forget }
+enum _ItemAction {
+  play,
+  playFromStart,
+  details,
+  series,
+  markPlayed,
+  markUnplayed,
+  favorite,
+  unfavorite,
+  forget,
+  download,
+  removeDownload,
+}
 
 /// Kontextmenü (Rechtsklick) für Karten: Abspielen, als gesehen markieren,
 /// aus "Weiterschauen" entfernen, Favoriten …
@@ -18,6 +31,7 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
   final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
   final data = item.userData;
   final canPlay = !item.isSeries && !item.isSeason && !item.isCollection;
+  final downloaded = container.read(downloadsProvider.notifier).entryFor(item.id);
 
   PopupMenuItem<_ItemAction> entry(_ItemAction value, IconData icon, String label) => PopupMenuItem(
     value: value,
@@ -64,6 +78,10 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
       else
         entry(_ItemAction.favorite, Icons.favorite_border_rounded, 'Zu Favoriten hinzufügen'),
       if (data.hasResumePosition) entry(_ItemAction.forget, Icons.history_toggle_off_rounded, 'Vergessen'),
+      if (canPlay) const PopupMenuDivider(),
+      if (canPlay && downloaded == null) entry(_ItemAction.download, Icons.download_rounded, 'Herunterladen'),
+      if (canPlay && downloaded != null)
+        entry(_ItemAction.removeDownload, Icons.delete_outline_rounded, 'Download löschen'),
     ],
   );
   restoreFocusAfterMenu(previousFocus);
@@ -99,6 +117,12 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
       await run(() => api.setFavorite(item.id, true), 'Zu Favoriten hinzugefügt');
     case _ItemAction.unfavorite:
       await run(() => api.setFavorite(item.id, false), 'Aus Favoriten entfernt');
+    case _ItemAction.download:
+      await container.read(downloadsProvider.notifier).enqueue(item);
+      messenger?.showSnackBar(_snack('Download gestartet: ${item.name}'));
+    case _ItemAction.removeDownload:
+      await container.read(downloadsProvider.notifier).remove(item.id);
+      messenger?.showSnackBar(_snack('Download gelöscht'));
     case _ItemAction.forget:
       await run(() => api.clearResumePosition(item.id), 'Aus „Weiterschauen“ entfernt');
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/downloads.dart';
 import '../../core/format.dart';
 import '../../core/images.dart';
 import '../../core/models.dart';
@@ -19,8 +20,15 @@ import '../home/hero_banner.dart';
 import '../home/home_providers.dart';
 import '../../widgets/focusable.dart';
 
-final itemProvider = FutureProvider.autoDispose.family<BaseItem, String>((ref, id) {
-  return ref.watch(apiProvider).getItem(id);
+final itemProvider = FutureProvider.autoDispose.family<BaseItem, String>((ref, id) async {
+  try {
+    return await ref.watch(apiProvider).getItem(id);
+  } catch (_) {
+    // Offline: gespeicherte Infos eines Downloads verwenden.
+    final local = ref.read(downloadsProvider.notifier).entryFor(id)?.loadItem();
+    if (local != null) return local;
+    rethrow;
+  }
 });
 
 final seasonsProvider = FutureProvider.autoDispose.family<List<BaseItem>, String>((ref, seriesId) {
@@ -428,6 +436,59 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
           activeColor: const Color(0xFFFF5C8A),
           onPressed: _toggleFavorite,
         ),
+        if (!item.isSeries && !item.isCollection) _DownloadButton(item: item),
+      ],
+    );
+  }
+}
+
+/// Herunterladen / Fortschritt / Fertig – je nach Zustand des Downloads.
+class _DownloadButton extends ConsumerWidget {
+  const _DownloadButton({required this.item});
+
+  final BaseItem item;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final entry = ref.watch(downloadedProvider(item.id));
+    final manager = ref.read(downloadsProvider.notifier);
+    if (entry == null) {
+      return CircleIconButton(
+        icon: Icons.download_rounded,
+        tooltip: 'Herunterladen (offline ansehen)',
+        onPressed: () => manager.enqueue(item),
+      );
+    }
+    if (entry.isDone) {
+      return CircleIconButton(
+        icon: Icons.download_done_rounded,
+        tooltip: 'Heruntergeladen – klicken zum Löschen',
+        active: true,
+        activeColor: AppColors.accentAlt,
+        onPressed: () => manager.remove(item.id),
+      );
+    }
+    // Läuft gerade oder wartet: Fortschrittsring, Klick pausiert bzw. setzt fort.
+    final running = entry.status == DownloadStatus.downloading || entry.status == DownloadStatus.queued;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        SizedBox(
+          width: 52,
+          height: 52,
+          child: CircularProgressIndicator(
+            value: entry.total > 0 ? entry.progress : null,
+            strokeWidth: 3,
+            color: AppColors.accent,
+            backgroundColor: Colors.white12,
+          ),
+        ),
+        CircleIconButton(
+          icon: running ? Icons.pause_rounded : Icons.play_arrow_rounded,
+          tooltip: running ? 'Download pausieren' : 'Download fortsetzen',
+          size: 44,
+          onPressed: () => running ? manager.pause(item.id) : manager.resume(item.id),
+        ),
       ],
     );
   }
@@ -474,7 +535,27 @@ class _SeasonsSectionState extends ConsumerState<_SeasonsSection> {
             },
           ),
         ),
-        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 0),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () {
+                final episodes = ref.read(episodesProvider((widget.series.id, selected))).value ?? const <BaseItem>[];
+                ref.read(downloadsProvider.notifier).enqueueAll(episodes);
+                ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                  SnackBar(
+                    content: Text('${episodes.length} Folgen werden heruntergeladen'),
+                    behavior: SnackBarBehavior.floating,
+                    width: 420,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.download_rounded, size: 18),
+              label: const Text('Staffel herunterladen'),
+            ),
+          ),
+        ),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           child: _EpisodesRow(key: ValueKey(selected), seriesId: widget.series.id, seasonId: selected),

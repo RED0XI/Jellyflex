@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../../core/downloads.dart';
 import '../../core/format.dart';
 import '../../core/gamepad_input.dart';
 import '../../core/images.dart';
@@ -62,6 +64,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   String? _playSessionId;
   String? _error;
   List<MediaSegment> _segments = const [];
+
+  /// Heruntergeladene Datei (statt Stream vom Server), falls vorhanden.
+  String? _localFile;
   BaseItem? _nextEpisode;
 
   /// Höchste Bitrate; `null` = Original (Direct Play), sonst rechnet der Server um.
@@ -268,7 +273,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   Future<void> _start() async {
     try {
-      final (item, info) = await (_api.getItem(widget.itemId), _api.getPlaybackInfo(widget.itemId)).wait;
+      // Heruntergeladen? Dann die lokale Datei nehmen – offline auch ohne Server.
+      final download = ref.read(downloadsProvider.notifier).entryFor(widget.itemId);
+      if (download != null && download.isDone && File(download.mediaFile!).existsSync()) {
+        _localFile = download.mediaFile;
+      }
+      BaseItem item;
+      PlaybackInfo info;
+      try {
+        (item, info) = await (_api.getItem(widget.itemId), _api.getPlaybackInfo(widget.itemId)).wait;
+      } catch (_) {
+        final local = _localFile == null ? null : download!.loadItem();
+        if (local == null) rethrow;
+        item = local;
+        info = PlaybackInfo(const {});
+      }
       final sources = info.mediaSources.isNotEmpty ? info.mediaSources : item.mediaSources;
       if (sources.isEmpty) throw Exception('Keine abspielbare Datei gefunden.');
       final source = sources.first;
@@ -277,6 +296,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       var maxBitrate = settings.maxBitrate;
       // Ist die Datei ohnehin kleiner als die Grenze, lohnt Umrechnen nicht.
       if (maxBitrate != null && (source.bitrate ?? 0) > 0 && source.bitrate! <= maxBitrate) maxBitrate = null;
+      if (_localFile != null) maxBitrate = null; // lokal nie umrechnen
       setState(() {
         _item = item;
         _source = source;
@@ -339,6 +359,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final source = _source!;
     final headers = {'Authorization': _api.authorizationHeader};
 
+    if (_localFile != null) {
+      await _player.open(Media(_localFile!, start: start));
+      return;
+    }
     if (!_transcoding) {
       await _player.open(
         Media(

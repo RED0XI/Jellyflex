@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'core/route_observer.dart';
 import 'core/session.dart';
 import 'features/details/details_screen.dart';
+import 'features/downloads/downloads_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/live_handler.dart';
 import 'features/library/library_screen.dart';
@@ -42,6 +43,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
       GoRoute(path: '/search', builder: (_, _) => const SearchScreen()),
+      GoRoute(path: '/downloads', builder: (_, _) => const DownloadsScreen()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(
         path: '/library/:id',
