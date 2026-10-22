@@ -1,0 +1,427 @@
+// Kleiner Jellyfin-Attrappen-Server zum Testen der Oberfläche ohne echten Server.
+//
+// Start:   dart run tool/mock_server.dart
+// In der App als Server-Adresse eingeben:  http://localhost:8097
+// Beliebiger Benutzername/Passwort funktioniert.
+//
+// Liefert fiktive Filme/Serien und erzeugt farbige Platzhalterbilder.
+// Videos gibt es keine – der Player zeigt hier also einen Fehler.
+
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
+
+const port = 8097;
+
+final _rand = math.Random(7);
+
+const _genres = ['Action', 'Drama', 'Sci-Fi', 'Komödie', 'Thriller', 'Abenteuer', 'Fantasy', 'Krimi', 'Animation'];
+const _movieNames = [
+  'Das Echo der Sterne',
+  'Nachtfalter',
+  'Kalte Brandung',
+  'Der letzte Sommer',
+  'Projekt Aurora',
+  'Stadt aus Glas',
+  'Die Uhrmacherin',
+  'Sturmwarnung',
+  'Unter Null',
+  'Grenzgänger',
+  'Morgenrot',
+  'Die stille Insel',
+  'Funkenflug',
+  'Atlas',
+];
+const _seriesNames = ['Nordlicht', 'Die Akademie', 'Signal', 'Blaue Stunde', 'Hafenviertel', 'Orbit'];
+const _overview =
+    'Eine fesselnde Geschichte über Mut, Freundschaft und die Frage, was uns wirklich zusammenhält. '
+    'Als ein unerwartetes Ereignis alles auf den Kopf stellt, müssen die Figuren über sich hinauswachsen – '
+    'und entdecken dabei, dass nichts so ist, wie es scheint.';
+
+final movies = <Map<String, dynamic>>[];
+final series = <Map<String, dynamic>>[];
+final seasons = <String, List<Map<String, dynamic>>>{};
+final episodes = <String, List<Map<String, dynamic>>>{};
+final byId = <String, Map<String, dynamic>>{};
+
+Map<String, dynamic> _userData({int position = 0, bool played = false, bool favorite = false, int? unplayed}) => {
+  'PlaybackPositionTicks': position,
+  'Played': played,
+  'IsFavorite': favorite,
+  'UnplayedItemCount': ?unplayed,
+};
+
+List<Map<String, dynamic>> _people() => [
+  for (var i = 0; i < 8; i++)
+    {
+      'Id': 'person$i',
+      'Name': [
+        'Lena Brandt',
+        'Jonas Weber',
+        'Mira Okafor',
+        'Tom Hendriks',
+        'Sara Lindqvist',
+        'Ali Demir',
+        'Nora Kim',
+        'Paul Roth',
+      ][i],
+      'Role': ['Hauptrolle', 'Kommissar', 'Wissenschaftlerin', 'Pilot', 'Mutter', 'Hacker', 'Agentin', 'Erzähler'][i],
+      'Type': 'Actor',
+      'PrimaryImageTag': 'p$i',
+    },
+];
+
+void _seed() {
+  for (var i = 0; i < _movieNames.length; i++) {
+    final id = 'movie$i';
+    final runtime = (85 + _rand.nextInt(70)) * 60 * 10000000;
+    final m = <String, dynamic>{
+      'Id': id,
+      'Name': _movieNames[i],
+      'Type': 'Movie',
+      'ProductionYear': 2010 + _rand.nextInt(15),
+      'CommunityRating': 5.5 + _rand.nextDouble() * 3.5,
+      'CriticRating': 40 + _rand.nextInt(60),
+      'OfficialRating': ['FSK-6', 'FSK-12', 'FSK-16'][i % 3],
+      'RunTimeTicks': runtime,
+      'Overview': _overview,
+      'Taglines': i.isEven ? ['Manche Geheimnisse sollten verborgen bleiben.'] : [],
+      'Genres': [_genres[i % _genres.length], _genres[(i + 3) % _genres.length]],
+      'ImageTags': {'Primary': 'p', if (i % 3 == 0) 'Logo': 'l', if (i % 2 == 0) 'Thumb': 't'},
+      'BackdropImageTags': i % 4 == 0 ? ['b0', 'b1', 'b2'] : ['b0'],
+      'PrimaryImageAspectRatio': 0.6667,
+      'People': _people(),
+      'UserData': _userData(
+        position: i < 3 ? (runtime * (0.2 + i * 0.25)).round() : 0,
+        played: i == 5,
+        favorite: i % 5 == 1,
+      ),
+      'MediaSources': [
+        {
+          'Id': id,
+          'Container': 'mkv',
+          'MediaStreams': [
+            {'Type': 'Video', 'Index': 0, 'Codec': 'hevc'},
+            {'Type': 'Audio', 'Index': 1, 'Language': 'ger', 'DisplayTitle': 'Deutsch - EAC3 - 5.1 - Standard'},
+            {'Type': 'Audio', 'Index': 2, 'Language': 'eng', 'DisplayTitle': 'Englisch - TrueHD - 7.1'},
+          ],
+        },
+      ],
+    };
+    movies.add(m);
+    byId[id] = m;
+  }
+
+  for (var s = 0; s < _seriesNames.length; s++) {
+    final seriesId = 'series$s';
+    final ser = <String, dynamic>{
+      'Id': seriesId,
+      'Name': _seriesNames[s],
+      'Type': 'Series',
+      'ProductionYear': 2015 + s,
+      'EndDate': s.isEven ? '${2019 + s}-01-01T00:00:00Z' : null,
+      'Status': s.isEven ? 'Ended' : 'Continuing',
+      'CommunityRating': 7.0 + _rand.nextDouble() * 2,
+      'OfficialRating': 'FSK-12',
+      'Overview': _overview,
+      'Genres': [_genres[(s + 2) % _genres.length], 'Drama'],
+      'ChildCount': 2,
+      'ImageTags': {'Primary': 'p', 'Logo': 'l', 'Thumb': 't'},
+      'BackdropImageTags': ['b0', 'b1'],
+      'People': _people(),
+      'UserData': _userData(unplayed: 10 + s, favorite: s == 2),
+    };
+    series.add(ser);
+    byId[seriesId] = ser;
+    seasons[seriesId] = [];
+
+    for (var n = 1; n <= 2; n++) {
+      final seasonId = '${seriesId}_s$n';
+      final season = <String, dynamic>{
+        'Id': seasonId,
+        'Name': 'Staffel $n',
+        'Type': 'Season',
+        'IndexNumber': n,
+        'SeriesId': seriesId,
+        'SeriesName': ser['Name'],
+        'ImageTags': {'Primary': 'p'},
+        'ParentBackdropItemId': seriesId,
+        'ParentBackdropImageTags': ['b0', 'b1'],
+        'UserData': _userData(),
+      };
+      seasons[seriesId]!.add(season);
+      byId[seasonId] = season;
+      episodes[seasonId] = [];
+
+      for (var e = 1; e <= 8; e++) {
+        final epId = '${seasonId}_e$e';
+        final runtime = (42 + _rand.nextInt(15)) * 60 * 10000000;
+        final ep = <String, dynamic>{
+          'Id': epId,
+          'Name': [
+            'Der Anfang',
+            'Spuren im Schnee',
+            'Funkstille',
+            'Gegenwind',
+            'Die Wahrheit',
+            'Zwischenzeit',
+            'Lichtjahre',
+            'Finale',
+          ][e - 1],
+          'Type': 'Episode',
+          'IndexNumber': e,
+          'ParentIndexNumber': n,
+          'SeriesId': seriesId,
+          'SeriesName': ser['Name'],
+          'SeasonId': seasonId,
+          'SeasonName': 'Staffel $n',
+          'RunTimeTicks': runtime,
+          'Overview': 'In dieser Folge spitzt sich die Lage zu – und eine alte Entscheidung holt alle wieder ein.',
+          'ImageTags': {'Primary': 'p'},
+          'SeriesPrimaryImageTag': 'p',
+          'SeriesThumbImageTag': 't',
+          'ParentPrimaryImageItemId': seasonId,
+          'ParentPrimaryImageTag': 'p',
+          'ParentBackdropItemId': seriesId,
+          'ParentBackdropImageTags': ['b0', 'b1'],
+          'ParentLogoItemId': seriesId,
+          'ParentLogoImageTag': 'l',
+          'ParentThumbItemId': seriesId,
+          'ParentThumbImageTag': 't',
+          'UserData': _userData(
+            played: s < 2 && n == 1 && e < 4,
+            position: s < 2 && n == 1 && e == 4 ? runtime ~/ 3 : 0,
+          ),
+        };
+        episodes[seasonId]!.add(ep);
+        byId[epId] = ep;
+      }
+    }
+  }
+}
+
+// --- Bilder: farbige Verläufe als PNG -------------------------------------------
+
+final _imageCache = <String, List<int>>{};
+
+List<int> _png(int w, int h, int seed, {bool logo = false}) {
+  final r = math.Random(seed);
+  final c1 = [40 + r.nextInt(150), 30 + r.nextInt(120), 60 + r.nextInt(170)];
+  final c2 = [r.nextInt(60), r.nextInt(60), 20 + r.nextInt(80)];
+  final channels = logo ? 4 : 3;
+  final raw = BytesBuilder();
+  for (var y = 0; y < h; y++) {
+    raw.addByte(0);
+    final row = Uint8List(w * channels);
+    for (var x = 0; x < w; x++) {
+      final t = (x / w) * 0.55 + (y / h) * 0.45;
+      final i = x * channels;
+      if (logo) {
+        // Weißer "Schriftzug"-Balken auf transparentem Grund.
+        final inBar = y > h * 0.3 && y < h * 0.7 && x > w * 0.05 && x < w * 0.95;
+        row[i] = 255;
+        row[i + 1] = 255;
+        row[i + 2] = 255;
+        row[i + 3] = inBar ? 230 : 0;
+      } else {
+        for (var c = 0; c < 3; c++) {
+          row[i + c] = (c1[c] + (c2[c] - c1[c]) * t).round().clamp(0, 255);
+        }
+      }
+    }
+    raw.add(row);
+  }
+  final idat = ZLibEncoder().convert(raw.toBytes());
+  final out = BytesBuilder()..add([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+  void chunk(String type, List<int> data) {
+    final typeBytes = ascii.encode(type);
+    out.add(_u32(data.length));
+    out.add(typeBytes);
+    out.add(data);
+    out.add(_u32(_crc32([...typeBytes, ...data])));
+  }
+
+  chunk('IHDR', [..._u32(w), ..._u32(h), 8, logo ? 6 : 2, 0, 0, 0]);
+  chunk('IDAT', idat);
+  chunk('IEND', const []);
+  return out.toBytes();
+}
+
+List<int> _u32(int v) => [(v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF];
+
+final _crcTable = List<int>.generate(256, (n) {
+  var c = n;
+  for (var k = 0; k < 8; k++) {
+    c = (c & 1) != 0 ? 0xEDB88320 ^ (c >> 1) : c >> 1;
+  }
+  return c;
+});
+
+int _crc32(List<int> data) {
+  var c = 0xFFFFFFFF;
+  for (final b in data) {
+    c = _crcTable[(c ^ b) & 0xFF] ^ (c >> 8);
+  }
+  return c ^ 0xFFFFFFFF;
+}
+
+// --- HTTP ----------------------------------------------------------------------
+
+Map<String, dynamic> _page(List<Map<String, dynamic>> items, Map<String, String> q) {
+  final start = int.tryParse(q['startIndex'] ?? '') ?? 0;
+  final limit = int.tryParse(q['limit'] ?? '') ?? items.length;
+  return {'Items': items.skip(start).take(limit).toList(), 'TotalRecordCount': items.length, 'StartIndex': start};
+}
+
+Object? _handle(HttpRequest req) {
+  final path = req.uri.path;
+  final q = req.uri.queryParameters;
+  final seg = path.split('/').where((s) => s.isNotEmpty).toList();
+
+  if (path == '/System/Info/Public') {
+    return {'ServerName': 'Demo-Server', 'Version': '12.2.0', 'Id': 'mock-server', 'ProductName': 'Jellyfin Server'};
+  }
+  if (path == '/Users/AuthenticateByName') {
+    return {
+      'AccessToken': 'mock-token',
+      'User': {'Id': 'user1', 'Name': 'Demo'},
+    };
+  }
+  if (path == '/QuickConnect/Enabled') return false;
+  if (path == '/Sessions/Logout' || path.startsWith('/Sessions/Playing')) return '';
+  if (path == '/UserViews') {
+    return {
+      'Items': [
+        {
+          'Id': 'lib-movies',
+          'Name': 'Filme',
+          'Type': 'CollectionFolder',
+          'CollectionType': 'movies',
+          'ImageTags': {'Primary': 'p'},
+        },
+        {
+          'Id': 'lib-shows',
+          'Name': 'Serien',
+          'Type': 'CollectionFolder',
+          'CollectionType': 'tvshows',
+          'ImageTags': {'Primary': 'p'},
+        },
+      ],
+    };
+  }
+  if (path == '/UserItems/Resume') {
+    final all = [
+      ...movies,
+      for (final e in episodes.values) ...e,
+    ].where((i) => (i['UserData']['PlaybackPositionTicks'] as int) > 0).toList();
+    return _page(all, q);
+  }
+  if (path == '/Shows/NextUp') {
+    final sid = q['seriesId'];
+    final list = <Map<String, dynamic>>[];
+    for (final ser in series) {
+      if (sid != null && ser['Id'] != sid) continue;
+      final eps = [for (final s in seasons[ser['Id']]!) ...episodes[s['Id']]!];
+      final next = eps.where((e) => e['UserData']['Played'] != true).firstOrNull;
+      if (next != null && eps.any((e) => e['UserData']['Played'] == true)) list.add(next);
+    }
+    return _page(list, q);
+  }
+  if (path == '/Items/Latest') {
+    return q['parentId'] == 'lib-shows' ? series.reversed.toList() : movies.reversed.toList();
+  }
+  if (path == '/Items') {
+    var list = <Map<String, dynamic>>[];
+    final types = (q['includeItemTypes'] ?? 'Movie,Series').split(',');
+    if (types.contains('Movie') && q['parentId'] != 'lib-shows') list.addAll(movies);
+    if (types.contains('Series') && q['parentId'] != 'lib-movies') list.addAll(series);
+    if (types.contains('Episode')) list.addAll([for (final e in episodes.values) ...e]);
+    final term = q['searchTerm']?.toLowerCase();
+    if (term != null) list = list.where((i) => (i['Name'] as String).toLowerCase().contains(term)).toList();
+    if (q['filters'] == 'IsFavorite') list = list.where((i) => i['UserData']['IsFavorite'] == true).toList();
+    if (q['sortBy'] == 'Random') list.shuffle(_rand);
+    if (q['sortBy']?.startsWith('SortName') ?? false) {
+      list.sort((a, b) => (a['Name'] as String).compareTo(b['Name'] as String));
+    }
+    return _page(list, q);
+  }
+  if (seg.length == 3 && seg[0] == 'Shows' && seg[2] == 'Seasons') return {'Items': seasons[seg[1]] ?? []};
+  if (seg.length == 3 && seg[0] == 'Shows' && seg[2] == 'Episodes') {
+    final seasonId = q['seasonId'];
+    var list = seasonId != null
+        ? episodes[seasonId] ?? <Map<String, dynamic>>[]
+        : [for (final s in seasons[seg[1]] ?? <Map<String, dynamic>>[]) ...episodes[s['Id']]!];
+    final startId = q['startItemId'];
+    if (startId != null) list = list.skipWhile((e) => e['Id'] != startId).toList();
+    return _page(list, q);
+  }
+  if (seg.length == 3 && seg[0] == 'Items' && seg[2] == 'Similar') {
+    return {'Items': movies.where((m) => m['Id'] != seg[1]).take(10).toList()};
+  }
+  if (seg.length == 3 && seg[0] == 'Items' && seg[2] == 'PlaybackInfo') {
+    final item = byId[seg[1]];
+    return {'PlaySessionId': 'mock-session', 'MediaSources': item?['MediaSources'] ?? []};
+  }
+  if (seg.length == 2 && seg[0] == 'MediaSegments') return {'Items': []};
+  if (seg.length == 2 && seg[0] == 'Items') return byId[seg[1]];
+  if (seg.length >= 2 && (seg[0] == 'UserFavoriteItems' || seg[0] == 'UserPlayedItems')) {
+    final item = byId[seg[1]];
+    if (item != null) {
+      final key = seg[0] == 'UserFavoriteItems' ? 'IsFavorite' : 'Played';
+      item['UserData'][key] = req.method == 'POST';
+    }
+    return item?['UserData'] ?? {};
+  }
+  return null;
+}
+
+Future<void> main() async {
+  _seed();
+  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
+  stdout.writeln('Jellyfin-Demo-Server läuft auf http://localhost:$port');
+
+  await for (final req in server) {
+    final res = req.response;
+    try {
+      final seg = req.uri.pathSegments;
+      if (seg.length >= 4 && seg[0] == 'Items' && seg[2] == 'Images') {
+        final q = req.uri.queryParameters;
+        final type = seg[3];
+        final isLogo = type == 'Logo';
+        int? parse(String k) => int.tryParse(q[k] ?? '');
+        var w = parse('fillWidth') ?? parse('maxWidth') ?? (type == 'Primary' ? 400 : 1280);
+        var h =
+            parse('fillHeight') ??
+            parse('maxHeight') ??
+            (type == 'Primary' && !seg[1].contains('_e') && !seg[1].startsWith('lib')
+                ? (w * 1.5).round()
+                : (w * 9 / 16).round());
+        if (isLogo) {
+          w = 600;
+          h = 180;
+        }
+        // Für die Geschwindigkeit verkleinern – die App skaliert ohnehin.
+        final scale = math.min(1.0, 640 / w);
+        w = math.max(8, (w * scale).round());
+        h = math.max(8, (h * scale).round());
+        final key = '${seg.join('/')}-$w-$h';
+        final bytes = _imageCache.putIfAbsent(key, () => _png(w, h, key.hashCode, logo: isLogo));
+        res.headers.contentType = ContentType('image', 'png');
+        res.add(bytes);
+      } else {
+        final body = _handle(req);
+        if (body == null) {
+          res.statusCode = 404;
+        } else {
+          res.headers.contentType = ContentType.json;
+          res.write(body is String ? body : jsonEncode(body));
+        }
+      }
+    } catch (e) {
+      res.statusCode = 500;
+      res.write('$e');
+    }
+    await res.close();
+  }
+}

@@ -1,0 +1,353 @@
+import 'dart:ui';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/images.dart';
+import '../../core/models.dart';
+import '../../core/session.dart';
+import '../../theme.dart';
+import '../../widgets/brand_logo.dart';
+import '../../widgets/jf_image.dart';
+import '../../widgets/media_cards.dart';
+import '../../widgets/media_row.dart';
+import '../../widgets/smooth_scroll.dart';
+import '../../widgets/states.dart';
+import 'hero_banner.dart';
+import 'home_providers.dart';
+
+class HomeScreen extends ConsumerStatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final home = ref.watch(homeProvider);
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final heroHeight = (screenHeight * 0.80).clamp(520.0, 920.0);
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          SmoothScroll(
+            controller: _scroll,
+            builder: (context, physics) => CustomScrollView(
+              controller: _scroll,
+              physics: physics,
+              slivers: [
+                SliverToBoxAdapter(child: HeroBanner(height: heroHeight)),
+                ...home.when(
+                  data: (data) => [
+                    SliverList.separated(
+                      itemCount: data.sections.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 26),
+                      itemBuilder: (context, i) => _SectionRow(section: data.sections[i]),
+                    ),
+                    if (data.libraries.isNotEmpty)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 26),
+                          child: _LibrariesRow(libraries: data.libraries),
+                        ),
+                      ),
+                  ],
+                  loading: () => [const SliverToBoxAdapter(child: RowsSkeleton())],
+                  error: (e, _) => [
+                    SliverToBoxAdapter(
+                      child: ErrorView(
+                        message: 'Die Startseite konnte nicht geladen werden.\n$e',
+                        onRetry: () => ref.invalidate(homeProvider),
+                      ),
+                    ),
+                  ],
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 72)),
+              ],
+            ),
+          ),
+          _TopNav(scroll: _scroll),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionRow extends StatelessWidget {
+  const _SectionRow({required this.section});
+
+  final HomeSection section;
+
+  @override
+  Widget build(BuildContext context) {
+    final landscape = section.style == SectionStyle.landscape;
+    return MediaRow(
+      title: section.title,
+      itemCount: section.items.length,
+      height: landscape ? kLandscapeWidth * 9 / 16 + kCardTextHeight : kPosterWidth * 1.5 + kCardTextHeight,
+      itemBuilder: (context, i) {
+        final item = section.items[i];
+        return landscape ? LandscapeCard(item: item) : PosterCard(item: item);
+      },
+    );
+  }
+}
+
+class _LibrariesRow extends ConsumerWidget {
+  const _LibrariesRow({required this.libraries});
+
+  final List<BaseItem> libraries;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return MediaRow(
+      title: 'Bibliotheken',
+      itemCount: libraries.length,
+      height: 160,
+      itemBuilder: (context, i) => _LibraryTile(library: libraries[i]),
+    );
+  }
+}
+
+void openLibrary(BuildContext context, BaseItem library) {
+  final query = Uri(queryParameters: {'name': library.name, 'type': ?library.collectionType}).query;
+  context.push('/library/${library.id}?$query');
+}
+
+class _LibraryTile extends ConsumerStatefulWidget {
+  const _LibraryTile({required this.library});
+
+  final BaseItem library;
+
+  @override
+  ConsumerState<_LibraryTile> createState() => _LibraryTileState();
+}
+
+class _LibraryTileState extends ConsumerState<_LibraryTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final api = ref.watch(apiProvider);
+    final lib = widget.library;
+    final image = Images.landscape(lib);
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: () => openLibrary(context, lib),
+        child: AnimatedScale(
+          scale: _hovered ? 1.05 : 1,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          child: Container(
+            width: 284,
+            height: 160,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(14)),
+            foregroundDecoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _hovered ? Colors.white.withValues(alpha: 0.85) : Colors.white.withValues(alpha: 0.06),
+                width: _hovered ? 2 : 1,
+              ),
+            ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                JfImage(url: api.imageUrlOrNull(image, fillWidth: 640, fillHeight: 360), blurHash: image?.blurHash),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [Color(0xDD000000), Color(0x00000000)],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 16,
+                  bottom: 14,
+                  child: Row(
+                    children: [
+                      Icon(lib.collectionType == 'tvshows' ? Icons.tv_rounded : Icons.movie_rounded, size: 20),
+                      const SizedBox(width: 8),
+                      Text(lib.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Schwebende Navigationsleiste. Wird beim Herunterscrollen milchig-undurchsichtig.
+class _TopNav extends ConsumerWidget {
+  const _TopNav({required this.scroll});
+
+  final ScrollController scroll;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final libraries = ref.watch(libraryViewsProvider).value ?? const <BaseItem>[];
+    final session = ref.watch(sessionProvider).value;
+
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: AnimatedBuilder(
+        animation: scroll,
+        builder: (context, child) {
+          final offset = scroll.hasClients ? scroll.offset : 0.0;
+          final t = (offset / 240).clamp(0.0, 1.0);
+          final solid = AppColors.background.withValues(alpha: 0.72);
+          final bar = Container(
+            padding: const EdgeInsets.only(top: kTitleBarHeight - 4, left: kPageGutter, right: kPageGutter + 4),
+            height: kTitleBarHeight + 60,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color.lerp(Colors.black.withValues(alpha: 0.55), solid, t)!,
+                  Color.lerp(Colors.black.withValues(alpha: 0), solid, t)!,
+                ],
+              ),
+              border: Border(
+                bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06 * t)),
+              ),
+            ),
+            child: child,
+          );
+          if (t == 0) return bar;
+          return ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 24 * t, sigmaY: 24 * t),
+              child: bar,
+            ),
+          );
+        },
+        child: Row(
+          children: [
+            const BrandLogo(size: 26),
+            const SizedBox(width: 40),
+            const _NavLink(label: 'Startseite', active: true),
+            for (final lib in libraries) _NavLink(label: lib.name, onTap: () => openLibrary(context, lib)),
+            const Spacer(),
+            IconButton(
+              tooltip: 'Suchen (Strg+F)',
+              icon: const Icon(Icons.search_rounded, size: 26),
+              onPressed: () => context.push('/search'),
+            ),
+            const SizedBox(width: 10),
+            PopupMenuButton<String>(
+              tooltip: session?.userName ?? 'Profil',
+              offset: const Offset(0, 48),
+              onSelected: (value) {
+                if (value == 'logout') ref.read(sessionProvider.notifier).logout();
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  enabled: false,
+                  child: Text(
+                    '${session?.userName ?? ''} · ${session?.serverName ?? ''}',
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
+                ),
+                const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'logout',
+                  child: Row(children: [Icon(Icons.logout_rounded, size: 20), SizedBox(width: 12), Text('Abmelden')]),
+                ),
+              ],
+              child: Container(
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                clipBehavior: Clip.antiAlias,
+                decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppColors.accentGradient),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Center(
+                      child: Text(
+                        (session?.userName.isNotEmpty ?? false) ? session!.userName[0].toUpperCase() : '?',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                      ),
+                    ),
+                    // Profilbild aus Jellyfin, sobald geladen (sonst bleibt der Buchstabe).
+                    if (ref.watch(userImageProvider).value case final url?)
+                      Image.network(
+                        url,
+                        fit: BoxFit.cover,
+                        filterQuality: FilterQuality.medium,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavLink extends StatefulWidget {
+  const _NavLink({required this.label, this.onTap, this.active = false});
+
+  final String label;
+  final VoidCallback? onTap;
+  final bool active;
+
+  @override
+  State<_NavLink> createState() => _NavLinkState();
+}
+
+class _NavLinkState extends State<_NavLink> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final highlighted = widget.active || _hovered;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 150),
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: widget.active ? FontWeight.w700 : FontWeight.w500,
+              color: highlighted ? AppColors.textPrimary : AppColors.textSecondary,
+            ),
+            child: Text(widget.label),
+          ),
+        ),
+      ),
+    );
+  }
+}
