@@ -176,6 +176,37 @@ class JellyfinApi {
     return AuthResult.fromJson((res.data as Map).cast<String, dynamic>());
   }
 
+  /// Meldet dem Server, welche Fernsteuerbefehle diese App versteht.
+  Future<void> reportCapabilities() => dio.post(
+    '/Sessions/Capabilities/Full',
+    data: {
+      'PlayableMediaTypes': ['Video'],
+      'SupportedCommands': [
+        'SetVolume',
+        'VolumeUp',
+        'VolumeDown',
+        'Mute',
+        'Unmute',
+        'ToggleMute',
+        'SetAudioStreamIndex',
+        'SetSubtitleStreamIndex',
+        'ToggleFullscreen',
+        'DisplayMessage',
+        'DisplayContent',
+        'GoHome',
+        'GoToSearch',
+        'GoToSettings',
+        'Back',
+        'Play',
+        'PlayState',
+        'PlayNext',
+        'PlayMediaSource',
+      ],
+      'SupportsMediaControl': true,
+      'SupportsPersistentIdentifier': true,
+    },
+  );
+
   Future<void> logout() async {
     await dio.post('/Sessions/Logout');
   }

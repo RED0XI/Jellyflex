@@ -6,6 +6,7 @@ import 'core/route_observer.dart';
 import 'core/session.dart';
 import 'features/details/details_screen.dart';
 import 'features/home/home_screen.dart';
+import 'features/live_handler.dart';
 import 'features/library/library_screen.dart';
 import 'features/login/login_screen.dart';
 import 'features/player/player_screen.dart';
@@ -82,7 +83,11 @@ class JellyflexApp extends ConsumerWidget {
       theme: buildTheme(),
       routerConfig: router,
       scrollBehavior: const _AppScrollBehavior(),
-      builder: (context, child) => WindowFrame(router: router, child: child!),
+      scaffoldMessengerKey: appMessengerKey,
+      builder: (context, child) => LiveHandler(
+        router: router,
+        child: WindowFrame(router: router, child: child!),
+      ),
     );
   }
 }

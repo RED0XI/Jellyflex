@@ -15,6 +15,9 @@ import 'dart:typed_data';
 
 const port = 8097;
 
+/// Offene Live-Verbindungen (WebSocket).
+final _sockets = <WebSocket>{};
+
 /// Testvideo für alle Streams (siehe lib/dev/player_harness.dart).
 final _videoFile = File(Platform.environment['JELLYFLEX_TEST_VIDEO'] ?? '${Directory.systemTemp.path}\\jellyflex_test.mkv');
 
@@ -334,7 +337,9 @@ Object? _handle(HttpRequest req) {
     };
   }
   if (path == '/QuickConnect/Enabled') return false;
-  if (path == '/Sessions/Logout' || path.startsWith('/Sessions/Playing')) return '';
+  if (path == '/Sessions/Logout' || path.startsWith('/Sessions/Playing') || path.startsWith('/Sessions/Capabilities')) {
+    return '';
+  }
   if (path == '/UserViews') {
     return {
       'Items': [
@@ -458,7 +463,25 @@ Future<void> main() async {
     final res = req.response;
     try {
       final seg = req.uri.pathSegments;
-      if (seg.length == 3 && seg[0] == 'Videos' && seg[2] == 'stream') {
+      // Live-Verbindung wie bei Jellyfin (/socket).
+      if (req.uri.path == '/socket' && WebSocketTransformer.isUpgradeRequest(req)) {
+        final socket = await WebSocketTransformer.upgrade(req);
+        _sockets.add(socket);
+        socket.add(jsonEncode({'MessageType': 'ForceKeepAlive', 'Data': 60}));
+        socket.listen((_) {}, onDone: () => _sockets.remove(socket));
+        stdout.writeln('Live-Verbindung geöffnet (${_sockets.length})');
+        continue;
+      }
+      // Testschnittstelle: POST /debug/send mit {"MessageType": …, "Data": …} an alle Clients.
+      if (req.uri.path == '/debug/send' && req.method == 'POST') {
+        final body = await utf8.decoder.bind(req).join();
+        for (final s in _sockets) {
+          s.add(body);
+        }
+        res.write('{"sent": ${_sockets.length}}');
+        await res.close();
+        continue;
+      }      if (seg.length == 3 && seg[0] == 'Videos' && seg[2] == 'stream') {
         // Nicht abwarten: Streams laufen parallel zu anderen Anfragen.
         unawaited(_serveVideo(req));
         continue;

@@ -10,6 +10,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../core/format.dart';
 import '../../core/images.dart';
 import '../../core/jellyfin_api.dart';
+import '../../core/live_connection.dart';
 import '../../core/media_session.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
@@ -100,6 +101,73 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _restoreFullscreen; // Zustand beim Öffnen merken.
     windowFullscreen.addListener(_onFullscreenChanged);
     MediaSession.onButton = _onMediaButton;
+    RemoteControl.onPlaystate = _onRemotePlaystate;
+    RemoteControl.onGeneral = _onRemoteGeneral;
+  }
+
+  /// Fernsteuerung (z. B. vom Handy über Jellyfin).
+  void _onRemotePlaystate(String command, Json data) {
+    switch (command) {
+      case 'Stop':
+        _close();
+      case 'Pause':
+        _player.pause();
+      case 'Unpause':
+        _player.play();
+      case 'PlayPause':
+        _player.playOrPause();
+      case 'NextTrack':
+        _playNext();
+      case 'Rewind':
+        _seekBy(-_seekStep);
+      case 'FastForward':
+        _seekBy(_seekStep);
+      case 'Seek':
+        final ticks = (data['SeekPositionTicks'] as num?)?.toInt();
+        if (ticks != null) _player.seek(ticksToDuration(ticks));
+    }
+    _showControls(autoHide: _player.state.playing);
+  }
+
+  bool _onRemoteGeneral(String name, Map<String, dynamic> args) {
+    final volume = _player.state.volume;
+    switch (name) {
+      case 'SetVolume':
+        _setVolume(double.tryParse('${args['Volume']}') ?? volume);
+      case 'VolumeUp':
+        _setVolume(volume + 5);
+      case 'VolumeDown':
+        _setVolume(volume - 5);
+      case 'Mute':
+        if (volume > 0) _toggleMute();
+      case 'Unmute':
+        if (volume == 0) _toggleMute();
+      case 'ToggleMute':
+        _toggleMute();
+      case 'SetAudioStreamIndex':
+        final index = int.tryParse('${args['Index']}');
+        if (index == null) return true;
+        _selectAudio(_transcoding ? 'jf:$index' : (_mpvIdFor(_source!, 'Audio', index) ?? ''));
+      case 'SetSubtitleStreamIndex':
+        final index = int.tryParse('${args['Index']}');
+        if (index == null) return true;
+        if (index < 0) {
+          _selectSubtitle('no');
+        } else if (_transcoding) {
+          _selectSubtitle('jf:$index');
+        } else {
+          final external = _externalSubtitles.where((s) => s.index == index).firstOrNull;
+          _selectSubtitle(
+            external != null
+                ? _api.subtitleUrl(widget.itemId, _source!.id, external)
+                : (_mpvIdFor(_source!, 'Subtitle', index) ?? ''),
+          );
+        }
+      default:
+        return false;
+    }
+    _reportProgress();
+    return true;
   }
 
   /// Medientasten der Tastatur bzw. Windows-Medienanzeige.
@@ -145,6 +213,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _api.reportPlaybackStopped(_progressBody()).ignore();
     }
     windowFullscreen.removeListener(_onFullscreenChanged);
+    if (RemoteControl.onPlaystate == _onRemotePlaystate) RemoteControl.onPlaystate = null;
+    if (RemoteControl.onGeneral == _onRemoteGeneral) RemoteControl.onGeneral = null;
     if (MediaSession.onButton == _onMediaButton) {
       MediaSession.onButton = null;
       // Bei "Nächste Folge" übernimmt gleich der neue Player die Anzeige.
