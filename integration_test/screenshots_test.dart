@@ -47,10 +47,7 @@ Future<void> _pumpFor(WidgetTester tester, Duration total) async {
 }
 
 Widget _app(Widget page) => ProviderScope(
-  overrides: [
-    sessionProvider.overrideWith(_FakeSession.new),
-    userImageProvider.overrideWith((ref) async => null),
-  ],
+  overrides: [sessionProvider.overrideWith(_FakeSession.new), userImageProvider.overrideWith((ref) async => null)],
   child: RepaintBoundary(
     key: _shotKey,
     child: MaterialApp(debugShowCheckedModeBanner: false, theme: buildTheme(), home: page),

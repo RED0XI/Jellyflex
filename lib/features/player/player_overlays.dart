@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 
 import '../../core/format.dart';
 import '../../core/models.dart';
+import '../../core/settings.dart';
 import '../../theme.dart';
 import '../../widgets/jf_image.dart';
 
@@ -344,7 +345,11 @@ class TrickplayPreview extends StatelessWidget {
     required this.tileUrl,
     required this.headers,
     this.width = 240,
+    this.title,
   });
+
+  /// Kapitelname über der Zeit (optional).
+  final String? title;
 
   final TrickplayInfo info;
   final Duration position;
@@ -398,15 +403,292 @@ class TrickplayPreview extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(6)),
-          child: Text(
+        SeekTimeBubble(position: position, title: title),
+      ],
+    );
+  }
+}
+
+/// Zeit (und ggf. Kapitelname) über der Spulleiste.
+class SeekTimeBubble extends StatelessWidget {
+  const SeekTimeBubble({super.key, required this.position, this.title});
+
+  final Duration position;
+  final String? title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 240),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(6)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (title != null)
+            Text(
+              title!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+            ),
+          Text(
             formatTimecode(position),
             style: const TextStyle(fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()]),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Panel "Wiedergabe": Geschwindigkeit, Qualität und Ton-/Untertitelversatz.
+class PlaybackPanel extends StatelessWidget {
+  const PlaybackPanel({
+    super.key,
+    required this.rate,
+    required this.onRate,
+    required this.maxBitrate,
+    required this.onQuality,
+    required this.audioDelay,
+    required this.subtitleDelay,
+    required this.onAudioDelay,
+    required this.onSubtitleDelay,
+  });
+
+  static const rates = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
+  final double rate;
+  final ValueChanged<double> onRate;
+  final int? maxBitrate;
+  final ValueChanged<int?> onQuality;
+  final double audioDelay;
+  final double subtitleDelay;
+  final ValueChanged<double> onAudioDelay;
+  final ValueChanged<double> onSubtitleDelay;
+
+  @override
+  Widget build(BuildContext context) {
+    // Eigene Ebene: Ändert sich das Panel, muss das Video nicht neu gezeichnet werden.
+    return RepaintBoundary(child: _buildPanel(context));
+  }
+
+  Widget _buildPanel(BuildContext context) {
+    return Container(
+      width: 680,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xF2101219),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 40)],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _PanelTitle('Geschwindigkeit'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final r in rates)
+                      _Chip(
+                        label: '${r.toString().replaceAll('.', ',').replaceAll(RegExp(r',0$'), '')}×',
+                        selected: (r - rate).abs() < 0.01,
+                        onTap: () => onRate(r),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                const _PanelTitle('Synchronisation'),
+                _DelayRow(label: 'Ton', value: audioDelay, onChanged: onAudioDelay),
+                const SizedBox(height: 8),
+                _DelayRow(label: 'Untertitel', value: subtitleDelay, onChanged: onSubtitleDelay),
+              ],
+            ),
+          ),
+          const SizedBox(width: 24),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _PanelTitle('Qualität'),
+                for (final q in qualityOptions)
+                  _SelectRow(
+                    label: q.$2,
+                    hint: q.$1 == null ? 'ohne Umrechnung' : null,
+                    selected: q.$1 == maxBitrate,
+                    onTap: () => onQuality(q.$1),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PanelTitle extends StatelessWidget {
+  const _PanelTitle(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Text(text, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+  );
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? Colors.white : Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: selected ? AppColors.background : AppColors.textPrimary,
+            ),
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _SelectRow extends StatefulWidget {
+  const _SelectRow({required this.label, required this.selected, required this.onTap, this.hint});
+
+  final String label;
+  final String? hint;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_SelectRow> createState() => _SelectRowState();
+}
+
+class _SelectRowState extends State<_SelectRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          decoration: BoxDecoration(
+            color: _hovered ? Colors.white.withValues(alpha: 0.08) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 26,
+                child: widget.selected ? const Icon(Icons.check_rounded, size: 19, color: AppColors.accent) : null,
+              ),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
+                  color: widget.selected || _hovered ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+              if (widget.hint != null) ...[
+                const SizedBox(width: 8),
+                Text(widget.hint!, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DelayRow extends StatelessWidget {
+  const _DelayRow({required this.label, required this.value, required this.onChanged});
+
+  final String label;
+  final double value;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = '${value > 0 ? '+' : ''}${value.toStringAsFixed(1).replaceAll('.', ',')} s';
+    return Row(
+      children: [
+        SizedBox(
+          width: 90,
+          child: Text(label, style: const TextStyle(color: AppColors.textSecondary)),
+        ),
+        _RoundButton(icon: Icons.remove_rounded, onTap: () => onChanged(value - 0.1)),
+        SizedBox(
+          width: 70,
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()]),
+          ),
+        ),
+        _RoundButton(icon: Icons.add_rounded, onTap: () => onChanged(value + 0.1)),
+        if (value != 0) ...[
+          const SizedBox(width: 6),
+          Tooltip(
+            message: 'Zurücksetzen',
+            child: _RoundButton(icon: Icons.restart_alt_rounded, onTap: () => onChanged(0)),
+          ),
+        ],
       ],
+    );
+  }
+}
+
+class _RoundButton extends StatelessWidget {
+  const _RoundButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.1)),
+          child: Icon(icon, size: 18),
+        ),
+      ),
     );
   }
 }

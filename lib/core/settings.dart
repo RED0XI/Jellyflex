@@ -20,6 +20,20 @@ const settingsLanguages = <String, String>{
   'chi': 'Chinesisch',
 };
 
+/// Qualitätsstufen (bit/s); `null` = Original ohne Umrechnung.
+const qualityOptions = <(int?, String)>[
+  (null, 'Original'),
+  (40000000, '40 Mbit/s · 4K'),
+  (20000000, '20 Mbit/s · 1080p'),
+  (10000000, '10 Mbit/s · 1080p'),
+  (6000000, '6 Mbit/s · 720p'),
+  (3000000, '3 Mbit/s · 720p'),
+  (1500000, '1,5 Mbit/s · 480p'),
+];
+
+String qualityLabel(int? bitrate) =>
+    qualityOptions.where((q) => q.$1 == bitrate).firstOrNull?.$2 ?? '${(bitrate! / 1000000).toStringAsFixed(1)} Mbit/s';
+
 /// Sonderwert für "Untertitel standardmäßig aus".
 const subtitlesOff = 'off';
 
@@ -39,7 +53,11 @@ class AppSettings {
     this.episodeImagesInRows = true,
     this.subtitleScale = 1.0,
     this.subtitleBackground = false,
+    this.maxBitrate,
   });
+
+  /// Höchste Bitrate in bit/s für die Wiedergabe. `null` = Original (Direct Play).
+  final int? maxBitrate;
 
   /// `null` = Jellyfin-Einstellung des Benutzers verwenden.
   final String? audioLanguage;
@@ -70,6 +88,7 @@ class AppSettings {
     bool? episodeImagesInRows,
     double? subtitleScale,
     bool? subtitleBackground,
+    int? Function()? maxBitrate,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -78,6 +97,7 @@ class AppSettings {
     episodeImagesInRows: episodeImagesInRows ?? this.episodeImagesInRows,
     subtitleScale: subtitleScale ?? this.subtitleScale,
     subtitleBackground: subtitleBackground ?? this.subtitleBackground,
+    maxBitrate: maxBitrate != null ? maxBitrate() : this.maxBitrate,
   );
 
   Map<String, dynamic> toJson() => {
@@ -88,6 +108,7 @@ class AppSettings {
     'episodeImagesInRows': episodeImagesInRows,
     'subtitleScale': subtitleScale,
     'subtitleBackground': subtitleBackground,
+    'maxBitrate': maxBitrate,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -98,6 +119,7 @@ class AppSettings {
     episodeImagesInRows: json['episodeImagesInRows'] as bool? ?? true,
     subtitleScale: (json['subtitleScale'] as num?)?.toDouble() ?? 1.0,
     subtitleBackground: json['subtitleBackground'] as bool? ?? false,
+    maxBitrate: (json['maxBitrate'] as num?)?.toInt(),
   );
 }
 

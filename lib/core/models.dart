@@ -95,6 +95,10 @@ class BaseItem {
       .toList();
 
   /// Trickplay-Info für eine Medienquelle; bevorzugt die Auflösung um 320 px.
+  /// Kapitel (Startzeit + Name), falls die Datei welche hat.
+  List<Chapter> get chapters =>
+      ((raw['Chapters'] as List?) ?? const []).whereType<Map>().map((c) => Chapter(c.cast<String, dynamic>())).toList();
+
   TrickplayInfo? trickplay(String mediaSourceId) {
     final all = raw['Trickplay'];
     if (all is! Map) return null;
@@ -152,6 +156,12 @@ class MediaSource {
   int? get defaultAudioStreamIndex => (raw['DefaultAudioStreamIndex'] as num?)?.toInt();
   int? get defaultSubtitleStreamIndex => (raw['DefaultSubtitleStreamIndex'] as num?)?.toInt();
 
+  /// Bei umgerechneter Wiedergabe: relative Adresse des HLS-Streams.
+  String? get transcodingUrl => raw['TranscodingUrl'] as String?;
+
+  /// Gesamt-Bitrate der Originaldatei (bit/s).
+  int? get bitrate => (raw['Bitrate'] as num?)?.toInt();
+
   List<MediaStream> get mediaStreams => ((raw['MediaStreams'] as List?) ?? const [])
       .whereType<Map>()
       .map((s) => MediaStream(s.cast<String, dynamic>()))
@@ -176,6 +186,20 @@ class MediaStream {
   bool get isExternal => raw['IsExternal'] == true;
   bool get isDefault => raw['IsDefault'] == true;
   bool get isForced => raw['IsForced'] == true;
+  int? get height => (raw['Height'] as num?)?.toInt();
+
+  /// "External", "Encode" (eingebrannt) … – nur bei umgerechneter Wiedergabe.
+  String? get deliveryMethod => raw['DeliveryMethod'] as String?;
+  String? get deliveryUrl => raw['DeliveryUrl'] as String?;
+}
+
+class Chapter {
+  Chapter(this.raw);
+
+  final Json raw;
+
+  Duration get start => ticksToDuration((raw['StartPositionTicks'] as num?)?.toInt() ?? 0);
+  String get name => (raw['Name'] as String?) ?? '';
 }
 
 /// Abschnitt einer Folge (Intro, Abspann …) aus der MediaSegments-API.

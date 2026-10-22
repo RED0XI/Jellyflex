@@ -22,8 +22,15 @@ import '../features/player/player_screen.dart';
 import '../theme.dart';
 import '../widgets/window_frame.dart';
 
+/// Angefragte Bitraten bei simulierter Umrechnung (für Tests).
+final harnessTranscodeRequests = <int>[];
+
+String get _testVideo =>
+    Platform.environment['JELLYFLEX_TEST_VIDEO'] ?? '${Directory.systemTemp.path}\\jellyflex_test.mkv';
+
 class _FakeApi extends JellyfinApi {
-  _FakeApi() : super(baseUrl: 'http://localhost', deviceId: 'harness', token: 't', userId: 'u');
+  // Leere baseUrl: so wird die "umgerechnete" Adresse direkt zum Dateipfad.
+  _FakeApi() : super(baseUrl: '', deviceId: 'harness', token: 't', userId: 'u');
 
   static final _source = {
     'Id': 'src',
@@ -39,6 +46,23 @@ class _FakeApi extends JellyfinApi {
   };
 
   @override
+  Future<PlaybackInfo> getTranscodeInfo(
+    String id, {
+    required String mediaSourceId,
+    required int maxBitrate,
+    int? audioIndex,
+    int? subtitleIndex,
+  }) async {
+    harnessTranscodeRequests.add(maxBitrate);
+    return PlaybackInfo({
+      'PlaySessionId': 'transcode',
+      'MediaSources': [
+        {..._source, 'TranscodingUrl': _testVideo},
+      ],
+    });
+  }
+
+  @override
   Future<BaseItem> getItem(String id) async => BaseItem({
     'Id': id,
     'Name': 'Testfolge',
@@ -47,6 +71,11 @@ class _FakeApi extends JellyfinApi {
     'IndexNumber': 1,
     'ParentIndexNumber': 1,
     'MediaSources': [_source],
+    'Chapters': [
+      {'StartPositionTicks': 0, 'Name': 'Anfang'},
+      {'StartPositionTicks': 300000000, 'Name': 'Die Mitte'},
+      {'StartPositionTicks': 800000000, 'Name': 'Das Ende'},
+    ],
   });
 
   @override
@@ -56,8 +85,7 @@ class _FakeApi extends JellyfinApi {
   });
 
   @override
-  String streamUrl(String itemId, {required String mediaSourceId, String? playSessionId}) =>
-      Platform.environment['JELLYFLEX_TEST_VIDEO'] ?? '${Directory.systemTemp.path}\\jellyflex_test.mkv';
+  String streamUrl(String itemId, {required String mediaSourceId, String? playSessionId}) => _testVideo;
 
   @override
   Future<List<MediaSegment>> getMediaSegments(String itemId) async => [

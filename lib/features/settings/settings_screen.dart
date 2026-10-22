@@ -93,6 +93,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ),
                             _Row(
+                              title: 'Qualität',
+                              subtitle:
+                                  'Original spielt die Datei direkt ab. Niedrigere Stufen lassen den '
+                                  'Server umrechnen – gut bei langsamer Verbindung.',
+                              trailing: _Choice<int?>(
+                                value: s.maxBitrate,
+                                label: qualityLabel(s.maxBitrate),
+                                options: qualityOptions,
+                                onChanged: (v) => ctrl.update((s) => s.copyWith(maxBitrate: () => v)),
+                              ),
+                            ),
+                            _Row(
                               title: 'Intro & Rückblick automatisch überspringen',
                               subtitle: 'Aus: Es erscheint nur der Knopf „Intro überspringen“.',
                               trailing: _Toggle(

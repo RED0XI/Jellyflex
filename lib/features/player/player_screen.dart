@@ -61,9 +61,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   List<MediaSegment> _segments = const [];
   BaseItem? _nextEpisode;
 
+  /// Höchste Bitrate; `null` = Original (Direct Play), sonst rechnet der Server um.
+  int? _maxBitrate;
+  bool get _transcoding => _maxBitrate != null;
+
+  /// Gewählte Spuren als Jellyfin-Streamindex (-1 = Untertitel aus).
+  int? _audioIndex;
+  int? _subtitleIndex;
+
+  List<Chapter> _chapters = const [];
+  double _audioDelay = 0;
+  double _subtitleDelay = 0;
+
   bool _controlsVisible = true;
   bool _hoveringControls = false;
   bool _trackPanelOpen = false;
+  bool _playbackPanelOpen = false;
+  bool get _anyPanelOpen => _trackPanelOpen || _playbackPanelOpen;
   bool _switchingToNext = false;
   bool _closing = false;
   bool _reportedStart = false;
@@ -153,10 +167,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       if (sources.isEmpty) throw Exception('Keine abspielbare Datei gefunden.');
       final source = sources.first;
       if (!mounted) return;
+      final settings = ref.read(settingsProvider);
+      var maxBitrate = settings.maxBitrate;
+      // Ist die Datei ohnehin kleiner als die Grenze, lohnt Umrechnen nicht.
+      if (maxBitrate != null && (source.bitrate ?? 0) > 0 && source.bitrate! <= maxBitrate) maxBitrate = null;
       setState(() {
         _item = item;
         _source = source;
         _playSessionId = info.playSessionId;
+        _maxBitrate = maxBitrate;
+        _audioIndex = _preferredAudioIndex(source);
+        _subtitleIndex = _preferredSubtitleIndex(source);
+        _chapters = item.chapters;
       });
 
       // Intro/Abspann und nächste Folge im Hintergrund nachladen.
@@ -187,13 +209,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
       final start = widget.startTicks != null ? ticksToDuration(widget.startTicks!) : null;
       await PlayerScreen.debugBeforeOpen?.call(_player);
-      await _player.open(
-        Media(
-          _api.streamUrl(item.id, mediaSourceId: source.id, playSessionId: info.playSessionId),
-          httpHeaders: {'Authorization': _api.authorizationHeader},
-          start: start,
-        ),
-      );
+      await _openStream(start);
 
       await _applySubtitleStyle();
       _updateMediaSession();
@@ -205,6 +221,71 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         debugPrint('Wiedergabestart konnte nicht gemeldet werden: $e');
       }
       _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) => _reportProgress());
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e'.replaceFirst('Exception: ', ''));
+    }
+  }
+
+  /// Öffnet die Originaldatei (Direct Play) oder – mit Bitrate-Grenze – eine
+  /// vom Server umgerechnete HLS-Fassung mit den gewählten Spuren.
+  Future<void> _openStream(Duration? start) async {
+    final item = _item!;
+    final source = _source!;
+    final headers = {'Authorization': _api.authorizationHeader};
+
+    if (!_transcoding) {
+      await _player.open(
+        Media(
+          _api.streamUrl(item.id, mediaSourceId: source.id, playSessionId: _playSessionId),
+          httpHeaders: headers,
+          start: start,
+        ),
+      );
+      return;
+    }
+
+    final subIndex = (_subtitleIndex ?? -1) >= 0 ? _subtitleIndex : null;
+    final info = await _api.getTranscodeInfo(
+      item.id,
+      mediaSourceId: source.id,
+      maxBitrate: _maxBitrate!,
+      audioIndex: _audioIndex,
+      subtitleIndex: subIndex,
+    );
+    final media = info.mediaSources.firstOrNull;
+    final url = media?.transcodingUrl;
+    if (media == null || url == null) throw Exception('Der Server hat keine umgerechnete Fassung geliefert.');
+    _playSessionId = info.playSessionId ?? _playSessionId;
+    await _player.open(Media('${_api.baseUrl}$url', httpHeaders: headers, start: start));
+
+    // Text-Untertitel kommen als eigene Datei, Bild-Untertitel sind eingebrannt.
+    final sub = media.mediaStreams
+        .where((s) => s.index == subIndex && s.deliveryMethod == 'External' && s.deliveryUrl != null)
+        .firstOrNull;
+    await _player.setSubtitleTrack(
+      sub == null
+          ? SubtitleTrack.no()
+          : SubtitleTrack.uri('${_api.baseUrl}${sub.deliveryUrl}', title: sub.displayTitle, language: sub.language),
+    );
+  }
+
+  /// Wechselt den Stream (Qualität oder Spur bei Umrechnung) an derselben Stelle.
+  Future<void> _switchStream(VoidCallback change) async {
+    final position = _player.state.position;
+    final wasPlaying = _player.state.playing;
+    if (_reportedStart) {
+      try {
+        await _api.reportPlaybackStopped(_progressBody()).timeout(const Duration(seconds: 3));
+      } catch (_) {}
+    }
+    setState(change);
+    // Bei Direct Play wählt _applyDefaultTracks die Spuren neu aus _audioIndex/_subtitleIndex.
+    _tracksApplied = _transcoding;
+    try {
+      await _openStream(position);
+      if (!wasPlaying) await _player.pause();
+      await _applySubtitleStyle();
+      await _api.reportPlaybackStart(_progressBody(position: position));
     } catch (e) {
       if (mounted) setState(() => _error = '$e'.replaceFirst('Exception: ', ''));
     }
@@ -248,7 +329,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     'IsPaused': !_player.state.playing,
     'IsMuted': _player.state.volume == 0,
     'VolumeLevel': _player.state.volume.round(),
-    'PlayMethod': 'DirectPlay',
+    'PlayMethod': _transcoding ? 'Transcode' : 'DirectPlay',
+    if (_audioIndex != null) 'AudioStreamIndex': _audioIndex,
+    if (_subtitleIndex != null) 'SubtitleStreamIndex': _subtitleIndex,
     'CanSeek': true,
   };
 
@@ -267,45 +350,49 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
   }
 
-  /// Audio-/Untertitelspur wählen: zuerst nach den App-Einstellungen
-  /// (bevorzugte Sprache), sonst wie es Jellyfin für den Benutzer vorsieht.
-  void _applyDefaultTracks() {
-    final source = _source;
-    if (_tracksApplied || source == null) return;
-    final tracks = _player.state.tracks;
-    final audio = tracks.audio.where(_isRealTrack).toList();
-    if (audio.isEmpty) return;
-    _tracksApplied = true;
-    final settings = ref.read(settingsProvider);
-
-    var audioIndex = source.defaultAudioStreamIndex;
-    if (settings.audioLanguage != null) {
-      final match = source
-          .embeddedStreams('Audio')
-          .where((s) => sameLanguage(s.language, settings.audioLanguage))
-          .firstOrNull;
-      if (match != null) audioIndex = match.index;
+  /// Tonspur nach App-Einstellung (bevorzugte Sprache), sonst wie in Jellyfin.
+  int? _preferredAudioIndex(MediaSource source) {
+    final pref = ref.read(settingsProvider).audioLanguage;
+    if (pref != null) {
+      final match = source.embeddedStreams('Audio').where((s) => sameLanguage(s.language, pref)).firstOrNull;
+      if (match != null) return match.index;
     }
-    final audioId = _mpvIdFor(source, 'Audio', audioIndex);
-    final audioTrack = audio.where((t) => t.id == audioId).firstOrNull;
-    if (audioTrack != null) _player.setAudioTrack(audioTrack);
+    return source.defaultAudioStreamIndex;
+  }
 
-    var subIndex = source.defaultSubtitleStreamIndex;
-    final subPref = settings.subtitleLanguage;
-    if (subPref == subtitlesOff) {
-      subIndex = -1;
-    } else if (subPref != null) {
+  /// Untertitel nach App-Einstellung, sonst wie in Jellyfin (-1 = aus).
+  int? _preferredSubtitleIndex(MediaSource source) {
+    final pref = ref.read(settingsProvider).subtitleLanguage;
+    if (pref == subtitlesOff) return -1;
+    if (pref != null) {
       // Vollständige Untertitel vor erzwungenen, eingebettete vor Dateien.
       final candidates =
-          source.mediaStreams.where((s) => s.type == 'Subtitle' && sameLanguage(s.language, subPref)).toList()
+          source.mediaStreams.where((s) => s.type == 'Subtitle' && sameLanguage(s.language, pref)).toList()
             ..sort((a, b) {
               final forced = (a.isForced ? 1 : 0) - (b.isForced ? 1 : 0);
               if (forced != 0) return forced;
               return (a.isExternal ? 1 : 0) - (b.isExternal ? 1 : 0);
             });
-      if (candidates.isNotEmpty) subIndex = candidates.first.index;
+      if (candidates.isNotEmpty) return candidates.first.index;
     }
+    return source.defaultSubtitleStreamIndex;
+  }
 
+  /// Bei Direct Play: die gewählten Spuren ([_audioIndex], [_subtitleIndex])
+  /// in mpv einstellen, sobald mpv die Spuren der Datei kennt.
+  void _applyDefaultTracks() {
+    final source = _source;
+    if (_tracksApplied || source == null || _transcoding) return;
+    final tracks = _player.state.tracks;
+    final audio = tracks.audio.where(_isRealTrack).toList();
+    if (audio.isEmpty) return;
+    _tracksApplied = true;
+
+    final audioId = _mpvIdFor(source, 'Audio', _audioIndex);
+    final audioTrack = audio.where((t) => t.id == audioId).firstOrNull;
+    if (audioTrack != null) _player.setAudioTrack(audioTrack);
+
+    final subIndex = _subtitleIndex;
     final external = _externalSubtitles.where((s) => s.index == subIndex).firstOrNull;
     if (subIndex == null || subIndex < 0) {
       _player.setSubtitleTrack(SubtitleTrack.no());
@@ -412,7 +499,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _scheduleHide() {
     _hideTimer?.cancel();
     _hideTimer = Timer(_hideDelay, () {
-      if (!mounted || _hoveringControls || _trackPanelOpen || !_player.state.playing) return;
+      if (!mounted || _hoveringControls || _anyPanelOpen || !_player.state.playing) return;
       setState(() => _controlsVisible = false);
       _syncWindowChrome();
     });
@@ -465,8 +552,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     } else if (key == LogicalKeyboardKey.keyM) {
       _toggleMute();
     } else if (key == LogicalKeyboardKey.escape) {
-      if (_trackPanelOpen) {
-        _setTrackPanel(false);
+      if (_anyPanelOpen) {
+        _closePanels();
       } else if (_fullscreen) {
         _toggleFullscreen();
       } else {
@@ -510,8 +597,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   behavior: HitTestBehavior.opaque,
                   onTap: () {
                     _focus.requestFocus();
-                    if (_trackPanelOpen) {
-                      _setTrackPanel(false);
+                    if (_anyPanelOpen) {
+                      _closePanels();
                     } else {
                       _player.playOrPause();
                     }
@@ -594,20 +681,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     );
   }
 
-  /// Vorschaubilder beim Spulen, sofern der Server Trickplay-Bilder erzeugt hat.
-  Widget Function(Duration)? _trickplayPreviewBuilder() {
+  /// Vorschau beim Spulen: Trickplay-Bild (falls vorhanden), Zeit und Kapitel.
+  Widget Function(Duration)? _previewBuilder() {
     final item = _item;
     final source = _source;
     if (item == null || source == null) return null;
     final info = item.trickplay(source.id);
-    if (info == null) return null;
     final headers = {'Authorization': _api.authorizationHeader};
-    return (position) => TrickplayPreview(
-      info: info,
-      position: position,
-      tileUrl: (tile) => _api.trickplayTileUrl(item.id, source.id, info.width, tile),
-      headers: headers,
-    );
+    return (position) => info == null
+        ? SeekTimeBubble(position: position, title: _chapterAt(position))
+        : TrickplayPreview(
+            info: info,
+            position: position,
+            title: _chapterAt(position),
+            tileUrl: (tile) => _api.trickplayTileUrl(item.id, source.id, info.width, tile),
+            headers: headers,
+          );
   }
 
   Widget _hoverZone(Widget child) => MouseRegion(
@@ -697,7 +786,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _SeekBar(player: _player, previewBuilder: _trickplayPreviewBuilder()),
+                _SeekBar(
+                  player: _player,
+                  previewBuilder: _previewBuilder(),
+                  chapters: [for (final c in _chapters) c.start],
+                ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -740,10 +833,36 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         );
                       },
                     ),
+                    if (_transcoding)
+                      Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.white38),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          qualityLabel(_maxBitrate).split(' · ').first,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    if (_player.state.rate != 1.0)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Text(
+                          '${_player.state.rate}×',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                        ),
+                      ),
                     _PlayerIconButton(
                       icon: Icons.subtitles_rounded,
                       tooltip: 'Audio & Untertitel',
                       onPressed: () => _setTrackPanel(!_trackPanelOpen),
+                    ),
+                    _PlayerIconButton(
+                      icon: Icons.tune_rounded,
+                      tooltip: 'Wiedergabe: Geschwindigkeit, Qualität, Synchronisation',
+                      onPressed: () => _setPlaybackPanel(!_playbackPanelOpen),
                     ),
                     _PlayerIconButton(
                       icon: _fullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
@@ -772,12 +891,29 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             child: _trackPanelOpen
                 ? _hoverZone(
                     _TracksPanel(
+                      key: const ValueKey('tracks'),
                       player: _player,
                       audioEntries: _audioEntries,
                       subtitleEntries: _subtitleEntries,
+                      selectedAudio: _selectedAudioId,
+                      selectedSubtitle: _selectedSubtitleId,
                       onAudio: _selectAudio,
                       onSubtitle: _selectSubtitle,
                       onClose: () => _setTrackPanel(false),
+                    ),
+                  )
+                : _playbackPanelOpen
+                ? _hoverZone(
+                    PlaybackPanel(
+                      key: const ValueKey('playback'),
+                      rate: _player.state.rate,
+                      onRate: _setRate,
+                      maxBitrate: _maxBitrate,
+                      onQuality: _setQuality,
+                      audioDelay: _audioDelay,
+                      subtitleDelay: _subtitleDelay,
+                      onAudioDelay: (v) => _setDelay(audio: v),
+                      onSubtitleDelay: (v) => _setDelay(subtitle: v),
                     ),
                   )
                 : const SizedBox.shrink(),
@@ -789,12 +925,39 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   // --- Ton & Untertitel ------------------------------------------------------
 
-  List<_TrackEntry> _audioEntries() => [
-    for (final t in _player.state.tracks.audio.where(_isRealTrack))
-      (id: t.id, label: _trackLabel('Audio', t.id, t.title, t.language, t.codec)),
-  ];
+  // Bei Direct Play wählt mpv die Spuren (IDs "1", "2" …). Bei Umrechnung
+  // entscheidet der Server – dort heißen die Einträge "jf:<Jellyfin-Index>"
+  // und ein Wechsel startet den Stream an derselben Stelle neu.
+
+  List<_TrackEntry> _audioEntries() {
+    if (_transcoding) {
+      return [
+        for (final s in _source?.mediaStreams.where((s) => s.type == 'Audio') ?? const <MediaStream>[])
+          (id: 'jf:${s.index}', label: s.displayTitle ?? languageName(s.language)),
+      ];
+    }
+    return [
+      for (final t in _player.state.tracks.audio.where(_isRealTrack))
+        (id: t.id, label: _trackLabel('Audio', t.id, t.title, t.language, t.codec)),
+    ];
+  }
+
+  String? _selectedAudioId() => _transcoding ? 'jf:$_audioIndex' : _player.state.track.audio.id;
+
+  String? _selectedSubtitleId() {
+    if (_transcoding) return (_subtitleIndex ?? -1) < 0 ? 'no' : 'jf:$_subtitleIndex';
+    final id = _player.state.track.subtitle.id;
+    return id == 'auto' ? null : id;
+  }
 
   List<_TrackEntry> _subtitleEntries() {
+    if (_transcoding) {
+      return [
+        (id: 'no', label: 'Aus'),
+        for (final s in _source?.mediaStreams.where((s) => s.type == 'Subtitle') ?? const <MediaStream>[])
+          (id: 'jf:${s.index}', label: s.displayTitle ?? languageName(s.language)),
+      ];
+    }
     // Nur eingebettete Spuren aus mpv; nachgeladene Dateien zeigen wir separat
     // mit ihrem Jellyfin-Namen (mpv hängt sie mit fortlaufender ID hinten an).
     final embeddedCount = _source?.embeddedStreams('Subtitle').length;
@@ -814,32 +977,106 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   void _selectAudio(String id) {
+    if (id.startsWith('jf:')) {
+      final index = int.parse(id.substring(3));
+      if (index != _audioIndex) _switchStream(() => _audioIndex = index);
+      return;
+    }
     final t = _player.state.tracks.audio.where((t) => t.id == id).firstOrNull;
-    if (t != null) _player.setAudioTrack(t);
+    if (t == null) return;
+    _player.setAudioTrack(t);
+    _audioIndex = _jellyfinStreamFor('Audio', id)?.index ?? _audioIndex;
   }
 
   void _selectSubtitle(String id) {
+    if (_transcoding) {
+      final index = id == 'no' ? -1 : int.parse(id.substring(3));
+      if (index != _subtitleIndex) _switchStream(() => _subtitleIndex = index);
+      return;
+    }
     if (id == 'no') {
       _player.setSubtitleTrack(SubtitleTrack.no());
+      _subtitleIndex = -1;
       return;
     }
     final ext = _externalSubtitles.where((s) => _api.subtitleUrl(widget.itemId, _source!.id, s) == id).firstOrNull;
     if (ext != null) {
       _player.setSubtitleTrack(_externalTrack(ext));
+      _subtitleIndex = ext.index;
       return;
     }
     final t = _player.state.tracks.subtitle.where((t) => t.id == id).firstOrNull;
-    if (t != null) _player.setSubtitleTrack(t);
+    if (t == null) return;
+    _player.setSubtitleTrack(t);
+    _subtitleIndex = _jellyfinStreamFor('Subtitle', id)?.index ?? _subtitleIndex;
   }
 
   void _setTrackPanel(bool open) {
-    setState(() => _trackPanelOpen = open);
-    if (open) {
+    setState(() {
+      _trackPanelOpen = open;
+      if (open) _playbackPanelOpen = false;
+    });
+    _afterPanelChange();
+  }
+
+  void _setPlaybackPanel(bool open) {
+    setState(() {
+      _playbackPanelOpen = open;
+      if (open) _trackPanelOpen = false;
+    });
+    _afterPanelChange();
+  }
+
+  void _closePanels() {
+    setState(() {
+      _trackPanelOpen = false;
+      _playbackPanelOpen = false;
+    });
+    _afterPanelChange();
+  }
+
+  void _afterPanelChange() {
+    if (_anyPanelOpen) {
       _showControls(autoHide: false);
     } else if (_player.state.playing) {
       _scheduleHide();
     }
     _focus.requestFocus();
+  }
+
+  // --- Geschwindigkeit, Qualität, Synchronisation ---------------------------
+
+  Future<void> _setRate(double rate) async {
+    await _player.setRate(rate);
+    if (mounted) setState(() {});
+  }
+
+  void _setQuality(int? bitrate) {
+    if (bitrate == _maxBitrate) return;
+    _switchStream(() => _maxBitrate = bitrate);
+  }
+
+  Future<void> _setDelay({double? audio, double? subtitle}) async {
+    final native = _player.platform;
+    if (native is! NativePlayer) return;
+    if (audio != null) {
+      _audioDelay = double.parse(audio.toStringAsFixed(1));
+      await native.setProperty('audio-delay', _audioDelay.toString());
+    }
+    if (subtitle != null) {
+      _subtitleDelay = double.parse(subtitle.toStringAsFixed(1));
+      await native.setProperty('sub-delay', _subtitleDelay.toString());
+    }
+    if (mounted) setState(() {});
+  }
+
+  /// Kapitelname an einer Position (für die Vorschau beim Spulen).
+  String? _chapterAt(Duration position) {
+    String? name;
+    for (final c in _chapters) {
+      if (c.start <= position) name = c.name;
+    }
+    return (name == null || name.isEmpty) ? null : name;
   }
 }
 
@@ -891,7 +1128,10 @@ class _PlayerIconButtonState extends State<_PlayerIconButton> {
 }
 
 class _SeekBar extends StatefulWidget {
-  const _SeekBar({required this.player, this.previewBuilder});
+  const _SeekBar({required this.player, this.previewBuilder, this.chapters = const []});
+
+  /// Startzeiten der Kapitel – werden als kleine Lücken in der Leiste gezeigt.
+  final List<Duration> chapters;
 
   final Player player;
 
@@ -954,11 +1194,30 @@ class _SeekBarState extends State<_SeekBar> {
         clipBehavior: Clip.none,
         children: [
           slider,
+          if (duration != null && widget.chapters.length > 1)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _ChapterTicksPainter(
+                    fractions: [
+                      for (final c in widget.chapters)
+                        if (c > Duration.zero && c < duration) c.inMilliseconds / duration.inMilliseconds,
+                    ],
+                    inset: _trackInset,
+                  ),
+                ),
+              ),
+            ),
           if (show)
             Positioned(
               bottom: 40,
               left: (_trackInset + fraction * trackWidth - previewWidth / 2).clamp(-72.0, width - previewWidth + 80),
-              child: IgnorePointer(child: builder(duration * fraction)),
+              child: IgnorePointer(
+                child: SizedBox(
+                  width: previewWidth,
+                  child: Align(alignment: Alignment.bottomCenter, child: builder(duration * fraction)),
+                ),
+              ),
             ),
         ],
       ),
@@ -1078,7 +1337,10 @@ typedef _TrackEntry = ({String id, String label});
 /// Aktualisiert sich selbst, sobald mpv neue Spuren oder eine andere Auswahl meldet.
 class _TracksPanel extends StatefulWidget {
   const _TracksPanel({
+    super.key,
     required this.player,
+    required this.selectedAudio,
+    required this.selectedSubtitle,
     required this.audioEntries,
     required this.subtitleEntries,
     required this.onAudio,
@@ -1089,6 +1351,8 @@ class _TracksPanel extends StatefulWidget {
   final Player player;
   final List<_TrackEntry> Function() audioEntries;
   final List<_TrackEntry> Function() subtitleEntries;
+  final String? Function() selectedAudio;
+  final String? Function() selectedSubtitle;
   final ValueChanged<String> onAudio;
   final ValueChanged<String> onSubtitle;
   final VoidCallback onClose;
@@ -1118,8 +1382,6 @@ class _TracksPanelState extends State<_TracksPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final track = widget.player.state.track;
-    final subtitleId = track.subtitle.id == 'auto' ? null : track.subtitle.id;
     return Container(
       width: 640,
       constraints: const BoxConstraints(maxHeight: 380),
@@ -1137,7 +1399,7 @@ class _TracksPanelState extends State<_TracksPanel> {
             child: _TrackColumn(
               title: 'Audio',
               entries: widget.audioEntries(),
-              selectedId: track.audio.id,
+              selectedId: widget.selectedAudio(),
               emptyText: 'Keine Tonspuren gefunden',
               onSelect: widget.onAudio,
             ),
@@ -1147,7 +1409,7 @@ class _TracksPanelState extends State<_TracksPanel> {
             child: _TrackColumn(
               title: 'Untertitel',
               entries: widget.subtitleEntries(),
-              selectedId: subtitleId,
+              selectedId: widget.selectedSubtitle(),
               emptyText: 'Keine Untertitel vorhanden',
               onSelect: widget.onSubtitle,
             ),
@@ -1256,4 +1518,26 @@ class _TrackRowState extends State<_TrackRow> {
       ),
     );
   }
+}
+
+/// Kleine Lücken in der Spulleiste an den Kapitelgrenzen.
+class _ChapterTicksPainter extends CustomPainter {
+  _ChapterTicksPainter({required this.fractions, required this.inset});
+
+  final List<double> fractions;
+  final double inset;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.black.withValues(alpha: 0.85);
+    final width = size.width - inset * 2;
+    final cy = size.height / 2;
+    for (final f in fractions) {
+      final x = inset + f * width;
+      canvas.drawRect(Rect.fromLTWH(x - 1.5, cy - 4, 3, 8), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ChapterTicksPainter old) => old.fractions.length != fractions.length;
 }
