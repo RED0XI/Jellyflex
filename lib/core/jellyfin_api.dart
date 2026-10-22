@@ -236,12 +236,22 @@ class JellyfinApi {
     required String sortOrder,
     int startIndex = 0,
     int limit = 100,
+    List<String> filters = const [],
+    String? genre,
+    List<int> years = const [],
+    String? nameStartsWith,
+    String? nameLessThan,
   }) async {
     final res = await dio.get(
       '/Items',
       queryParameters: {
         ..._common,
         'parentId': parentId,
+        if (filters.isNotEmpty) 'filters': filters.join(','),
+        'genres': ?genre,
+        if (years.isNotEmpty) 'years': years.join(','),
+        'nameStartsWith': ?nameStartsWith,
+        'nameLessThan': ?nameLessThan,
         'includeItemTypes': includeItemTypes,
         'recursive': true,
         'sortBy': sortBy,
@@ -257,6 +267,18 @@ class JellyfinApi {
         .map((e) => BaseItem(e.cast<String, dynamic>()))
         .toList();
     return LibraryPage(items, (data['TotalRecordCount'] as num?)?.toInt() ?? items.length);
+  }
+
+  /// Genres einer Bibliothek (für Filter und Genre-Reihen).
+  Future<List<String>> getGenres(String? parentId, {String includeItemTypes = 'Movie,Series'}) async {
+    final items = await _getItems('/Genres', {
+      'userId': userId,
+      'parentId': ?parentId,
+      'includeItemTypes': includeItemTypes,
+      'sortBy': 'SortName',
+      'enableImages': false,
+    });
+    return items.map((g) => g.name).where((n) => n.isNotEmpty).toList();
   }
 
   Future<List<BaseItem>> getSeasons(String seriesId) => _getItems('/Shows/$seriesId/Seasons', {..._common});
