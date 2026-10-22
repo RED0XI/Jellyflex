@@ -65,7 +65,7 @@ class JellyfinApi {
   }
 
   static const clientName = 'Jellyflex';
-  static const clientVersion = '0.1.0';
+  static const clientVersion = '0.2.0';
 
   /// Felder, die für Karten und Detailansichten gebraucht werden.
   static const _fields = 'Overview,PrimaryImageAspectRatio,Genres,ChildCount,Taglines';

@@ -14,6 +14,12 @@ Ein moderner, flüssiger Jellyfin-Client für Windows – gebaut mit Flutter und
 flutter run -d windows
 ```
 
+**Installer bauen** (ergibt `dist\Jellyflex-Setup-<Version>.exe`, installiert ohne Admin-Rechte):
+
+```bash
+powershell -ExecutionPolicy Bypass -File tool/build_installer.ps1
+```
+
 **Neu bauen:**
 
 ```bash
@@ -48,6 +54,8 @@ flutter test integration_test/player_tracks_test.dart -d windows
 - **Intro/Rückblick überspringen** (Media Segments, z. B. vom Intro-Skipper-Plugin)
 - **Nächste Folge** mit Countdown, **Trickplay**-Vorschaubilder beim Spulen
 - Fortschritt wird laufend an den Server gemeldet
+- Windows-Medienanzeige (Titel/Bild im Lautstärke-Overlay) und Medientasten
+- Einstellungen: bevorzugte Sprachen, Intro automatisch überspringen, Untertitelgröße …
 
 Bilder werden genauso ausgewählt wie in der offiziellen Jellyfin-Weboberfläche
 (`poster`/`folder`/`cover` → Primary, `backdrop`/`fanart` → Backdrop, `landscape`/`thumb` → Thumb,

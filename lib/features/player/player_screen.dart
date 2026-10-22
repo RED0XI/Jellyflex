@@ -10,6 +10,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../core/format.dart';
 import '../../core/images.dart';
 import '../../core/jellyfin_api.dart';
+import '../../core/media_session.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../core/settings.dart';
@@ -63,6 +64,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _controlsVisible = true;
   bool _hoveringControls = false;
   bool _trackPanelOpen = false;
+  bool _switchingToNext = false;
   bool _closing = false;
   bool _reportedStart = false;
   bool _tracksApplied = false;
@@ -83,6 +85,33 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _scheduleHide();
     _restoreFullscreen; // Zustand beim Öffnen merken.
     windowFullscreen.addListener(_onFullscreenChanged);
+    MediaSession.onButton = _onMediaButton;
+  }
+
+  /// Medientasten der Tastatur bzw. Windows-Medienanzeige.
+  void _onMediaButton(String button) {
+    switch (button) {
+      case 'play':
+        _player.play();
+      case 'pause':
+        _player.pause();
+      case 'stop':
+        _close();
+      case 'next':
+        _playNext();
+    }
+  }
+
+  void _updateMediaSession() {
+    final item = _item;
+    if (item == null || _closing) return;
+    MediaSession.update(
+      title: item.isEpisode ? (item.seriesName ?? item.name) : item.name,
+      subtitle: item.isEpisode ? [?item.episodeLabel, item.name].join(' · ') : yearLabel(item),
+      artUrl: _api.imageUrlOrNull(Images.landscape(item), fillWidth: 480, fillHeight: 270),
+      playing: _player.state.playing,
+      canNext: _nextEpisode != null,
+    );
   }
 
   void _onFullscreenChanged() {
@@ -102,6 +131,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _api.reportPlaybackStopped(_progressBody()).ignore();
     }
     windowFullscreen.removeListener(_onFullscreenChanged);
+    if (MediaSession.onButton == _onMediaButton) {
+      MediaSession.onButton = null;
+      // Bei "Nächste Folge" übernimmt gleich der neue Player die Anzeige.
+      if (!_switchingToNext) MediaSession.clear();
+    }
     if (!_closing && windowFullscreen.value != _restoreFullscreen) setWindowFullscreen(_restoreFullscreen);
     _player.dispose();
     _focus.dispose();
@@ -132,6 +166,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       if (item.isEpisode) {
         _api.getNextEpisode(item).then((next) {
           if (mounted) setState(() => _nextEpisode = next);
+          _updateMediaSession();
         });
       }
 
@@ -161,6 +196,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       );
 
       await _applySubtitleStyle();
+      _updateMediaSession();
 
       try {
         await _api.reportPlaybackStart(_progressBody(position: start));
@@ -223,6 +259,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _onPlayingChanged(bool playing) {
     _reportProgress();
+    MediaSession.setPlaying(playing);
     if (playing) {
       _scheduleHide();
     } else {
@@ -341,6 +378,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final next = _nextEpisode;
     if (next == null || _closing) return;
     _closing = true;
+    _switchingToNext = true;
     _progressTimer?.cancel();
     final body = _progressBody();
     await _player.pause();
