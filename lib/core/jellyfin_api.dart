@@ -269,6 +269,39 @@ class JellyfinApi {
     return LibraryPage(items, (data['TotalRecordCount'] as num?)?.toInt() ?? items.length);
   }
 
+  /// Sammlungen (z. B. "Der Herr der Ringe – Filmreihe").
+  Future<List<BaseItem>> getCollections({int limit = 30}) => _getItems('/Items', {
+    ..._common,
+    'includeItemTypes': 'BoxSet',
+    'recursive': true,
+    'sortBy': 'SortName',
+    'limit': limit,
+  });
+
+  /// Inhalt einer Sammlung in Erscheinungsreihenfolge.
+  Future<List<BaseItem>> getCollectionItems(String collectionId) =>
+      _getItems('/Items', {..._common, 'parentId': collectionId, 'sortBy': 'PremiereDate,ProductionYear,SortName'});
+
+  /// Zufällige Filme/Serien eines Genres.
+  Future<List<BaseItem>> getByGenre(String genre, {int limit = 20}) => _getItems('/Items', {
+    ..._common,
+    'genres': genre,
+    'includeItemTypes': 'Movie,Series',
+    'recursive': true,
+    'sortBy': 'Random',
+    'limit': limit,
+  });
+
+  /// Empfehlungen wie "Weil du X angesehen hast".
+  Future<List<Recommendation>> getRecommendations({int categories = 3, int perCategory = 16}) async {
+    final res = await dio.get(
+      '/Movies/Recommendations',
+      queryParameters: {'userId': userId, 'categoryLimit': categories, 'itemLimit': perCategory, 'fields': _fields},
+    );
+    final list = res.data is List ? res.data as List : const [];
+    return list.whereType<Map>().map((m) => Recommendation(m.cast<String, dynamic>())).toList();
+  }
+
   /// Genres einer Bibliothek (für Filter und Genre-Reihen).
   Future<List<String>> getGenres(String? parentId, {String includeItemTypes = 'Movie,Series'}) async {
     final items = await _getItems('/Genres', {

@@ -14,6 +14,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:jellyflex/core/jellyfin_api.dart';
 import 'package:jellyflex/core/models.dart';
 import 'package:jellyflex/core/session.dart';
+import 'package:jellyflex/features/home/home_screen.dart';
 import 'package:jellyflex/features/library/library_screen.dart';
 import 'package:jellyflex/features/home/home_providers.dart';
 import 'package:jellyflex/features/settings/settings_screen.dart';
@@ -134,4 +135,38 @@ void main() {
     await _pumpFor(tester, const Duration(seconds: 1));
     await _saveShot(tester, 'library');
   });
+
+  // Braucht den Demo-Server: dart run tool/mock_server.dart
+  testWidgets('Startseite (Demo-Server)', (tester) async {
+    try {
+      await HttpClient().getUrl(Uri.parse('http://localhost:8097/System/Info/Public')).then((r) => r.close());
+    } catch (_) {
+      markTestSkipped('Demo-Server läuft nicht');
+      return;
+    }
+    await tester.binding.setSurfaceSize(const Size(1440, 2900));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [sessionProvider.overrideWith(_DemoSession.new)],
+        child: RepaintBoundary(
+          key: _shotKey,
+          child: MaterialApp(debugShowCheckedModeBanner: false, theme: buildTheme(), home: const HomeScreen()),
+        ),
+      ),
+    );
+    await _pumpFor(tester, const Duration(seconds: 6));
+    await _saveShot(tester, 'home_full');
+  });
+}
+
+class _DemoSession extends SessionController {
+  @override
+  Future<AuthSession?> build() async => const AuthSession(
+    serverUrl: 'http://localhost:8097',
+    serverName: 'Demo-Server',
+    userId: 'user1',
+    userName: 'Demo',
+    token: 'mock-token',
+    deviceId: 'd',
+  );
 }

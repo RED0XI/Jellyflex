@@ -39,6 +39,7 @@ class BaseItem {
   bool get isSeries => type == 'Series';
   bool get isEpisode => type == 'Episode';
   bool get isSeason => type == 'Season';
+  bool get isCollection => type == 'BoxSet';
 
   DateTime? get premiereDate => _date(raw['PremiereDate']);
   DateTime? get endDate => _date(raw['EndDate']);
@@ -191,6 +192,28 @@ class MediaStream {
   /// "External", "Encode" (eingebrannt) … – nur bei umgerechneter Wiedergabe.
   String? get deliveryMethod => raw['DeliveryMethod'] as String?;
   String? get deliveryUrl => raw['DeliveryUrl'] as String?;
+}
+
+/// Empfehlungskategorie ("Weil du X angesehen hast" …).
+class Recommendation {
+  Recommendation(this.raw);
+
+  final Json raw;
+
+  String get type => (raw['RecommendationType'] as String?) ?? '';
+  String get baselineItemName => (raw['BaselineItemName'] as String?) ?? '';
+
+  List<BaseItem> get items =>
+      ((raw['Items'] as List?) ?? const []).whereType<Map>().map((m) => BaseItem(m.cast<String, dynamic>())).toList();
+
+  /// Überschrift für die Reihe auf der Startseite.
+  String get title => switch (type) {
+    'SimilarToRecentlyPlayed' => 'Weil du „$baselineItemName“ angesehen hast',
+    'SimilarToLikedItem' => 'Weil dir „$baselineItemName“ gefällt',
+    'HasDirectorFromRecentlyPlayed' || 'HasLikedDirector' => 'Mehr von $baselineItemName',
+    'HasActorFromRecentlyPlayed' || 'HasLikedActor' => 'Mit $baselineItemName',
+    _ => 'Empfehlungen',
+  };
 }
 
 class Chapter {

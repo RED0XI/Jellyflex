@@ -56,6 +56,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       separatorBuilder: (_, _) => const SizedBox(height: 26),
                       itemBuilder: (context, i) => _SectionRow(section: data.sections[i]),
                     ),
+                    // Empfehlungen, Sammlungen, Genres – erscheinen, sobald geladen.
+                    SliverList.list(
+                      children: [
+                        for (final section in ref.watch(discoverProvider).value ?? const <HomeSection>[])
+                          Padding(
+                            padding: const EdgeInsets.only(top: 26),
+                            child: _SectionRow(section: section),
+                          ),
+                      ],
+                    ),
                     if (data.libraries.isNotEmpty)
                       SliverToBoxAdapter(
                         child: Padding(

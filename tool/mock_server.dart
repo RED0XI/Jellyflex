@@ -73,6 +73,17 @@ List<Map<String, dynamic>> _people() => [
 ];
 
 void _seed() {
+  byId['boxset0'] = {
+    'Id': 'boxset0',
+    'Name': 'Die Sterne-Trilogie',
+    'Type': 'BoxSet',
+    'Overview': 'Alle drei Teile der gefeierten Reihe in einer Sammlung.',
+    'ProductionYear': 2012,
+    'ImageTags': {'Primary': 'p'},
+    'BackdropImageTags': ['b0'],
+    'ChildCount': 3,
+    'UserData': _userData(),
+  };
   for (var i = 0; i < _movieNames.length; i++) {
     final id = 'movie$i';
     final runtime = (85 + _rand.nextInt(70)) * 60 * 10000000;
@@ -331,9 +342,22 @@ Object? _handle(HttpRequest req) {
   if (path == '/Items/Latest') {
     return q['parentId'] == 'lib-shows' ? series.reversed.toList() : movies.reversed.toList();
   }
+  if (path == '/Genres') return {'Items': [for (final g in _genres) {'Name': g, 'Id': 'genre-$g'}]};
+  if (path == '/Movies/Recommendations') {
+    return [
+      {'RecommendationType': 'SimilarToRecentlyPlayed', 'BaselineItemName': movies[0]['Name'], 'Items': movies.skip(3).take(8).toList()},
+      {'RecommendationType': 'SimilarToLikedItem', 'BaselineItemName': movies[1]['Name'], 'Items': movies.skip(6).take(8).toList()},
+    ];
+  }
+  if (path == '/Items' && q['parentId'] == 'boxset0') return _page(movies.take(3).toList(), q);
   if (path == '/Items') {
     var list = <Map<String, dynamic>>[];
     final types = (q['includeItemTypes'] ?? 'Movie,Series').split(',');
+    if (types.contains('BoxSet')) list.add(byId['boxset0']!);
+    final genre = q['genres'];
+    if (genre != null) {
+      return _page([...movies, ...series].where((i) => (i['Genres'] as List).contains(genre)).toList(), q);
+    }
     if (types.contains('Movie') && q['parentId'] != 'lib-shows') list.addAll(movies);
     if (types.contains('Series') && q['parentId'] != 'lib-movies') list.addAll(series);
     if (types.contains('Episode')) list.addAll([for (final e in episodes.values) ...e]);

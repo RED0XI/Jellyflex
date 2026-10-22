@@ -59,6 +59,28 @@ final homeProvider = FutureProvider.autoDispose<HomeData>((ref) async {
   ]);
 });
 
+/// Zusätzliche Reihen zum Stöbern: Empfehlungen, Sammlungen und drei
+/// zufällige Genres. Lädt getrennt, damit die Startseite schneller erscheint.
+final discoverProvider = FutureProvider.autoDispose<List<HomeSection>>((ref) async {
+  final api = ref.watch(apiProvider);
+  final recommendationsFuture = api.getRecommendations().catchError((_) => <Recommendation>[]);
+  final collectionsFuture = _safe(api.getCollections());
+  final genresFuture = api.getGenres(null).catchError((_) => <String>[]);
+
+  final recommendations = await recommendationsFuture;
+  final collections = await collectionsFuture;
+  final genres = [...await genresFuture]..shuffle();
+  final genreRows = await Future.wait(genres.take(3).map((g) async => (g, await _safe(api.getByGenre(g)))));
+
+  return [
+    for (final r in recommendations)
+      if (r.items.length >= 3) HomeSection(r.title, r.items, SectionStyle.poster),
+    if (collections.isNotEmpty) HomeSection('Sammlungen', collections, SectionStyle.poster),
+    for (final (genre, items) in genreRows)
+      if (items.length >= 4) HomeSection(genre, items, SectionStyle.poster),
+  ];
+});
+
 /// URL des Profilbilds des angemeldeten Benutzers (oder `null`).
 final userImageProvider = FutureProvider.autoDispose<String?>((ref) async {
   final api = ref.watch(apiProvider);

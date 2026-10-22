@@ -17,7 +17,7 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
   final router = GoRouter.of(context);
   final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
   final data = item.userData;
-  final canPlay = !item.isSeries && !item.isSeason;
+  final canPlay = !item.isSeries && !item.isSeason && !item.isCollection;
 
   PopupMenuItem<_ItemAction> entry(_ItemAction value, IconData icon, String label) => PopupMenuItem(
     value: value,

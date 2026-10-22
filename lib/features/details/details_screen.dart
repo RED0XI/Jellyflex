@@ -30,6 +30,11 @@ final episodesProvider = FutureProvider.autoDispose.family<List<BaseItem>, (Stri
   return ref.watch(apiProvider).getEpisodes(args.$1, args.$2);
 });
 
+/// Inhalt einer Sammlung (BoxSet).
+final collectionItemsProvider = FutureProvider.autoDispose.family<List<BaseItem>, String>((ref, id) {
+  return ref.watch(apiProvider).getCollectionItems(id);
+});
+
 final similarProvider = FutureProvider.autoDispose.family<List<BaseItem>, String>((ref, id) async {
   try {
     return await ref.watch(apiProvider).getSimilar(id);
@@ -170,6 +175,7 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                 ),
               ),
               if (item.isSeries) SliverToBoxAdapter(child: _SeasonsSection(series: item)),
+              if (item.isCollection) SliverToBoxAdapter(child: _CollectionRow(collectionId: item.id)),
               if (item.isEpisode && item.seriesId != null && item.seasonId != null)
                 SliverToBoxAdapter(
                   child: _EpisodesRow(
@@ -358,7 +364,16 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
     final played = _played ?? item.userData.played;
 
     final Widget playButtons;
-    if (item.isSeries) {
+    if (item.isCollection) {
+      // Erster noch nicht gesehener Teil der Sammlung.
+      final items = ref.watch(collectionItemsProvider(item.id)).value ?? const <BaseItem>[];
+      final next = items.where((i) => !i.userData.played).firstOrNull ?? items.firstOrNull;
+      playButtons = PrimaryButton(
+        label: next == null ? 'Abspielen' : 'Abspielen  ·  ${next.name}',
+        icon: Icons.play_arrow_rounded,
+        onPressed: next == null || next.isSeries ? null : () => playItem(context, next),
+      );
+    } else if (item.isSeries) {
       final nextUp = ref.watch(seriesNextUpProvider(item.id));
       final episode = nextUp.value;
       final resuming = episode?.userData.hasResumePosition ?? false;
@@ -642,6 +657,28 @@ class _SimilarRow extends ConsumerWidget {
       itemCount: items.length,
       height: kPosterWidth * 1.5 + kCardTextHeight,
       itemBuilder: (context, i) => PosterCard(item: items[i]),
+    );
+  }
+}
+
+/// Alle Filme/Serien einer Sammlung.
+class _CollectionRow extends ConsumerWidget {
+  const _CollectionRow({required this.collectionId});
+
+  final String collectionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(collectionItemsProvider(collectionId)).value ?? const <BaseItem>[];
+    if (items.isEmpty) return const SizedBox(height: 40);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: MediaRow(
+        title: 'In dieser Sammlung',
+        itemCount: items.length,
+        height: kPosterWidth * 1.5 + kCardTextHeight,
+        itemBuilder: (context, i) => PosterCard(item: items[i]),
+      ),
     );
   }
 }
