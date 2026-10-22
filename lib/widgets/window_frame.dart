@@ -87,6 +87,10 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
         const SingleActivator(LogicalKeyboardKey.keyF, control: true): () {
           if (loggedInArea && !path.startsWith('/play') && path != '/search') widget.router.push('/search');
         },
+        // Strg+, öffnet die Einstellungen.
+        const SingleActivator(LogicalKeyboardKey.comma, control: true): () {
+          if (loggedInArea && !path.startsWith('/play') && path != '/settings') widget.router.push('/settings');
+        },
         // F11 schaltet überall Vollbild um, Esc verlässt es.
         const SingleActivator(LogicalKeyboardKey.f11): toggleWindowFullscreen,
         const SingleActivator(LogicalKeyboardKey.escape): () {

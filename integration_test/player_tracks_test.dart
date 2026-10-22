@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:jellyflex/core/settings.dart';
 import 'package:jellyflex/dev/player_harness.dart';
 import 'package:jellyflex/widgets/window_frame.dart';
 import 'package:media_kit/media_kit.dart';
@@ -94,5 +95,35 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.f11);
     await _pumpFor(tester, const Duration(seconds: 1));
     expect(windowFullscreen.value, isFalse);
+  });
+
+  testWidgets('Player: bevorzugte Sprachen und automatisches Überspringen', (tester) async {
+    await windowManager.ensureInitialized();
+    Player? player;
+    await prepareHarness(onPlayer: (p) => player = p);
+
+    await tester.pumpWidget(
+      buildHarnessApp(
+        settings: const AppSettings(audioLanguage: 'eng', subtitleLanguage: 'eng', autoSkipIntro: true),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Test-Player öffnen'));
+    for (var i = 0; i < 100; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      final p = player;
+      if (p != null && p.state.tracks.audio.length >= 4 && p.state.duration > Duration.zero) break;
+    }
+    final p = player!;
+    await _pumpFor(tester, const Duration(seconds: 2));
+    debugPrint('Mit Einstellungen: audio=${p.state.track.audio.id} sub=${p.state.track.subtitle.id}');
+    expect(p.state.track.audio.id, '2', reason: 'Englische Tonspur bevorzugt');
+    expect(p.state.track.subtitle.id, '2', reason: 'Englische Untertitel bevorzugt');
+
+    // Im Intro (3 s – 25 s) wird automatisch ans Ende gesprungen.
+    await p.seek(const Duration(seconds: 5));
+    await _pumpFor(tester, const Duration(seconds: 3));
+    debugPrint('Nach Auto-Skip: ${p.state.position}');
+    expect(p.state.position.inSeconds, greaterThanOrEqualTo(24));
   });
 }

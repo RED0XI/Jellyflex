@@ -6,6 +6,7 @@ import '../core/format.dart';
 import '../core/images.dart';
 import '../core/models.dart';
 import '../core/session.dart';
+import '../core/settings.dart';
 import '../features/item_actions.dart';
 import '../theme.dart';
 import 'jf_image.dart';
@@ -264,7 +265,7 @@ class LandscapeCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final api = ref.watch(apiProvider);
     final dpr = MediaQuery.devicePixelRatioOf(context);
-    final image = Images.landscape(item);
+    final image = Images.landscape(item, episodeImages: ref.watch(settingsProvider).episodeImagesInRows);
     final w = _bucket(width * dpr);
     return SizedBox(
       width: width,

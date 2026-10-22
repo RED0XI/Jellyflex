@@ -5,6 +5,7 @@
 // Spielt ein lokales Testvideo mit zwei Tonspuren und zwei Untertiteln ab,
 // um Spurwahl, Intro-Button, Vollbild usw. zu prüfen.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -16,6 +17,7 @@ import 'package:window_manager/window_manager.dart';
 import '../core/jellyfin_api.dart';
 import '../core/models.dart';
 import '../core/session.dart';
+import '../core/settings.dart';
 import '../features/player/player_screen.dart';
 import '../theme.dart';
 import '../widgets/window_frame.dart';
@@ -95,7 +97,8 @@ Future<void> prepareHarness({void Function(Player player)? onPlayer}) async {
   PlayerScreen.debugBeforeOpen = (player) async => onPlayer?.call(player);
 }
 
-Widget buildHarnessApp() {
+/// [settings]: feste App-Einstellungen für den Test (werden in eine Temp-Datei geschrieben).
+Widget buildHarnessApp({AppSettings? settings}) {
   final router = GoRouter(
     routes: [
       GoRoute(
@@ -114,7 +117,15 @@ Widget buildHarnessApp() {
   );
 
   return ProviderScope(
-    overrides: [apiProvider.overrideWithValue(_FakeApi())],
+    overrides: [
+      apiProvider.overrideWithValue(_FakeApi()),
+      if (settings != null)
+        settingsProvider.overrideWith(() {
+          final file = File('${Directory.systemTemp.createTempSync('jellyflex_settings').path}\\settings.json')
+            ..writeAsStringSync(jsonEncode(settings.toJson()));
+          return SettingsController(file);
+        }),
+    ],
     child: MaterialApp.router(
       theme: buildTheme(),
       routerConfig: router,

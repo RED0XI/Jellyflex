@@ -12,6 +12,7 @@ import '../../core/images.dart';
 import '../../core/jellyfin_api.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
+import '../../core/settings.dart';
 import '../../theme.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/window_frame.dart';
@@ -140,7 +141,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         ..add(
           _player.stream.completed.listen((done) {
             if (!done) return;
-            if (_nextEpisode != null) {
+            if (_nextEpisode != null && ref.read(settingsProvider).nextEpisodeCountdown) {
               _playNext();
             } else {
               _close();
@@ -158,6 +159,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           start: start,
         ),
       );
+
+      await _applySubtitleStyle();
 
       try {
         await _api.reportPlaybackStart(_progressBody(position: start));
@@ -180,6 +183,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (!mounted || _error != null || isSubtitle || _player.state.duration > Duration.zero) return;
     setState(() => _error = 'Die Datei konnte nicht geladen werden.\n$message');
     _showControls(autoHide: false);
+  }
+
+  /// Untertitelgröße und Hintergrund aus den Einstellungen an mpv übergeben.
+  Future<void> _applySubtitleStyle() async {
+    final native = _player.platform;
+    if (native is! NativePlayer) return;
+    final s = ref.read(settingsProvider);
+    final props = {
+      'sub-scale': s.subtitleScale.toStringAsFixed(2),
+      'sub-border-style': s.subtitleBackground ? 'background-box' : 'outline-and-shadow',
+      'sub-back-color': '#B3000000',
+    };
+    for (final e in props.entries) {
+      try {
+        await native.setProperty(e.key, e.value);
+      } catch (err) {
+        debugPrint('mpv-Eigenschaft ${e.key} nicht gesetzt: $err');
+      }
+    }
   }
 
   Json _progressBody({Duration? position}) => {
@@ -208,8 +230,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
   }
 
-  /// Audio-/Untertitelspur so wählen, wie es die Jellyfin-Einstellungen
-  /// des Benutzers vorsehen (Sprache, Standard-/Erzwungen-Flags).
+  /// Audio-/Untertitelspur wählen: zuerst nach den App-Einstellungen
+  /// (bevorzugte Sprache), sonst wie es Jellyfin für den Benutzer vorsieht.
   void _applyDefaultTracks() {
     final source = _source;
     if (_tracksApplied || source == null) return;
@@ -217,12 +239,36 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final audio = tracks.audio.where(_isRealTrack).toList();
     if (audio.isEmpty) return;
     _tracksApplied = true;
+    final settings = ref.read(settingsProvider);
 
-    final audioId = _mpvIdFor(source, 'Audio', source.defaultAudioStreamIndex);
+    var audioIndex = source.defaultAudioStreamIndex;
+    if (settings.audioLanguage != null) {
+      final match = source
+          .embeddedStreams('Audio')
+          .where((s) => sameLanguage(s.language, settings.audioLanguage))
+          .firstOrNull;
+      if (match != null) audioIndex = match.index;
+    }
+    final audioId = _mpvIdFor(source, 'Audio', audioIndex);
     final audioTrack = audio.where((t) => t.id == audioId).firstOrNull;
     if (audioTrack != null) _player.setAudioTrack(audioTrack);
 
-    final subIndex = source.defaultSubtitleStreamIndex;
+    var subIndex = source.defaultSubtitleStreamIndex;
+    final subPref = settings.subtitleLanguage;
+    if (subPref == subtitlesOff) {
+      subIndex = -1;
+    } else if (subPref != null) {
+      // Vollständige Untertitel vor erzwungenen, eingebettete vor Dateien.
+      final candidates =
+          source.mediaStreams.where((s) => s.type == 'Subtitle' && sameLanguage(s.language, subPref)).toList()
+            ..sort((a, b) {
+              final forced = (a.isForced ? 1 : 0) - (b.isForced ? 1 : 0);
+              if (forced != 0) return forced;
+              return (a.isExternal ? 1 : 0) - (b.isExternal ? 1 : 0);
+            });
+      if (candidates.isNotEmpty) subIndex = candidates.first.index;
+    }
+
     final external = _externalSubtitles.where((s) => s.index == subIndex).firstOrNull;
     if (subIndex == null || subIndex < 0) {
       _player.setSubtitleTrack(SubtitleTrack.no());
@@ -399,6 +445,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Änderungen an der Untertitel-Darstellung sofort übernehmen.
+    ref.listen(settingsProvider, (prev, next) {
+      if (prev?.subtitleScale != next.subtitleScale || prev?.subtitleBackground != next.subtitleBackground) {
+        _applySubtitleStyle();
+      }
+    });
+    final settings = ref.watch(settingsProvider);
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Focus(
@@ -463,6 +517,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       ? null
                       : _api.imageUrlOrNull(Images.landscape(_nextEpisode!), fillWidth: 760, fillHeight: 428),
                   controlsVisible: _controlsVisible,
+                  autoSkip: settings.autoSkipIntro,
+                  autoPlayNext: settings.nextEpisodeCountdown,
                   onSeek: (target) {
                     _player.seek(target);
                     _focus.requestFocus();

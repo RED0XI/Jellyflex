@@ -263,6 +263,7 @@ class _TopNav extends ConsumerWidget {
               offset: const Offset(0, 48),
               onSelected: (value) {
                 if (value == 'logout') ref.read(sessionProvider.notifier).logout();
+                if (value == 'settings') context.push('/settings');
               },
               itemBuilder: (_) => [
                 PopupMenuItem(
@@ -273,6 +274,12 @@ class _TopNav extends ConsumerWidget {
                   ),
                 ),
                 const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'settings',
+                  child: Row(
+                    children: [Icon(Icons.settings_outlined, size: 20), SizedBox(width: 12), Text('Einstellungen')],
+                  ),
+                ),
                 const PopupMenuItem(
                   value: 'logout',
                   child: Row(children: [Icon(Icons.logout_rounded, size: 20), SizedBox(width: 12), Text('Abmelden')]),

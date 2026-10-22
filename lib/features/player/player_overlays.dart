@@ -29,7 +29,15 @@ class PlayerSkipOverlay extends StatefulWidget {
     required this.onSeek,
     required this.onPlayNext,
     this.controlsVisible = false,
+    this.autoSkip = false,
+    this.autoPlayNext = true,
   });
+
+  /// Intro/Rückblick automatisch überspringen statt nur den Knopf zu zeigen.
+  final bool autoSkip;
+
+  /// Countdown zur nächsten Folge (sonst nur Knopf).
+  final bool autoPlayNext;
 
   final Player player;
   final List<MediaSegment> segments;
@@ -52,6 +60,7 @@ class _PlayerSkipOverlayState extends State<PlayerSkipOverlay> {
   MediaSegment? _activeSkip;
   bool _showNextUp = false;
   bool _nextUpDismissed = false;
+  final _autoSkipped = <MediaSegment>{};
 
   @override
   void initState() {
@@ -78,6 +87,10 @@ class _PlayerSkipOverlayState extends State<PlayerSkipOverlay> {
       final threshold = outro?.start ?? duration - _nextUpLeadTime;
       nextUp = position >= threshold && position < duration;
     }
+    if (skip != null && widget.autoSkip && _autoSkipped.add(skip)) {
+      widget.onSeek(skip.end);
+    }
+
     // Zurückgespult → Karte darf wieder erscheinen.
     if (!nextUp) _nextUpDismissed = false;
 
@@ -112,6 +125,7 @@ class _PlayerSkipOverlayState extends State<PlayerSkipOverlay> {
             ? _NextEpisodeCard(
                 key: const ValueKey('next'),
                 episode: widget.nextEpisode!,
+                countdown: widget.autoPlayNext,
                 imageUrl: widget.nextEpisodeImageUrl,
                 onPlay: widget.onPlayNext,
                 onDismiss: () => setState(() => _nextUpDismissed = true),
@@ -186,8 +200,10 @@ class _NextEpisodeCard extends StatefulWidget {
     required this.imageUrl,
     required this.onPlay,
     required this.onDismiss,
+    this.countdown = true,
   });
 
+  final bool countdown;
   final BaseItem episode;
   final String? imageUrl;
   final VoidCallback onPlay;
@@ -201,8 +217,13 @@ class _NextEpisodeCardState extends State<_NextEpisodeCard> with SingleTickerPro
   late final _countdown = AnimationController(vsync: this, duration: const Duration(seconds: 12))
     ..addStatusListener((status) {
       if (status == AnimationStatus.completed) widget.onPlay();
-    })
-    ..forward();
+    });
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.countdown) _countdown.forward();
+  }
 
   @override
   void dispose() {

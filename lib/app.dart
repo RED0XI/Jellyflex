@@ -9,6 +9,7 @@ import 'features/library/library_screen.dart';
 import 'features/login/login_screen.dart';
 import 'features/player/player_screen.dart';
 import 'features/search/search_screen.dart';
+import 'features/settings/settings_screen.dart';
 import 'features/splash_screen.dart';
 import 'theme.dart';
 import 'widgets/window_frame.dart';
@@ -38,6 +39,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
       GoRoute(path: '/search', builder: (_, _) => const SearchScreen()),
+      GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(
         path: '/library/:id',
         builder: (_, state) => LibraryScreen(
