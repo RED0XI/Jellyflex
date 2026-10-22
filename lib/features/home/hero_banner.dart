@@ -217,26 +217,28 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
                 ),
               ),
             ),
-            // Trailer blendet weich über das Hintergrundbild.
-            if (_trailerVideo != null)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: AnimatedOpacity(
-                    opacity: _trailerVisible ? 1 : 0,
-                    duration: const Duration(milliseconds: 1200),
-                    curve: Curves.easeInOut,
-                    child: ClipRect(
-                      child: Video(
-                        controller: _trailerVideo!,
-                        controls: NoVideoControls,
-                        fit: BoxFit.cover,
-                        fill: Colors.transparent,
-                        wakelock: false,
+            // Trailer blendet weich über das Hintergrundbild. Der Platz bleibt immer im Baum –
+            // sonst baut Flutter den Rest des Banners neu und der Fokus (Tastatur/Controller) ginge verloren.
+            Positioned.fill(
+              child: _trailerVideo == null
+                  ? const SizedBox.shrink()
+                  : IgnorePointer(
+                      child: AnimatedOpacity(
+                        opacity: _trailerVisible ? 1 : 0,
+                        duration: const Duration(milliseconds: 1200),
+                        curve: Curves.easeInOut,
+                        child: ClipRect(
+                          child: Video(
+                            controller: _trailerVideo!,
+                            controls: NoVideoControls,
+                            fit: BoxFit.cover,
+                            fill: Colors.transparent,
+                            wakelock: false,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ),
+            ),
             // Abdunkeln links (für den Text) und unten (Übergang zu den Reihen).
             const Positioned.fill(
               child: DecoratedBox(
@@ -312,13 +314,16 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
               child: AnimatedOpacity(
                 opacity: _trailerVisible ? 1 : 0,
                 duration: const Duration(milliseconds: 400),
-                child: IgnorePointer(
-                  ignoring: !_trailerVisible,
-                  child: CircleIconButton(
-                    icon: _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                    tooltip: _muted ? 'Ton an' : 'Ton aus',
-                    size: 46,
-                    onPressed: _toggleMute,
+                child: ExcludeFocus(
+                  excluding: !_trailerVisible,
+                  child: IgnorePointer(
+                    ignoring: !_trailerVisible,
+                    child: CircleIconButton(
+                      icon: _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                      tooltip: _muted ? 'Ton an' : 'Ton aus',
+                      size: 46,
+                      onPressed: _toggleMute,
+                    ),
                   ),
                 ),
               ),

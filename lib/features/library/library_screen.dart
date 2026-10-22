@@ -9,6 +9,7 @@ import '../../widgets/media_cards.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/states.dart';
 import '../../widgets/top_scrim.dart';
+import '../../widgets/focusable.dart';
 
 enum LibrarySort {
   name('Titel', 'SortName', 'Ascending'),
@@ -382,27 +383,20 @@ class _ToggleChip extends StatefulWidget {
 }
 
 class _ToggleChipState extends State<_ToggleChip> {
-  bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: _Pill(
-          active: widget.active,
-          hovered: _hovered,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(widget.active ? Icons.check_rounded : widget.icon, size: 18),
-              const SizedBox(width: 8),
-              Text(widget.label, style: const TextStyle(fontWeight: FontWeight.w600)),
-            ],
-          ),
+    return Focusable(
+      onTap: widget.onTap,
+      builder: (context, hovered) => _Pill(
+        active: widget.active,
+        hovered: hovered,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(widget.active ? Icons.check_rounded : widget.icon, size: 18),
+            const SizedBox(width: 8),
+            Text(widget.label, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
         ),
       ),
     );
@@ -505,34 +499,25 @@ class _LetterButton extends StatefulWidget {
 }
 
 class _LetterButtonState extends State<_LetterButton> {
-  bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          width: 30,
-          height: 30,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: widget.active
-                ? Colors.white
-                : (_hovered ? Colors.white.withValues(alpha: 0.12) : Colors.transparent),
-          ),
-          child: Text(
-            widget.letter,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: widget.active ? AppColors.background : AppColors.textSecondary,
-            ),
+    return Focusable(
+      onTap: widget.onTap,
+      builder: (context, hovered) => AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        width: 30,
+        height: 30,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: widget.active ? Colors.white : (hovered ? Colors.white.withValues(alpha: 0.12) : Colors.transparent),
+        ),
+        child: Text(
+          widget.letter,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: widget.active ? AppColors.background : AppColors.textSecondary,
           ),
         ),
       ),

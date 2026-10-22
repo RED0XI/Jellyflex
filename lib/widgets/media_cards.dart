@@ -9,6 +9,7 @@ import '../core/session.dart';
 import '../core/settings.dart';
 import '../features/item_actions.dart';
 import '../theme.dart';
+import 'focusable.dart';
 import 'jf_image.dart';
 
 const double kPosterWidth = 168;
@@ -40,19 +41,12 @@ class _HoverCard extends StatefulWidget {
 }
 
 class _HoverCardState extends State<_HoverCard> {
-  bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        onSecondaryTapUp: widget.onContextMenu == null ? null : (d) => widget.onContextMenu!(d.globalPosition),
-        child: widget.builder(_hovered),
-      ),
+    return Focusable(
+      onTap: widget.onTap,
+      onSecondaryTap: widget.onContextMenu,
+      builder: (context, highlighted) => widget.builder(highlighted),
     );
   }
 }

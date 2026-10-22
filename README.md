@@ -77,6 +77,20 @@ Bilder werden genauso ausgewählt wie in der offiziellen Jellyfin-Weboberfläche
 | Player | `M` | Stumm |
 | Player | `Esc` | Vollbild verlassen bzw. Player schließen |
 
+**Ohne Maus:** Pfeiltasten bewegen die Auswahl (wie bei TV-Apps), Enter öffnet,
+Menütaste bzw. Umschalt+F10 öffnet das Kontextmenü.
+
+### Controller (Xbox, PlayStation …)
+
+| Taste | Außerhalb des Players | Im Player |
+|---|---|---|
+| Steuerkreuz / linker Stick | Auswahl bewegen | ←/→ spulen (10 s) |
+| A | Auswählen | Abspielen / Pause |
+| B | Zurück | Player schließen |
+| X | Kontextmenü | Panel „Audio & Untertitel“ |
+| Y | Suche | – |
+| Start | – | Abspielen / Pause |
+
 ## Projektaufbau
 
 ```

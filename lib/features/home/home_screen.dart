@@ -16,6 +16,7 @@ import '../../widgets/smooth_scroll.dart';
 import '../../widgets/states.dart';
 import 'hero_banner.dart';
 import 'home_providers.dart';
+import '../../widgets/focusable.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -146,61 +147,54 @@ class _LibraryTile extends ConsumerStatefulWidget {
 }
 
 class _LibraryTileState extends ConsumerState<_LibraryTile> {
-  bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
     final api = ref.watch(apiProvider);
     final lib = widget.library;
     final image = Images.landscape(lib);
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: () => openLibrary(context, lib),
-        child: AnimatedScale(
-          scale: _hovered ? 1.05 : 1,
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          child: Container(
-            width: 284,
-            height: 160,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(14)),
-            foregroundDecoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: _hovered ? Colors.white.withValues(alpha: 0.85) : Colors.white.withValues(alpha: 0.06),
-                width: _hovered ? 2 : 1,
+    return Focusable(
+      onTap: () => openLibrary(context, lib),
+      builder: (context, hovered) => AnimatedScale(
+        scale: hovered ? 1.05 : 1,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        child: Container(
+          width: 284,
+          height: 160,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(14)),
+          foregroundDecoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: hovered ? Colors.white.withValues(alpha: 0.85) : Colors.white.withValues(alpha: 0.06),
+              width: hovered ? 2 : 1,
+            ),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              JfImage(url: api.imageUrlOrNull(image, fillWidth: 640, fillHeight: 360), blurHash: image?.blurHash),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [Color(0xDD000000), Color(0x00000000)],
+                  ),
+                ),
               ),
-            ),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                JfImage(url: api.imageUrlOrNull(image, fillWidth: 640, fillHeight: 360), blurHash: image?.blurHash),
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [Color(0xDD000000), Color(0x00000000)],
-                    ),
-                  ),
+              Positioned(
+                left: 16,
+                bottom: 14,
+                child: Row(
+                  children: [
+                    Icon(lib.collectionType == 'tvshows' ? Icons.tv_rounded : Icons.movie_rounded, size: 20),
+                    const SizedBox(width: 8),
+                    Text(lib.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                  ],
                 ),
-                Positioned(
-                  left: 16,
-                  bottom: 14,
-                  child: Row(
-                    children: [
-                      Icon(lib.collectionType == 'tvshows' ? Icons.tv_rounded : Icons.movie_rounded, size: 20),
-                      const SizedBox(width: 8),
-                      Text(lib.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -352,28 +346,24 @@ class _NavLink extends StatefulWidget {
 }
 
 class _NavLinkState extends State<_NavLink> {
-  bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
-    final highlighted = widget.active || _hovered;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 150),
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: widget.active ? FontWeight.w700 : FontWeight.w500,
-              color: highlighted ? AppColors.textPrimary : AppColors.textSecondary,
-            ),
-            child: Text(widget.label),
+    return Focusable(
+      onTap: widget.onTap ?? () {},
+      scrollAlignment: 0,
+      builder: (context, hovered) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        child: AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 150),
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: widget.active ? FontWeight.w700 : FontWeight.w500,
+            color: widget.active || hovered ? AppColors.textPrimary : AppColors.textSecondary,
+            decoration: hovered ? TextDecoration.underline : null,
+            decorationColor: AppColors.accent,
+            decorationThickness: 2,
           ),
+          child: Text(widget.label),
         ),
       ),
     );

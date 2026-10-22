@@ -17,6 +17,7 @@ import '../../widgets/states.dart';
 import '../../widgets/top_scrim.dart';
 import '../home/hero_banner.dart';
 import '../home/home_providers.dart';
+import '../../widgets/focusable.dart';
 
 final itemProvider = FutureProvider.autoDispose.family<BaseItem, String>((ref, id) {
   return ref.watch(apiProvider).getItem(id);
@@ -495,30 +496,23 @@ class _SeasonChip extends StatefulWidget {
 }
 
 class _SeasonChipState extends State<_SeasonChip> {
-  bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: widget.selected ? Colors.white : Colors.white.withValues(alpha: _hovered ? 0.16 : 0.08),
-            borderRadius: BorderRadius.circular(22),
-          ),
-          child: Text(
-            widget.label,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: widget.selected ? AppColors.background : AppColors.textPrimary,
-            ),
+    return Focusable(
+      onTap: widget.onTap,
+      builder: (context, hovered) => AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: widget.selected ? Colors.white : Colors.white.withValues(alpha: hovered ? 0.16 : 0.08),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Text(
+          widget.label,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: widget.selected ? AppColors.background : AppColors.textPrimary,
           ),
         ),
       ),

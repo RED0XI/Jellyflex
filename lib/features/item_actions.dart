@@ -31,6 +31,8 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
     ),
   );
 
+  // Nach dem Menü soll der Fokus (Tastatur/Controller) wieder auf der Karte liegen.
+  final previousFocus = FocusManager.instance.primaryFocus;
   final action = await showMenu<_ItemAction>(
     context: context,
     position: RelativeRect.fromRect(globalPosition & const Size(1, 1), Offset.zero & overlay.size),
@@ -64,6 +66,7 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
       if (data.hasResumePosition) entry(_ItemAction.forget, Icons.history_toggle_off_rounded, 'Vergessen'),
     ],
   );
+  restoreFocusAfterMenu(previousFocus);
   if (action == null) return;
 
   final api = container.read(apiProvider);
@@ -109,3 +112,25 @@ SnackBar _snack(String text) => SnackBar(
   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
   duration: const Duration(seconds: 3),
 );
+
+/// Flutter gibt den Fokus nach dem Schließen eines Menüs an die Seite zurück,
+/// nicht an das vorher fokussierte Element. Sobald das passiert, leiten wir
+/// ihn an [node] weiter – so geht es per Tastatur/Controller nahtlos weiter.
+void restoreFocusAfterMenu(FocusNode? node) {
+  if (node == null) return;
+  late void Function() listener;
+  listener = () {
+    final context = node.context;
+    final primary = FocusManager.instance.primaryFocus;
+    // Karte weg oder jemand hat bewusst ein anderes Element fokussiert → fertig.
+    if (context == null || !context.mounted || (primary != null && primary is! FocusScopeNode && primary != node)) {
+      FocusManager.instance.removeListener(listener);
+      return;
+    }
+    // Die Seite kann den Fokus während der Schließ-Animation mehrmals an sich ziehen –
+    // aber nur zurückholen, solange die Karte auf der sichtbaren Seite liegt.
+    if (primary is FocusScopeNode && (ModalRoute.of(context)?.isCurrent ?? true)) node.requestFocus();
+  };
+  FocusManager.instance.addListener(listener);
+  listener();
+}

@@ -8,6 +8,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../core/format.dart';
+import '../../core/gamepad_input.dart';
 import '../../core/images.dart';
 import '../../core/jellyfin_api.dart';
 import '../../core/live_connection.dart';
@@ -20,6 +21,7 @@ import '../../widgets/buttons.dart';
 import '../../widgets/window_frame.dart';
 import '../details/details_screen.dart';
 import 'player_overlays.dart';
+import '../../widgets/focusable.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key, required this.itemId, this.startTicks, this.restoreFullscreen});
@@ -103,6 +105,39 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     MediaSession.onButton = _onMediaButton;
     RemoteControl.onPlaystate = _onRemotePlaystate;
     RemoteControl.onGeneral = _onRemoteGeneral;
+    GamepadInput.playerHandler = _onPad;
+  }
+
+  /// Controller im Player: ←/→ spulen, A/Start Pause, B zurück, X Spuren-Panel.
+  /// In offenen Panels steuert das Steuerkreuz die Auswahl.
+  bool _onPad(PadAction action) {
+    if (_anyPanelOpen) {
+      if (action == PadAction.back || action == PadAction.menu) {
+        _closePanels();
+        return true;
+      }
+      if (action != PadAction.playPause) return false;
+      _player.playOrPause();
+      return true;
+    }
+    switch (action) {
+      case PadAction.left:
+        _seekBy(-_seekStep);
+      case PadAction.right:
+        _seekBy(_seekStep);
+      case PadAction.select || PadAction.playPause:
+        _player.playOrPause();
+      case PadAction.back:
+        _close();
+      case PadAction.menu:
+        _setTrackPanel(true);
+        // Erste Zeile im Panel fokussieren.
+        WidgetsBinding.instance.addPostFrameCallback((_) => _focus.nextFocus());
+      case PadAction.up || PadAction.down || PadAction.search:
+        break;
+    }
+    _showControls(autoHide: _player.state.playing);
+    return true;
   }
 
   /// Fernsteuerung (z. B. vom Handy über Jellyfin).
@@ -215,6 +250,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     windowFullscreen.removeListener(_onFullscreenChanged);
     if (RemoteControl.onPlaystate == _onRemotePlaystate) RemoteControl.onPlaystate = null;
     if (RemoteControl.onGeneral == _onRemoteGeneral) RemoteControl.onGeneral = null;
+    if (GamepadInput.playerHandler == _onPad) GamepadInput.playerHandler = null;
     if (MediaSession.onButton == _onMediaButton) {
       MediaSession.onButton = null;
       // Bei "Nächste Folge" übernimmt gleich der neue Player die Anzeige.
@@ -604,6 +640,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final isRepeat = event is KeyRepeatEvent;
     if (!isDown && !isRepeat) return KeyEventResult.ignored;
     final key = event.logicalKey;
+
+    // In offenen Panels bewegen die Pfeiltasten die Auswahl, Enter wählt.
+    final arrows = {
+      LogicalKeyboardKey.arrowUp,
+      LogicalKeyboardKey.arrowDown,
+      LogicalKeyboardKey.arrowLeft,
+      LogicalKeyboardKey.arrowRight,
+      LogicalKeyboardKey.enter,
+    };
+    if (_anyPanelOpen && arrows.contains(key)) {
+      if (node.hasPrimaryFocus && key != LogicalKeyboardKey.enter) {
+        node.nextFocus();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
 
     if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.keyJ) {
       _seekBy(-_seekStep);
@@ -1547,43 +1599,36 @@ class _TrackRow extends StatefulWidget {
 }
 
 class _TrackRowState extends State<_TrackRow> {
-  bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: BoxDecoration(
-            color: _hovered ? Colors.white.withValues(alpha: 0.08) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 28,
-                child: widget.selected ? const Icon(Icons.check_rounded, size: 20, color: AppColors.accent) : null,
-              ),
-              Expanded(
-                child: Text(
-                  widget.label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
-                    color: widget.selected || _hovered ? Colors.white : AppColors.textSecondary,
-                  ),
+    return Focusable(
+      onTap: widget.onTap,
+      builder: (context, hovered) => AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: hovered ? Colors.white.withValues(alpha: 0.08) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 28,
+              child: widget.selected ? const Icon(Icons.check_rounded, size: 20, color: AppColors.accent) : null,
+            ),
+            Expanded(
+              child: Text(
+                widget.label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
+                  color: widget.selected || hovered ? Colors.white : AppColors.textSecondary,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

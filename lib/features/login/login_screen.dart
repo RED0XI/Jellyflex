@@ -10,6 +10,7 @@ import '../../core/session.dart';
 import '../../theme.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/buttons.dart';
+import '../../widgets/focusable.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -481,8 +482,6 @@ class _ProfileTile extends StatefulWidget {
 }
 
 class _ProfileTileState extends State<_ProfileTile> {
-  bool _hovered = false;
-
   Future<void> _showMenu(Offset position) async {
     final onForget = widget.onForget;
     if (onForget == null) return;
@@ -506,70 +505,65 @@ class _ProfileTileState extends State<_ProfileTile> {
   Widget build(BuildContext context) {
     final size = widget.small ? 56.0 : 104.0;
     final initial = widget.name.isNotEmpty ? widget.name[0].toUpperCase() : '?';
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        onSecondaryTapUp: (d) => _showMenu(d.globalPosition),
-        child: SizedBox(
-          width: widget.small ? 72 : 130,
-          child: Column(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: size,
-                height: size,
-                clipBehavior: Clip.antiAlias,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(size * 0.28),
-                  gradient: widget.icon == null ? AppColors.accentGradient : null,
-                  color: widget.icon != null ? Colors.white.withValues(alpha: _hovered ? 0.16 : 0.08) : null,
-                  border: Border.all(color: _hovered ? Colors.white : Colors.transparent, width: 2.5),
-                ),
-                child: widget.icon != null
-                    ? Icon(widget.icon, size: size * 0.45, color: AppColors.textSecondary)
-                    : Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Center(
-                            child: Text(
-                              initial,
-                              style: TextStyle(fontSize: size * 0.42, fontWeight: FontWeight.w800),
-                            ),
-                          ),
-                          if (widget.imageUrl != null)
-                            Image.network(
-                              widget.imageUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                            ),
-                        ],
-                      ),
+    return Focusable(
+      onTap: widget.onTap,
+      onSecondaryTap: widget.onForget == null ? null : _showMenu,
+      builder: (context, hovered) => SizedBox(
+        width: widget.small ? 72 : 130,
+        child: Column(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: size,
+              height: size,
+              clipBehavior: Clip.antiAlias,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(size * 0.28),
+                gradient: widget.icon == null ? AppColors.accentGradient : null,
+                color: widget.icon != null ? Colors.white.withValues(alpha: hovered ? 0.16 : 0.08) : null,
+                border: Border.all(color: hovered ? Colors.white : Colors.transparent, width: 2.5),
               ),
-              const SizedBox(height: 10),
+              child: widget.icon != null
+                  ? Icon(widget.icon, size: size * 0.45, color: AppColors.textSecondary)
+                  : Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Center(
+                          child: Text(
+                            initial,
+                            style: TextStyle(fontSize: size * 0.42, fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        if (widget.imageUrl != null)
+                          Image.network(
+                            widget.imageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                          ),
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              widget.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: widget.small ? 12.5 : 15,
+                fontWeight: FontWeight.w600,
+                color: hovered ? Colors.white : AppColors.textSecondary,
+              ),
+            ),
+            if (widget.subtitle != null)
               Text(
-                widget.name,
+                widget.subtitle!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: widget.small ? 12.5 : 15,
-                  fontWeight: FontWeight.w600,
-                  color: _hovered ? Colors.white : AppColors.textSecondary,
-                ),
+                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
               ),
-              if (widget.subtitle != null)
-                Text(
-                  widget.subtitle!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                ),
-            ],
-          ),
+          ],
         ),
       ),
     );

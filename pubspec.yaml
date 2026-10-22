@@ -45,6 +45,7 @@ dependencies:
   flutter_blurhash: ^0.9.1
   google_fonts: 8.0.0
   ffi: ^2.2.0
+  gamepads: ^0.1.12
 
 dev_dependencies:
   flutter_test:

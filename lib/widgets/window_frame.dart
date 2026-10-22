@@ -5,7 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../core/gamepad_input.dart';
 import '../theme.dart';
+import 'focus_navigation.dart';
+import 'focusable.dart';
 
 /// Steuert, ob die Fensterleiste sichtbar ist (der Player blendet sie aus).
 final windowChromeVisible = ValueNotifier<bool>(true);
@@ -32,7 +35,15 @@ class WindowFrame extends StatefulWidget {
   State<WindowFrame> createState() => _WindowFrameState();
 }
 
+final _arrowDirections = {
+  LogicalKeyboardKey.arrowUp: TraversalDirection.up,
+  LogicalKeyboardKey.arrowDown: TraversalDirection.down,
+  LogicalKeyboardKey.arrowLeft: TraversalDirection.left,
+  LogicalKeyboardKey.arrowRight: TraversalDirection.right,
+};
+
 class _WindowFrameState extends State<WindowFrame> with WindowListener {
+  final _frameFocus = FocusNode(debugLabel: 'WindowFrame');
   bool _maximized = false;
 
   @override
@@ -40,6 +51,8 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
     super.initState();
     windowManager.addListener(this);
     widget.router.routerDelegate.addListener(_onRouteChanged);
+    GamepadInput.start(_onPadAction);
+    HardwareKeyboard.instance.addHandler(_onHardwareKey);
     windowManager.isMaximized().then((v) {
       if (mounted) setState(() => _maximized = v);
     });
@@ -49,7 +62,55 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
   void dispose() {
     windowManager.removeListener(this);
     widget.router.routerDelegate.removeListener(_onRouteChanged);
+    GamepadInput.stop();
+    HardwareKeyboard.instance.removeHandler(_onHardwareKey);
+    _frameFocus.dispose();
     super.dispose();
+  }
+
+  /// Liegt der Fokus auf keinem Element (ganz oben im Fenster), erreichen Tasten
+  /// die Seite nicht – Pfeiltasten hier direkt in Fokus-Navigation umsetzen.
+  bool _onHardwareKey(KeyEvent event) {
+    final primary = FocusManager.instance.primaryFocus;
+    if (primary != null && primary != FocusManager.instance.rootScope && primary != _frameFocus) return false;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
+    final direction = _arrowDirections[event.logicalKey];
+    if (direction == null) return false;
+    moveFocusInDirection(direction);
+    return true;
+  }
+
+  /// Controller außerhalb des Players: Fokus bewegen, auswählen, zurück …
+  void _onPadAction(PadAction action) {
+    final focus = FocusManager.instance.primaryFocus;
+    final direction = switch (action) {
+      PadAction.up => TraversalDirection.up,
+      PadAction.down => TraversalDirection.down,
+      PadAction.left => TraversalDirection.left,
+      PadAction.right => TraversalDirection.right,
+      _ => null,
+    };
+    if (direction != null) {
+      moveFocusInDirection(direction);
+      return;
+    }
+    final context = focus?.context;
+    switch (action) {
+      case PadAction.select:
+        if (context != null) Actions.maybeInvoke(context, const ActivateIntent());
+      case PadAction.menu:
+        if (context != null) Actions.maybeInvoke(context, const ShowContextMenuIntent());
+      case PadAction.back:
+        // Schließt ein offenes Menü bzw. geht eine Seite zurück.
+        if (context != null) {
+          Navigator.maybeOf(context)?.maybePop();
+        } else if (widget.router.canPop()) {
+          widget.router.pop();
+        }
+      case PadAction.search:
+        if (_currentPath() != '/search') widget.router.push('/search');
+      default:
+    }
   }
 
   void _onRouteChanged() {
@@ -91,24 +152,45 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
         const SingleActivator(LogicalKeyboardKey.comma, control: true): () {
           if (loggedInArea && !path.startsWith('/play') && path != '/settings') widget.router.push('/settings');
         },
-        // F11 schaltet überall Vollbild um, Esc verlässt es.
+        // F11 schaltet überall Vollbild um.
         const SingleActivator(LogicalKeyboardKey.f11): toggleWindowFullscreen,
-        const SingleActivator(LogicalKeyboardKey.escape): () {
-          if (windowFullscreen.value) setWindowFullscreen(false);
-        },
-        // Alt+← bzw. Maus-"Zurück" wie im Browser.
-        const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): () {
-          if (showBack) widget.router.pop();
-        },
       },
-      // Fängt Tastendrücke auf, wenn sonst nichts fokussiert ist (z. B. auf der Startseite).
-      child: Focus(
-        autofocus: true,
-        child: Listener(
-          onPointerDown: (e) {
-            if (e.buttons == kBackMouseButton && showBack) widget.router.pop();
+      // Esc und Alt+← nur abfangen, wenn sie hier etwas bewirken – sonst bleiben sie
+      // für Menüs, Dialoge usw. (z. B. Esc schließt ein Kontextmenü).
+      child: Shortcuts(
+        shortcuts: const {
+          SingleActivator(LogicalKeyboardKey.escape): _ExitFullscreenIntent(),
+          SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): _GoBackIntent(),
+        },
+        child: Actions(
+          actions: {
+            _ExitFullscreenIntent: _WhenAction<_ExitFullscreenIntent>(
+              () => windowFullscreen.value,
+              () => setWindowFullscreen(false),
+            ),
+            _GoBackIntent: _WhenAction<_GoBackIntent>(() => showBack, () => widget.router.pop()),
           },
-          child: _buildFrame(showBack),
+          // Fängt Tastendrücke auf, wenn sonst nichts fokussiert ist (z. B. auf der Startseite).
+          child: Focus(
+            autofocus: true,
+            focusNode: _frameFocus,
+            // Pfeiltasten bewegen den Fokus (eigene, TV-artige Regel). Textfelder und der
+            // Player verarbeiten ihre Pfeiltasten vorher selbst.
+            onKeyEvent: (node, event) {
+              if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
+              final direction = _arrowDirections[event.logicalKey];
+              if (direction == null) return KeyEventResult.ignored;
+              // Auch wenn es in die Richtung nichts gibt: Fokus bleibt, wo er ist.
+              moveFocusInDirection(direction);
+              return KeyEventResult.handled;
+            },
+            child: Listener(
+              onPointerDown: (e) {
+                if (e.buttons == kBackMouseButton && showBack) widget.router.pop();
+              },
+              child: _buildFrame(showBack),
+            ),
+          ),
         ),
       ),
     );
@@ -222,5 +304,30 @@ class _TitleBarButtonState extends State<_TitleBarButton> {
         ),
       ),
     );
+  }
+}
+
+class _ExitFullscreenIntent extends Intent {
+  const _ExitFullscreenIntent();
+}
+
+class _GoBackIntent extends Intent {
+  const _GoBackIntent();
+}
+
+/// Aktion, die nur greift (und die Taste nur dann "verbraucht"), wenn [enabled] gilt.
+class _WhenAction<T extends Intent> extends Action<T> {
+  _WhenAction(this.enabled, this.run);
+
+  final bool Function() enabled;
+  final VoidCallback run;
+
+  @override
+  bool isEnabled(T intent) => enabled();
+
+  @override
+  Object? invoke(T intent) {
+    run();
+    return null;
   }
 }

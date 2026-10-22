@@ -8,6 +8,7 @@ import '../../core/models.dart';
 import '../../core/settings.dart';
 import '../../theme.dart';
 import '../../widgets/jf_image.dart';
+import '../../widgets/focusable.dart';
 
 /// Beschriftung für "… überspringen" je nach Abschnittstyp.
 String _skipLabel(String type) => switch (type) {
@@ -154,39 +155,32 @@ class _SkipButton extends StatefulWidget {
 }
 
 class _SkipButtonState extends State<_SkipButton> {
-  bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-          decoration: BoxDecoration(
-            color: _hovered ? Colors.white : Colors.black.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 1.5),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.skip_next_rounded, color: _hovered ? AppColors.background : Colors.white),
-              const SizedBox(width: 8),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: _hovered ? AppColors.background : Colors.white,
-                ),
+    return Focusable(
+      onTap: widget.onPressed,
+      builder: (context, hovered) => AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+        decoration: BoxDecoration(
+          color: hovered ? Colors.white : Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 1.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.skip_next_rounded, color: hovered ? AppColors.background : Colors.white),
+            const SizedBox(width: 8),
+            Text(
+              widget.label,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: hovered ? AppColors.background : Colors.white,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -591,41 +585,34 @@ class _SelectRow extends StatefulWidget {
 }
 
 class _SelectRowState extends State<_SelectRow> {
-  bool _hovered = false;
-
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          decoration: BoxDecoration(
-            color: _hovered ? Colors.white.withValues(alpha: 0.08) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 26,
-                child: widget.selected ? const Icon(Icons.check_rounded, size: 19, color: AppColors.accent) : null,
+    return Focusable(
+      onTap: widget.onTap,
+      builder: (context, hovered) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        decoration: BoxDecoration(
+          color: hovered ? Colors.white.withValues(alpha: 0.08) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 26,
+              child: widget.selected ? const Icon(Icons.check_rounded, size: 19, color: AppColors.accent) : null,
+            ),
+            Text(
+              widget.label,
+              style: TextStyle(
+                fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
+                color: widget.selected || hovered ? Colors.white : AppColors.textSecondary,
               ),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  fontWeight: widget.selected ? FontWeight.w700 : FontWeight.w500,
-                  color: widget.selected || _hovered ? Colors.white : AppColors.textSecondary,
-                ),
-              ),
-              if (widget.hint != null) ...[
-                const SizedBox(width: 8),
-                Text(widget.hint!, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-              ],
+            ),
+            if (widget.hint != null) ...[
+              const SizedBox(width: 8),
+              Text(widget.hint!, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
             ],
-          ),
+          ],
         ),
       ),
     );

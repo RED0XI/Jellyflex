@@ -179,16 +179,23 @@ void main() {
         ),
       ),
     );
-    // 4 s warten bis zum Start, dann Laden und Einblenden.
-    await _pumpFor(tester, const Duration(seconds: 9));
-    final muteOpacity = tester
-        .widget<AnimatedOpacity>(
-          find.ancestor(of: find.byIcon(Icons.volume_off_rounded), matching: find.byType(AnimatedOpacity)).first,
-        )
-        .opacity;
-    debugPrint('Ton-Knopf sichtbar: $muteOpacity');
+    // Start nach 4 s, dann Laden und Einblenden – bis zu 20 s warten.
+    double muteOpacity() {
+      final finder = find.ancestor(of: find.byIcon(Icons.volume_off_rounded), matching: find.byType(AnimatedOpacity));
+      if (finder.evaluate().isEmpty) return 0; // Banner noch nicht geladen
+      return tester.widget<AnimatedOpacity>(finder.first).opacity;
+    }
+
+    final end = DateTime.now().add(const Duration(seconds: 20));
+    while (DateTime.now().isBefore(end) && muteOpacity() < 1) {
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+    await _pumpFor(
+      tester,
+      const Duration(milliseconds: 1500),
+    ); // Einblenden abwarten    debugPrint('Ton-Knopf sichtbar: ${muteOpacity()}');
     await _saveShot(tester, 'home_trailer');
-    expect(muteOpacity, 1.0, reason: 'Trailer sollte laufen und eingeblendet sein');
+    expect(muteOpacity(), 1.0, reason: 'Trailer sollte laufen und eingeblendet sein');
   });
 
   testWidgets('Profilauswahl', (tester) async {
