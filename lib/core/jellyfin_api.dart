@@ -14,11 +14,12 @@ class ServerInfo {
 }
 
 class AuthResult {
-  const AuthResult({required this.token, required this.userId, required this.userName});
+  const AuthResult({required this.token, required this.userId, required this.userName, this.userImageTag});
 
   final String token;
   final String userId;
   final String userName;
+  final String? userImageTag;
 
   factory AuthResult.fromJson(Json json) {
     final user = (json['User'] as Map).cast<String, dynamic>();
@@ -26,6 +27,7 @@ class AuthResult {
       token: json['AccessToken'] as String,
       userId: user['Id'] as String,
       userName: (user['Name'] as String?) ?? '',
+      userImageTag: user['PrimaryImageTag'] as String?,
     );
   }
 }
@@ -138,6 +140,16 @@ class JellyfinApi {
   Future<AuthResult> authenticate(String username, String password) async {
     final res = await dio.post('/Users/AuthenticateByName', data: {'Username': username, 'Pw': password});
     return AuthResult.fromJson((res.data as Map).cast<String, dynamic>());
+  }
+
+  /// Benutzer, die der Server auf dem Anmeldebildschirm zeigt (oft leer).
+  Future<List<Json>> getPublicUsers() async {
+    try {
+      final res = await dio.get('/Users/Public');
+      return (res.data as List).whereType<Map>().map((m) => m.cast<String, dynamic>()).toList();
+    } catch (_) {
+      return const [];
+    }
   }
 
   Future<bool> isQuickConnectEnabled() async {

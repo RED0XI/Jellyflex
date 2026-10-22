@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/jellyfin_api.dart';
+import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../theme.dart';
 import '../../widgets/brand_logo.dart';
@@ -22,6 +23,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _userFocus = FocusNode();
+  final _passFocus = FocusNode();
 
   ServerInfo? _server;
   bool _busy = false;
@@ -30,6 +32,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _quickConnectAvailable = false;
   String? _quickConnectCode;
   Timer? _quickConnectTimer;
+
+  /// Gespeicherte Konten ausblenden und ein neues hinzufügen.
+  bool _addingAccount = false;
+
+  /// Benutzer, die der Server öffentlich anzeigt (Klick füllt den Namen aus).
+  List<Json> _publicUsers = const [];
 
   @override
   void initState() {
@@ -46,6 +54,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _userCtrl.dispose();
     _passCtrl.dispose();
     _userFocus.dispose();
+    _passFocus.dispose();
     super.dispose();
   }
 
@@ -58,11 +67,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final server = await JellyfinApi.probe(_serverCtrl.text);
       final api = await SessionController.anonymousApi(server);
-      final qc = await api.isQuickConnectEnabled();
+      final (qc, users) = await (api.isQuickConnectEnabled(), api.getPublicUsers()).wait;
       if (!mounted) return;
       setState(() {
         _server = server;
         _quickConnectAvailable = qc;
+        _publicUsers = users;
       });
       _userFocus.requestFocus();
     } catch (_) {
@@ -135,8 +145,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
   }
 
+  /// Öffentlicher Benutzer gewählt: ohne Passwort direkt anmelden, sonst Namen eintragen.
+  Future<void> _pickPublicUser(Json user) async {
+    _userCtrl.text = (user['Name'] as String?) ?? '';
+    if (user['HasPassword'] == false) {
+      _passCtrl.clear();
+      await _login();
+    } else {
+      _passFocus.requestFocus();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final accounts = ref.watch(savedAccountsProvider).value ?? const <AuthSession>[];
+    final showProfiles = accounts.isNotEmpty && !_addingAccount && _server == null;
+
     return Scaffold(
       body: Stack(
         children: [
@@ -151,8 +175,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 8),
                   const Text('Dein Kino. Auf dem Desktop.', style: TextStyle(color: AppColors.textSecondary)),
                   const SizedBox(height: 36),
-                  Container(
-                    width: 420,
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                    width: showProfiles ? 560 : 420,
                     padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(
                       color: AppColors.surface.withValues(alpha: 0.82),
@@ -165,7 +191,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       curve: Curves.easeOutCubic,
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 300),
-                        child: _server == null ? _buildServerStep() : _buildLoginStep(),
+                        child: showProfiles
+                            ? _buildProfiles(accounts)
+                            : _server == null
+                            ? _buildServerStep(canGoBack: accounts.isNotEmpty)
+                            : _buildLoginStep(),
                       ),
                     ),
                   ),
@@ -178,11 +208,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildServerStep() {
+  /// "Wer schaut?" – gespeicherte Konten zum schnellen Wechseln.
+  Widget _buildProfiles(List<AuthSession> accounts) {
+    return Column(
+      key: const ValueKey('profiles'),
+      children: [
+        const Text('Wer schaut?', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 24),
+        Wrap(
+          spacing: 18,
+          runSpacing: 18,
+          alignment: WrapAlignment.center,
+          children: [
+            for (final a in accounts)
+              _ProfileTile(
+                name: a.userName,
+                subtitle: a.serverName,
+                imageUrl: a.userImageUrl,
+                onTap: () => ref.read(sessionProvider.notifier).activate(a),
+                onForget: () => ref.read(sessionProvider.notifier).forgetAccount(a),
+              ),
+            _ProfileTile(
+              name: 'Konto hinzufügen',
+              icon: Icons.add_rounded,
+              onTap: () => setState(() => _addingAccount = true),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildServerStep({bool canGoBack = false}) {
     return Column(
       key: const ValueKey('server'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (canGoBack)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => setState(() => _addingAccount = false),
+              icon: const Icon(Icons.arrow_back_rounded, size: 18),
+              label: const Text('Zur Profilauswahl'),
+            ),
+          ),
         const Text('Server verbinden', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
         const SizedBox(height: 6),
         const Text('Gib die Adresse deines Jellyfin-Servers ein.', style: TextStyle(color: AppColors.textSecondary)),
@@ -268,6 +338,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ],
         ),
+        if (_publicUsers.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (final u in _publicUsers)
+                _ProfileTile(
+                  name: (u['Name'] as String?) ?? '',
+                  imageUrl: u['PrimaryImageTag'] == null
+                      ? null
+                      : '${server.url}/UserImage?${Uri(queryParameters: {'userId': u['Id'] as String, 'tag': u['PrimaryImageTag'] as String}).query}',
+                  small: true,
+                  onTap: () => _pickPublicUser(u),
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: 24),
         TextField(
           controller: _userCtrl,
@@ -278,6 +366,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         const SizedBox(height: 14),
         TextField(
           controller: _passCtrl,
+          focusNode: _passFocus,
           obscureText: true,
           decoration: const InputDecoration(labelText: 'Passwort', prefixIcon: Icon(Icons.lock_rounded)),
           onSubmitted: (_) => _login(),
@@ -363,6 +452,126 @@ class _AmbientBackgroundState extends State<_AmbientBackground> with SingleTicke
           ),
         );
       },
+    );
+  }
+}
+
+/// Profilkachel: rundes Bild (oder Symbol) mit Namen; Rechtsklick → entfernen.
+class _ProfileTile extends StatefulWidget {
+  const _ProfileTile({
+    required this.name,
+    required this.onTap,
+    this.subtitle,
+    this.imageUrl,
+    this.icon,
+    this.onForget,
+    this.small = false,
+  });
+
+  final String name;
+  final String? subtitle;
+  final String? imageUrl;
+  final IconData? icon;
+  final VoidCallback onTap;
+  final VoidCallback? onForget;
+  final bool small;
+
+  @override
+  State<_ProfileTile> createState() => _ProfileTileState();
+}
+
+class _ProfileTileState extends State<_ProfileTile> {
+  bool _hovered = false;
+
+  Future<void> _showMenu(Offset position) async {
+    final onForget = widget.onForget;
+    if (onForget == null) return;
+    final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final choice = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(position & const Size(1, 1), Offset.zero & overlay.size),
+      items: const [
+        PopupMenuItem(
+          value: 'forget',
+          child: Row(
+            children: [Icon(Icons.person_remove_outlined, size: 20), SizedBox(width: 12), Text('Konto entfernen')],
+          ),
+        ),
+      ],
+    );
+    if (choice == 'forget') onForget();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = widget.small ? 56.0 : 104.0;
+    final initial = widget.name.isNotEmpty ? widget.name[0].toUpperCase() : '?';
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onSecondaryTapUp: (d) => _showMenu(d.globalPosition),
+        child: SizedBox(
+          width: widget.small ? 72 : 130,
+          child: Column(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: size,
+                height: size,
+                clipBehavior: Clip.antiAlias,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(size * 0.28),
+                  gradient: widget.icon == null ? AppColors.accentGradient : null,
+                  color: widget.icon != null ? Colors.white.withValues(alpha: _hovered ? 0.16 : 0.08) : null,
+                  border: Border.all(color: _hovered ? Colors.white : Colors.transparent, width: 2.5),
+                ),
+                child: widget.icon != null
+                    ? Icon(widget.icon, size: size * 0.45, color: AppColors.textSecondary)
+                    : Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Center(
+                            child: Text(
+                              initial,
+                              style: TextStyle(fontSize: size * 0.42, fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                          if (widget.imageUrl != null)
+                            Image.network(
+                              widget.imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                            ),
+                        ],
+                      ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                widget.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: widget.small ? 12.5 : 15,
+                  fontWeight: FontWeight.w600,
+                  color: _hovered ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+              if (widget.subtitle != null)
+                Text(
+                  widget.subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

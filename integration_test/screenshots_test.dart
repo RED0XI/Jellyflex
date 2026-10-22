@@ -16,6 +16,7 @@ import 'package:jellyflex/core/models.dart';
 import 'package:jellyflex/core/session.dart';
 import 'package:jellyflex/features/home/home_screen.dart';
 import 'package:jellyflex/features/library/library_screen.dart';
+import 'package:jellyflex/features/login/login_screen.dart';
 import 'package:jellyflex/features/home/home_providers.dart';
 import 'package:jellyflex/features/settings/settings_screen.dart';
 import 'package:jellyflex/theme.dart';
@@ -188,6 +189,43 @@ void main() {
     debugPrint('Ton-Knopf sichtbar: $muteOpacity');
     await _saveShot(tester, 'home_trailer');
     expect(muteOpacity, 1.0, reason: 'Trailer sollte laufen und eingeblendet sein');
+  });
+
+  testWidgets('Profilauswahl', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          savedAccountsProvider.overrideWith(
+            (ref) async => const [
+              AuthSession(
+                serverUrl: 'http://x',
+                serverName: 'Aphelion',
+                userId: 'a',
+                userName: 'Alex',
+                token: 't',
+                deviceId: 'd',
+              ),
+              AuthSession(
+                serverUrl: 'http://x',
+                serverName: 'Aphelion',
+                userId: 'b',
+                userName: 'Gast',
+                token: 't',
+                deviceId: 'd',
+              ),
+            ],
+          ),
+        ],
+        child: RepaintBoundary(
+          key: _shotKey,
+          child: MaterialApp(debugShowCheckedModeBanner: false, theme: buildTheme(), home: const LoginScreen()),
+        ),
+      ),
+    );
+    await _pumpFor(tester, const Duration(seconds: 2));
+    expect(find.text('Wer schaut?'), findsOneWidget);
+    await _saveShot(tester, 'profiles');
   });
 }
 
