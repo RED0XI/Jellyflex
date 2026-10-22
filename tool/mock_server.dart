@@ -7,12 +7,46 @@
 // Liefert fiktive Filme/Serien und erzeugt farbige Platzhalterbilder.
 // Videos gibt es keine – der Player zeigt hier also einen Fehler.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
 const port = 8097;
+
+/// Testvideo für alle Streams (siehe lib/dev/player_harness.dart).
+final _videoFile = File(Platform.environment['JELLYFLEX_TEST_VIDEO'] ?? '${Directory.systemTemp.path}\\jellyflex_test.mkv');
+
+/// Liefert das Testvideo aus – mit Range-Unterstützung, damit Spulen klappt.
+Future<void> _serveVideo(HttpRequest req) async {
+  final res = req.response;
+  if (!_videoFile.existsSync()) {
+    res.statusCode = 404;
+    await res.close();
+    return;
+  }
+  final length = _videoFile.lengthSync();
+  res.headers.set('Accept-Ranges', 'bytes');
+  res.headers.contentType = ContentType('video', 'x-matroska');
+  var start = 0;
+  var end = length - 1;
+  final range = req.headers.value('range');
+  final match = range == null ? null : RegExp(r'bytes=(\d*)-(\d*)').firstMatch(range);
+  if (match != null) {
+    start = int.tryParse(match.group(1)!) ?? 0;
+    end = match.group(2)!.isEmpty ? length - 1 : int.parse(match.group(2)!);
+    res.statusCode = HttpStatus.partialContent;
+    res.headers.set('Content-Range', 'bytes $start-$end/$length');
+  }
+  res.contentLength = end - start + 1;
+  try {
+    await res.addStream(_videoFile.openRead(start, end + 1));
+  } catch (_) {
+    // Abbruch durch den Player (z. B. beim Spulen) – normal.
+  }
+  await res.close();
+}
 
 final _rand = math.Random(7);
 
@@ -388,6 +422,21 @@ Object? _handle(HttpRequest req) {
     return {'PlaySessionId': 'mock-session', 'MediaSources': item?['MediaSources'] ?? []};
   }
   if (seg.length == 2 && seg[0] == 'MediaSegments') return {'Items': []};
+  if (seg.length == 3 && seg[0] == 'Items' && seg[2] == 'LocalTrailers') {
+    if (!(byId[seg[1]]?['Type'] == 'Movie')) return [];
+    final id = 'trailer-${seg[1]}';
+    return [
+      {
+        'Id': id,
+        'Name': 'Trailer',
+        'Type': 'Trailer',
+        'MediaSources': [
+          {'Id': id},
+        ],
+      },
+    ];
+  }
+  if (seg.length == 3 && seg[0] == 'Items' && seg[2] == 'ThemeVideos') return {'Items': []};
   if (seg.length == 2 && seg[0] == 'Items') return byId[seg[1]];
   if (seg.length >= 2 && (seg[0] == 'UserFavoriteItems' || seg[0] == 'UserPlayedItems')) {
     final item = byId[seg[1]];
@@ -409,6 +458,11 @@ Future<void> main() async {
     final res = req.response;
     try {
       final seg = req.uri.pathSegments;
+      if (seg.length == 3 && seg[0] == 'Videos' && seg[2] == 'stream') {
+        // Nicht abwarten: Streams laufen parallel zu anderen Anfragen.
+        unawaited(_serveVideo(req));
+        continue;
+      }
       if (seg.length >= 4 && seg[0] == 'Items' && seg[2] == 'Images') {
         final q = req.uri.queryParameters;
         final type = seg[3];

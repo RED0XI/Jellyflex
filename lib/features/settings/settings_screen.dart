@@ -158,6 +158,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           icon: Icons.home_outlined,
                           children: [
                             _Row(
+                              title: 'Trailer im Banner',
+                              subtitle:
+                                  'Spielt nach ein paar Sekunden stumm den Trailer des Titels ab (falls vorhanden).',
+                              trailing: _Toggle(
+                                value: s.bannerTrailers,
+                                onChanged: (v) => ctrl.update((s) => s.copyWith(bannerTrailers: v)),
+                              ),
+                            ),
+                            _Row(
                               title: 'Episodenbilder bei „Weiterschauen“',
                               subtitle: 'Aus: Statt des Standbilds der Folge das Bild der Serie zeigen.',
                               trailing: _Toggle(

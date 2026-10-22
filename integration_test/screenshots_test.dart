@@ -19,6 +19,7 @@ import 'package:jellyflex/features/library/library_screen.dart';
 import 'package:jellyflex/features/home/home_providers.dart';
 import 'package:jellyflex/features/settings/settings_screen.dart';
 import 'package:jellyflex/theme.dart';
+import 'package:media_kit/media_kit.dart';
 
 class _FakeSession extends SessionController {
   @override
@@ -115,6 +116,7 @@ Widget _app(Widget page) => ProviderScope(
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
 
   testWidgets('Einstellungen', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1440, 1300));
@@ -156,6 +158,36 @@ void main() {
     );
     await _pumpFor(tester, const Duration(seconds: 6));
     await _saveShot(tester, 'home_full');
+  });
+
+  // Braucht den Demo-Server mit Testvideo (Trailer = %TEMP%\jellyflex_test.mkv).
+  testWidgets('Startseite: Trailer im Banner', (tester) async {
+    try {
+      await HttpClient().getUrl(Uri.parse('http://localhost:8097/System/Info/Public')).then((r) => r.close());
+    } catch (_) {
+      markTestSkipped('Demo-Server läuft nicht');
+      return;
+    }
+    await tester.binding.setSurfaceSize(const Size(1440, 900));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [sessionProvider.overrideWith(_DemoSession.new)],
+        child: RepaintBoundary(
+          key: _shotKey,
+          child: MaterialApp(debugShowCheckedModeBanner: false, theme: buildTheme(), home: const HomeScreen()),
+        ),
+      ),
+    );
+    // 4 s warten bis zum Start, dann Laden und Einblenden.
+    await _pumpFor(tester, const Duration(seconds: 9));
+    final muteOpacity = tester
+        .widget<AnimatedOpacity>(
+          find.ancestor(of: find.byIcon(Icons.volume_off_rounded), matching: find.byType(AnimatedOpacity)).first,
+        )
+        .opacity;
+    debugPrint('Ton-Knopf sichtbar: $muteOpacity');
+    await _saveShot(tester, 'home_trailer');
+    expect(muteOpacity, 1.0, reason: 'Trailer sollte laufen und eingeblendet sein');
   });
 }
 

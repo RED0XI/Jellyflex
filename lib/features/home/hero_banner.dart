@@ -3,11 +3,15 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../core/format.dart';
 import '../../core/images.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
+import '../../core/settings.dart';
+import '../../core/route_observer.dart';
 import '../../theme.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/jf_image.dart';
@@ -25,12 +29,25 @@ class HeroBanner extends ConsumerStatefulWidget {
   ConsumerState<HeroBanner> createState() => _HeroBannerState();
 }
 
-class _HeroBannerState extends ConsumerState<HeroBanner> {
+class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
   static const _interval = Duration(seconds: 9);
+  static const _trailerDelay = Duration(seconds: 4);
 
   int _index = 0;
   bool _hovered = false;
   Timer? _timer;
+
+  // --- Trailer im Hintergrund ---
+  Player? _trailerPlayer;
+  VideoController? _trailerVideo;
+  StreamSubscription<bool>? _trailerPlayingSub;
+  StreamSubscription<bool>? _trailerDoneSub;
+  Timer? _trailerTimer;
+  String? _trailerItemId;
+  bool _trailerVisible = false;
+  bool _muted = true;
+  bool _pageVisible = true;
+  ModalRoute<void>? _route;
 
   @override
   void initState() {
@@ -39,25 +56,125 @@ class _HeroBannerState extends ConsumerState<HeroBanner> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null && route != _route) {
+      if (_route != null) appRouteObserver.unsubscribe(this);
+      _route = route;
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
   void dispose() {
+    appRouteObserver.unsubscribe(this);
     _timer?.cancel();
+    _trailerTimer?.cancel();
+    _trailerPlayingSub?.cancel();
+    _trailerDoneSub?.cancel();
+    _trailerPlayer?.dispose();
     super.dispose();
+  }
+
+  // Andere Seite geöffnet → Trailer anhalten; zurück → weiter wie gewohnt.
+  @override
+  void didPushNext() {
+    _pageVisible = false;
+    _stopTrailer();
+  }
+
+  @override
+  void didPopNext() {
+    _pageVisible = true;
+    _restartTimer();
+    _scheduleTrailer();
   }
 
   void _restartTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(_interval, (_) {
-      if (!_hovered && mounted) setState(() => _index++);
+      // Während ein Trailer läuft, wird nicht weitergeblättert.
+      if (!_hovered && !_trailerVisible && _pageVisible && mounted) _advance(_index + 1);
     });
   }
 
-  void _goTo(int index) {
+  void _advance(int index) {
+    _stopTrailer();
     setState(() => _index = index);
+    _scheduleTrailer();
+  }
+
+  void _goTo(int index) {
+    _advance(index);
     _restartTimer();
+  }
+
+  /// Nach kurzer Zeit den Trailer des aktuellen Titels starten (falls vorhanden).
+  void _scheduleTrailer() {
+    _trailerTimer?.cancel();
+    if (!ref.read(settingsProvider).bannerTrailers || !_pageVisible) return;
+    final items = ref.read(featuredProvider).value ?? const <BaseItem>[];
+    if (items.isEmpty) return;
+    final item = items[_index % items.length];
+    _trailerTimer = Timer(_trailerDelay, () => _startTrailer(item));
+  }
+
+  Future<void> _startTrailer(BaseItem item) async {
+    final api = ref.read(apiProvider);
+    final trailer = await api.getTrailer(item.id);
+    if (trailer == null || !mounted || !_pageVisible) return;
+    final items = ref.read(featuredProvider).value ?? const <BaseItem>[];
+    if (items.isEmpty || items[_index % items.length].id != item.id) return; // inzwischen weitergeblättert
+
+    final player = _trailerPlayer ??= Player(
+      configuration: const PlayerConfiguration(title: 'Jellyflex Trailer', bufferSize: 32 * 1024 * 1024),
+    );
+    _trailerVideo ??= VideoController(player);
+    _trailerItemId = item.id;
+    _trailerPlayingSub?.cancel();
+    _trailerDoneSub?.cancel();
+    _trailerPlayingSub = player.stream.playing.listen((playing) {
+      // Erst einblenden, wenn wirklich Bilder kommen.
+      if (playing && mounted && _trailerItemId == item.id) {
+        Future.delayed(const Duration(milliseconds: 400), () {
+          if (mounted && _trailerItemId == item.id) setState(() => _trailerVisible = true);
+        });
+      }
+    });
+    _trailerDoneSub = player.stream.completed.listen((done) {
+      if (done && mounted && _trailerItemId == item.id) _advance(_index + 1);
+    });
+    await player.setVolume(_muted ? 0 : 70);
+    final sourceId = trailer.mediaSources.firstOrNull?.id ?? trailer.id;
+    await player.open(
+      Media(
+        api.streamUrl(trailer.id, mediaSourceId: sourceId),
+        httpHeaders: {'Authorization': api.authorizationHeader},
+      ),
+    );
+    // Trailer im Hintergrund ohne Untertitel.
+    await player.setSubtitleTrack(SubtitleTrack.no());
+  }
+
+  void _stopTrailer() {
+    _trailerTimer?.cancel();
+    _trailerItemId = null;
+    _trailerPlayer?.stop();
+    if (_trailerVisible && mounted) setState(() => _trailerVisible = false);
+  }
+
+  void _toggleMute() {
+    setState(() => _muted = !_muted);
+    _trailerPlayer?.setVolume(_muted ? 0 : 70);
   }
 
   @override
   Widget build(BuildContext context) {
+    // Erste Daten da → ersten Trailer einplanen.
+    ref.listen(featuredProvider, (prev, next) {
+      if ((prev?.value ?? const []).isEmpty && (next.value ?? const []).isNotEmpty) _scheduleTrailer();
+    });
     final items = ref.watch(featuredProvider).value ?? const <BaseItem>[];
     final api = ref.watch(apiProvider);
     final width = MediaQuery.sizeOf(context).width;
@@ -100,6 +217,26 @@ class _HeroBannerState extends ConsumerState<HeroBanner> {
                 ),
               ),
             ),
+            // Trailer blendet weich über das Hintergrundbild.
+            if (_trailerVideo != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: _trailerVisible ? 1 : 0,
+                    duration: const Duration(milliseconds: 1200),
+                    curve: Curves.easeInOut,
+                    child: ClipRect(
+                      child: Video(
+                        controller: _trailerVideo!,
+                        controls: NoVideoControls,
+                        fit: BoxFit.cover,
+                        fill: Colors.transparent,
+                        wakelock: false,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             // Abdunkeln links (für den Text) und unten (Übergang zu den Reihen).
             const Positioned.fill(
               child: DecoratedBox(
@@ -166,6 +303,24 @@ class _HeroBannerState extends ConsumerState<HeroBanner> {
                       ),
                     ),
                 ],
+              ),
+            ),
+            // Ton an/aus, solange ein Trailer läuft.
+            Positioned(
+              right: kPageGutter,
+              bottom: 84,
+              child: AnimatedOpacity(
+                opacity: _trailerVisible ? 1 : 0,
+                duration: const Duration(milliseconds: 400),
+                child: IgnorePointer(
+                  ignoring: !_trailerVisible,
+                  child: CircleIconButton(
+                    icon: _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                    tooltip: _muted ? 'Ton an' : 'Ton aus',
+                    size: 46,
+                    onPressed: _toggleMute,
+                  ),
+                ),
               ),
             ),
           ],

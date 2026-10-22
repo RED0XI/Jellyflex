@@ -54,7 +54,11 @@ class AppSettings {
     this.subtitleScale = 1.0,
     this.subtitleBackground = false,
     this.maxBitrate,
+    this.bannerTrailers = true,
   });
+
+  /// Trailer stumm im Startseiten-Banner abspielen.
+  final bool bannerTrailers;
 
   /// Höchste Bitrate in bit/s für die Wiedergabe. `null` = Original (Direct Play).
   final int? maxBitrate;
@@ -89,6 +93,7 @@ class AppSettings {
     double? subtitleScale,
     bool? subtitleBackground,
     int? Function()? maxBitrate,
+    bool? bannerTrailers,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -98,6 +103,7 @@ class AppSettings {
     subtitleScale: subtitleScale ?? this.subtitleScale,
     subtitleBackground: subtitleBackground ?? this.subtitleBackground,
     maxBitrate: maxBitrate != null ? maxBitrate() : this.maxBitrate,
+    bannerTrailers: bannerTrailers ?? this.bannerTrailers,
   );
 
   Map<String, dynamic> toJson() => {
@@ -109,6 +115,7 @@ class AppSettings {
     'subtitleScale': subtitleScale,
     'subtitleBackground': subtitleBackground,
     'maxBitrate': maxBitrate,
+    'bannerTrailers': bannerTrailers,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -120,6 +127,7 @@ class AppSettings {
     subtitleScale: (json['subtitleScale'] as num?)?.toDouble() ?? 1.0,
     subtitleBackground: json['subtitleBackground'] as bool? ?? false,
     maxBitrate: (json['maxBitrate'] as num?)?.toInt(),
+    bannerTrailers: json['bannerTrailers'] as bool? ?? true,
   );
 }
 

@@ -302,6 +302,19 @@ class JellyfinApi {
     return list.whereType<Map>().map((m) => Recommendation(m.cast<String, dynamic>())).toList();
   }
 
+  /// Lokaler Trailer (oder Theme-Video) eines Titels, sonst `null`.
+  Future<BaseItem?> getTrailer(String itemId) async {
+    try {
+      final local = await _getItems('/Items/$itemId/LocalTrailers', {'userId': userId});
+      if (local.isNotEmpty) return local.first;
+    } catch (_) {}
+    try {
+      final themes = await _getItems('/Items/$itemId/ThemeVideos', {'userId': userId});
+      if (themes.isNotEmpty) return themes.first;
+    } catch (_) {}
+    return null;
+  }
+
   /// Genres einer Bibliothek (für Filter und Genre-Reihen).
   Future<List<String>> getGenres(String? parentId, {String includeItemTypes = 'Movie,Series'}) async {
     final items = await _getItems('/Genres', {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'core/route_observer.dart';
 import 'core/session.dart';
 import 'features/details/details_screen.dart';
 import 'features/home/home_screen.dart';
@@ -22,6 +23,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: '/splash',
+    observers: [appRouteObserver],
     refreshListenable: refresh,
     redirect: (context, state) {
       final session = ref.read(sessionProvider);
