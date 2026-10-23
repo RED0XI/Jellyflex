@@ -18,6 +18,7 @@ import '../../core/media_session.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../core/settings.dart';
+import '../../core/sleep_timer.dart';
 import '../../theme.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/window_frame.dart';
@@ -98,6 +99,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Timer? _hideTimer;
   Timer? _progressTimer;
 
+  /// Schlaf-Timer: Restzeit für die Anzeige, Lautstärke vor dem Ausblenden,
+  /// "Gute Nacht"-Bildschirm nach dem Anhalten.
+  Timer? _sleepTick;
+  final _sleepLeft = ValueNotifier<Duration?>(null);
+  double? _sleepVolumeBase;
+  bool _sleeping = false;
+
   /// Vollbild ist ein gemeinsamer Zustand des Fensters (auch F11 außerhalb des Players).
   bool get _fullscreen => windowFullscreen.value;
 
@@ -115,6 +123,100 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     RemoteControl.onPlaystate = _onRemotePlaystate;
     RemoteControl.onGeneral = _onRemoteGeneral;
     GamepadInput.playerHandler = _onPad;
+    SleepTimer.instance.addListener(_onSleepTimerChanged);
+    _sleepTick = Timer.periodic(const Duration(seconds: 1), (_) => _checkSleepTimer());
+    _checkSleepTimer();
+  }
+
+  // --- Schlaf-Timer ------------------------------------------------------------
+
+  void _onSleepTimerChanged() {
+    // Während des Ausblendens abgebrochen → Lautstärke zurück.
+    if (!SleepTimer.instance.active && _sleepVolumeBase != null) {
+      _player.setVolume(_sleepVolumeBase!);
+      _sleepVolumeBase = null;
+    }
+    _sleepLeft.value = SleepTimer.instance.remaining;
+    if (mounted) setState(() {});
+  }
+
+  void _checkSleepTimer() {
+    final left = SleepTimer.instance.remaining;
+    _sleepLeft.value = left;
+    if (left == null || _closing || _sleeping || _item == null) return;
+    if (left <= Duration.zero) {
+      _sleepNow();
+      return;
+    }
+    // In der letzten Minute langsam leiser werden.
+    if (left <= SleepTimer.fadeOut && _player.state.playing) {
+      _sleepVolumeBase ??= _player.state.volume;
+      _player.setVolume(_sleepVolumeBase! * left.inMilliseconds / SleepTimer.fadeOut.inMilliseconds);
+    }
+  }
+
+  /// Anhalten, Lautstärke wiederherstellen und "Gute Nacht" zeigen.
+  Future<void> _sleepNow() async {
+    if (_sleeping || _closing) return;
+    _sleeping = true;
+    await _player.pause();
+    final base = _sleepVolumeBase;
+    _sleepVolumeBase = null;
+    if (base != null) await _player.setVolume(base);
+    SleepTimer.instance.cancel();
+    _reportProgress();
+    if (mounted) setState(() {});
+  }
+
+  void _wakeUp() {
+    setState(() => _sleeping = false);
+    _player.play();
+    _focus.requestFocus();
+  }
+
+  Future<void> _showSleepMenu(BuildContext buttonContext) async {
+    final box = buttonContext.findRenderObject()! as RenderBox;
+    final overlay = Overlay.of(buttonContext).context.findRenderObject()! as RenderBox;
+    final topLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
+    final timer = SleepTimer.instance;
+    final isEpisode = _item?.isEpisode ?? false;
+    _hideTimer?.cancel();
+    final choice = await showMenu<int>(
+      context: buttonContext,
+      // Über dem Knopf öffnen (unten ist kein Platz).
+      position: RelativeRect.fromLTRB(topLeft.dx - 180, topLeft.dy - 330, overlay.size.width - topLeft.dx - 40, 0),
+      constraints: const BoxConstraints(minWidth: 240),
+      items: [
+        const PopupMenuItem(
+          enabled: false,
+          height: 34,
+          child: Text('Schlaf-Timer', style: TextStyle(color: AppColors.textSecondary)),
+        ),
+        if (timer.active) const PopupMenuItem(value: 0, child: Text('Aus')),
+        PopupMenuItem(
+          value: -1,
+          child: Row(
+            children: [
+              Expanded(child: Text(isEpisode ? 'Am Ende dieser Folge' : 'Am Ende des Films')),
+              if (timer.mode == SleepMode.endOfItem) const Icon(Icons.check_rounded, size: 18, color: AppColors.accent),
+            ],
+          ),
+        ),
+        for (final m in const [15, 30, 45, 60, 90]) PopupMenuItem(value: m, child: Text('In $m Minuten')),
+      ],
+    );
+    _focus.requestFocus();
+    if (_player.state.playing) _scheduleHide();
+    switch (choice) {
+      case null:
+        return;
+      case 0:
+        timer.cancel();
+      case -1:
+        timer.setEndOfItem();
+      default:
+        timer.setMinutes(choice);
+    }
   }
 
   /// Controller im Player: ←/→ spulen, A/Start Pause, B zurück, X Spuren-Panel.
@@ -257,6 +359,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (RemoteControl.onPlaystate == _onRemotePlaystate) RemoteControl.onPlaystate = null;
     if (RemoteControl.onGeneral == _onRemoteGeneral) RemoteControl.onGeneral = null;
     if (GamepadInput.playerHandler == _onPad) GamepadInput.playerHandler = null;
+    SleepTimer.instance.removeListener(_onSleepTimerChanged);
+    _sleepTick?.cancel();
+    _sleepLeft.dispose();
     if (MediaSession.onButton == _onMediaButton) {
       MediaSession.onButton = null;
       // Bei "Nächste Folge" übernimmt gleich der neue Player die Anzeige.
@@ -333,6 +438,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         ..add(
           _player.stream.completed.listen((done) {
             if (!done) return;
+            if (SleepTimer.instance.mode == SleepMode.endOfItem) {
+              _sleepNow();
+              return;
+            }
             if (_nextEpisode != null && ref.read(settingsProvider).nextEpisodeCountdown) {
               _playNext();
             } else {
@@ -497,6 +606,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   void _onPlayingChanged(bool playing) {
+    // Per Medientaste o. Ä. weitergespielt → "Gute Nacht" ausblenden.
+    if (playing && _sleeping && mounted) setState(() => _sleeping = false);
     _reportProgress();
     MediaSession.setPlaying(playing);
     if (playing) {
@@ -706,6 +817,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (!isDown && !isRepeat) return KeyEventResult.ignored;
     final key = event.logicalKey;
 
+    if (_sleeping && isDown) {
+      if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.keyK) {
+        _wakeUp();
+        return KeyEventResult.handled;
+      }
+    }
+
     // In offenen Panels bewegen die Pfeiltasten die Auswahl, Enter wählt.
     final arrows = {
       LogicalKeyboardKey.arrowUp,
@@ -830,12 +948,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       : _api.imageUrlOrNull(Images.landscape(_nextEpisode!), fillWidth: 760, fillHeight: 428),
                   controlsVisible: _controlsVisible,
                   autoSkip: settings.autoSkipIntro,
-                  autoPlayNext: settings.nextEpisodeCountdown,
+                  // Schlaf-Timer "am Ende dieser Folge": keine nächste Folge starten.
+                  autoPlayNext: settings.nextEpisodeCountdown && SleepTimer.instance.mode != SleepMode.endOfItem,
                   onSeek: (target) {
                     _player.seek(target);
                     _focus.requestFocus();
                   },
                   onPlayNext: _playNext,
+                ),
+              if (_sleeping)
+                Positioned.fill(
+                  child: _SleepOverlay(onContinue: _wakeUp, onClose: _close),
                 ),
             ],
           ),
@@ -1041,6 +1164,42 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                         ),
                       ),
+                    ListenableBuilder(
+                      listenable: Listenable.merge([_sleepLeft, SleepTimer.instance]),
+                      builder: (context, _) {
+                        final timer = SleepTimer.instance;
+                        final left = _sleepLeft.value;
+                        final label = switch (timer.mode) {
+                          SleepMode.off => null,
+                          SleepMode.endOfItem => 'am Ende',
+                          SleepMode.minutes =>
+                            left == null || left.inMinutes >= 1
+                                ? '${left?.inMinutes ?? 0} Min.'
+                                : '${left.inSeconds} s',
+                        };
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (label != null)
+                              Text(
+                                label,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.accent,
+                                ),
+                              ),
+                            Builder(
+                              builder: (buttonContext) => _PlayerIconButton(
+                                icon: timer.active ? Icons.bedtime_rounded : Icons.bedtime_outlined,
+                                tooltip: 'Schlaf-Timer',
+                                onPressed: () => _showSleepMenu(buttonContext),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                     _PlayerIconButton(
                       icon: Icons.subtitles_rounded,
                       tooltip: 'Audio & Untertitel',
@@ -1265,6 +1424,65 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 }
 
 // --- Bausteine ---------------------------------------------------------------
+
+/// "Gute Nacht": erscheint, wenn der Schlaf-Timer die Wiedergabe angehalten hat.
+class _SleepOverlay extends StatefulWidget {
+  const _SleepOverlay({required this.onContinue, required this.onClose});
+
+  final VoidCallback onContinue;
+  final VoidCallback onClose;
+
+  @override
+  State<_SleepOverlay> createState() => _SleepOverlayState();
+}
+
+class _SleepOverlayState extends State<_SleepOverlay> {
+  bool _shown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Langsam einblenden.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _shown = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      opacity: _shown ? 1 : 0,
+      duration: const Duration(milliseconds: 1600),
+      child: ColoredBox(
+        color: const Color(0xE6000000),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.bedtime_rounded, size: 64, color: Color(0xFFFACC15)),
+              const SizedBox(height: 18),
+              const Text('Gute Nacht', style: TextStyle(fontSize: 40, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              const Text(
+                'Der Schlaf-Timer hat die Wiedergabe angehalten.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  PrimaryButton(label: 'Weiterschauen', icon: Icons.play_arrow_rounded, onPressed: widget.onContinue),
+                  const SizedBox(width: 12),
+                  GlassButton(label: 'Player schließen', icon: Icons.close_rounded, onPressed: widget.onClose),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _PlayerIconButton extends StatefulWidget {
   const _PlayerIconButton({required this.icon, required this.tooltip, required this.onPressed, this.size = 30});
