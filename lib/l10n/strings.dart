@@ -253,6 +253,17 @@ class S {
   String get goodEvening => _t('Good evening', 'Guten Abend');
   String get coverStory => _t('Cover story', 'Titelgeschichte');
   String get layout => _t('Layout', 'Layout');
+  String get shortcuts => _t('Keyboard shortcuts', 'Tastenkürzel');
+  String get shortcutsEverywhere => _t('Everywhere', 'Überall');
+  String get shortcutsPlayer => _t('Player', 'Player');
+  String get shortcutsController => _t('Controller', 'Controller');
+  String get shortcutMoveFocus => _t('Move selection', 'Auswahl bewegen');
+  String get shortcutOpen => _t('Open / choose', 'Öffnen / wählen');
+  String get shortcutSeek => _t('10 s back / forward', '10 s zurück / vor');
+  String get shortcutVolume => _t('Volume', 'Lautstärke');
+  String get shortcutScreenshot => _t('Screenshot', 'Bildschirmfoto');
+  String get shortcutMenu => _t('Menu (like right-click)', 'Menü (wie Rechtsklick)');
+  String get keySpace => _t('Space', 'Leertaste');
   String get profilePin => _t('Profile PIN', 'Profil-PIN');
   String get profilePinHint => _t(
     'Optional: asks for a PIN before this profile opens on this computer.',

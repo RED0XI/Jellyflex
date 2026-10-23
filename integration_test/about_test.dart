@@ -4,6 +4,7 @@
 // Start:          flutter test integration_test/about_test.dart -d windows
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -53,6 +54,17 @@ void main() {
     await saveShot(tester, 'error_report');
     await tester.tap(find.text('Schließen'));
     await pumpFor(tester, const Duration(milliseconds: 500));
+
+    // "?" zeigt die Tastenkürzel.
+    // Wie auf einer echten Tastatur: Umschalt + Taste, die "?" ergibt.
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.slash, physicalKey: PhysicalKeyboardKey.slash, character: '?');
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.slash, physicalKey: PhysicalKeyboardKey.slash);
+    await pumpFor(tester, const Duration(milliseconds: 600));
+    expect(find.text('Tastenkürzel'), findsWidgets);
+    await saveShot(tester, 'shortcut_sheet');
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    expect(find.text('Tastenkürzel'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
 }

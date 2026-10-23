@@ -10,6 +10,7 @@ import '../core/gamepad_input.dart';
 import '../theme.dart';
 import 'focus_navigation.dart';
 import 'focusable.dart';
+import 'shortcut_sheet.dart';
 import '../l10n/strings.dart';
 
 /// Steuert, ob die Fensterleiste sichtbar ist (der Player blendet sie aus).
@@ -99,6 +100,7 @@ final _arrowDirections = {
 
 class _WindowFrameState extends State<WindowFrame> with WindowListener {
   final _frameFocus = FocusNode(debugLabel: 'WindowFrame');
+  bool _sheetOpen = false;
   bool _maximized = false;
 
   @override
@@ -127,6 +129,18 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
   /// die Seite nicht – Pfeiltasten hier direkt in Fokus-Navigation umsetzen.
   bool _onHardwareKey(KeyEvent event) {
     final primary = FocusManager.instance.primaryFocus;
+    // "?" zeigt überall die Tastenkürzel – außer beim Tippen in ein Textfeld.
+    if (event is KeyDownEvent && event.character == '?' && !_sheetOpen) {
+      final ctx = primary?.context;
+      final typing =
+          ctx != null && (ctx.widget is EditableText || ctx.findAncestorWidgetOfExactType<EditableText>() != null);
+      final navContext = widget.router.routerDelegate.navigatorKey.currentState?.overlay?.context;
+      if (!typing && navContext != null) {
+        _sheetOpen = true;
+        showShortcutSheet(navContext).whenComplete(() => _sheetOpen = false);
+        return true;
+      }
+    }
     if (primary != null && primary != FocusManager.instance.rootScope && primary != _frameFocus) return false;
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
     final direction = _arrowDirections[event.logicalKey];
