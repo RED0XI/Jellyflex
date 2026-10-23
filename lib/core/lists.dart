@@ -65,7 +65,9 @@ class ListsController {
       _refresh(list.id);
       return true;
     }
-    await api.removeFromPlaylist(list.id, [?entry.playlistItemId]);
+    final entryId = entry.playlistItemId;
+    if (entryId == null) return true; // ohne Eintrags-ID nicht entfernbar – steht weiter drauf
+    await api.removeFromPlaylist(list.id, [entryId]);
     _refresh(list.id);
     return false;
   }

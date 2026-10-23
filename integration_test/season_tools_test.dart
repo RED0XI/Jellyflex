@@ -36,7 +36,12 @@ void main() {
     final root = Directory.systemTemp.createTempSync('jellyflex_season_tools_');
     // Langsam ausliefern, damit der Download-Fortschritt sichtbar bleibt.
     await tester.runAsync(() => _post('/debug/throttle?bps=200000'));
-    // Ausgangslage: beide Staffeln ungesehen (falls ein früherer Lauf abbrach).
+    // Ausgangszustand der Demo-Daten merken (andere Tests zählen darauf) …
+    final ids = [
+      for (final s in [1, 2]) ...['series1_s$s', for (var e = 1; e <= 8; e++) 'series1_s${s}_e$e'],
+    ];
+    final before = (await tester.runAsync(() => saveUserData(ids)))!;
+    // … dann: beide Staffeln ungesehen (falls ein früherer Lauf abbrach).
     for (final s in ['series1_s1', 'series1_s2']) {
       await tester.runAsync(() => _post('/UserPlayedItems/$s', method: 'DELETE'));
     }
@@ -89,6 +94,8 @@ void main() {
     } finally {
       await tester.pumpWidget(const SizedBox());
       await tester.runAsync(() => _post('/debug/throttle?bps=0'));
+      // Demo-Daten genau wiederherstellen.
+      await tester.runAsync(() => restoreUserData(before));
       try {
         root.deleteSync(recursive: true);
       } catch (_) {}

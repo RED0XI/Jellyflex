@@ -54,6 +54,8 @@ void main() {
 
     // Zwei Filme anwählen (die ersten beiden Karten).
     final ids = [for (final e in overlays.evaluate().take(2)) (e.widget as SelectableOverlay).item.id];
+    // Ausgangszustand merken – andere Tests (z. B. Jahresrückblick) zählen auf die Demo-Daten.
+    final before = (await tester.runAsync(() => saveUserData(ids)))!;
     await tester.tap(overlays.at(0));
     await tester.tap(overlays.at(1));
     await pumpFor(tester, const Duration(milliseconds: 400));
@@ -76,6 +78,9 @@ void main() {
     for (final id in ids) {
       expect(await tester.runAsync(() => _played(id)), isFalse, reason: '$id ungesehen');
     }
+
+    // Demo-Daten genau wiederherstellen.
+    await tester.runAsync(() => restoreUserData(before));
 
     // Esc beendet den Auswahlmodus.
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);

@@ -7,6 +7,7 @@ import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../core/gamepad_input.dart';
+import '../core/route_observer.dart';
 import '../theme.dart';
 import 'focus_navigation.dart';
 import 'focusable.dart';
@@ -130,7 +131,8 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
   bool _onHardwareKey(KeyEvent event) {
     final primary = FocusManager.instance.primaryFocus;
     // "?" zeigt überall die Tastenkürzel – außer beim Tippen in ein Textfeld.
-    if (event is KeyDownEvent && event.character == '?' && !_sheetOpen) {
+    // Nicht über anderen Dialogen/Menüs (z. B. der PIN-Abfrage).
+    if (event is KeyDownEvent && event.character == '?' && !_sheetOpen && popupTracker.open.value == 0) {
       final ctx = primary?.context;
       final typing =
           ctx != null && (ctx.widget is EditableText || ctx.findAncestorWidgetOfExactType<EditableText>() != null);

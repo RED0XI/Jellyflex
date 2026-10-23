@@ -11,7 +11,7 @@
 //   POST /debug/send       {"MessageType": …, "Data": …} an alle Live-Verbindungen
 //   POST /debug/throttle?bps=200000   Videos langsam ausliefern (0 = normal)
 //   POST /debug/offline?on=1          Server "nicht erreichbar" spielen (503)
-//   GET  /debug/userdata/{id}         Benutzerdaten eines Titels ansehen
+//   GET  /debug/userdata/{id}         Benutzerdaten eines Titels ansehen (PUT: genau so setzen)
 //   GET  /debug/laststream            zuletzt angefragter Video-Stream (Fassung)
 //   GET  /debug/images?delay=150&reset=1   Bilder verzögern (langsames Netz) / Zähler
 
@@ -795,6 +795,10 @@ Future<void> main() async {
         continue;
       }
       if (seg.length == 3 && seg[0] == 'debug' && seg[1] == 'userdata') {
+        // PUT: Benutzerdaten genau so wiederherstellen (Tests räumen damit auf).
+        if (req.method == 'PUT' && byId[seg[2]] != null) {
+          byId[seg[2]]!['UserData'] = jsonDecode(await utf8.decoder.bind(req).join()) as Map<String, dynamic>;
+        }
         res.headers.contentType = ContentType.json;
         res.write(jsonEncode(byId[seg[2]]?['UserData']));
         await res.close();
@@ -865,10 +869,11 @@ Future<void> main() async {
       }
       if (req.uri.path == '/debug/playlists') {
         res.headers.contentType = ContentType.json;
-        res.write(jsonEncode([
-          for (final pl in _playlists.values)
-            {...pl, 'Items': _playlistEntries[pl['Id']]!.map((e) => e.id).toList()},
-        ]));
+        res.write(
+          jsonEncode([
+            for (final pl in _playlists.values) {...pl, 'Items': _playlistEntries[pl['Id']]!.map((e) => e.id).toList()},
+          ]),
+        );
         await res.close();
         continue;
       }

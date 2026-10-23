@@ -154,16 +154,21 @@ class SessionController extends AsyncNotifier<AuthSession?> {
   Future<void> loginWithPassword(ServerInfo server, String username, String password) async {
     final api = await anonymousApi(server);
     final result = await api.authenticate(username, password);
-    await _complete(server, api.deviceId, result);
+    // Wer das Server-Passwort kennt, ist der Kontoinhaber – eine vergessene PIN
+    // darf ihn nicht aussperren. Bei Konten ohne Passwort gilt die PIN weiter.
+    await _complete(server, api.deviceId, result, ownerProven: password.isNotEmpty);
   }
 
   Future<void> loginWithQuickConnect(ServerInfo server, String secret) async {
     final api = await anonymousApi(server);
     final result = await api.authenticateWithQuickConnect(secret);
-    await _complete(server, api.deviceId, result);
+    // Quick Connect muss auf einem angemeldeten Gerät desselben Kontos bestätigt werden.
+    await _complete(server, api.deviceId, result, ownerProven: true);
   }
 
-  Future<void> _complete(ServerInfo server, String deviceId, AuthResult result) async {
+  /// [ownerProven]: mit Passwort bzw. bestätigtem Quick Connect angemeldet – dann
+  /// wird eine gesetzte Profil-PIN entfernt (neu festlegen in den Einstellungen).
+  Future<void> _complete(ServerInfo server, String deviceId, AuthResult result, {bool ownerProven = false}) async {
     final session = AuthSession(
       serverUrl: server.url,
       serverName: server.name,
@@ -175,8 +180,9 @@ class SessionController extends AsyncNotifier<AuthSession?> {
     );
     await _storage.write(key: _lastServerKey, value: server.url);
     final previous = await loadSavedAccounts();
-    // Erneute Anmeldung behält eine gesetzte Profil-PIN.
-    final pin = previous.where((a) => a.accountKey == session.accountKey).firstOrNull?.pinHash;
+    // Erneute Anmeldung ohne Nachweis (Konto ohne Passwort) behält die Profil-PIN.
+    final pin = ownerProven ? null : previous.where((a) => a.accountKey == session.accountKey).firstOrNull?.pinHash;
+    if (ownerProven) ProfilePin.recordSuccess(session.accountKey);
     final accounts = [...previous]..removeWhere((a) => a.accountKey == session.accountKey);
     final withPin = session.withPin(pin);
     await _saveAccounts([withPin, ...accounts]);
@@ -215,7 +221,11 @@ class SessionController extends AsyncNotifier<AuthSession?> {
   }
 
   /// Gespeichertes Konto vergessen (meldet es beim Server ab, falls möglich).
+  /// Suchverlauf eines Kontos löschen (beim Abmelden/Vergessen).
+  Future<void> _forgetSearches(AuthSession account) => _storage.delete(key: 'jellyflex.searches.${account.accountKey}');
+
   Future<void> forgetAccount(AuthSession account) async {
+    await _forgetSearches(account);
     try {
       await JellyfinApi(
         baseUrl: account.serverUrl,
@@ -231,6 +241,7 @@ class SessionController extends AsyncNotifier<AuthSession?> {
 
   Future<void> logout() async {
     final session = state.value;
+    if (session != null) await _forgetSearches(session);
     if (session != null) {
       try {
         await ref.read(apiProvider).logout();

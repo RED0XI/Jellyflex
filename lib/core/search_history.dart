@@ -12,19 +12,27 @@ class SearchHistory extends Notifier<List<String>> {
   static const _max = 8;
   String? _key;
 
+  /// Schon geändert, bevor der gespeicherte Verlauf geladen war?
+  bool _changed = false;
+
   @override
   List<String> build() {
     final session = ref.watch(sessionProvider).value;
     _key = session == null ? null : 'jellyflex.searches.${session.accountKey}';
+    _changed = false;
     final key = _key;
     if (key != null) {
       SecureStore.instance.read(key: key).then((raw) {
         if (!ref.mounted || _key != key || raw == null) return;
         try {
-          state = [
+          final loaded = [
             for (final s in jsonDecode(raw) as List)
               if (s is String) s,
-          ].take(_max).toList();
+          ];
+          // Neuere Eingaben nicht überschreiben, sondern davor stellen.
+          state = _changed
+              ? [...state, ...loaded.where((s) => !state.contains(s))].take(_max).toList()
+              : loaded.take(_max).toList();
         } catch (_) {}
       });
     }
@@ -42,6 +50,7 @@ class SearchHistory extends Notifier<List<String>> {
   void clear() => _set(const []);
 
   void _set(List<String> list) {
+    _changed = true;
     state = list;
     final key = _key;
     if (key == null) return;

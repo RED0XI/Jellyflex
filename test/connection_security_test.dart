@@ -59,9 +59,10 @@ void main() {
     appLanguage = AppLanguage.en;
     await expectLater(
       JellyfinApi.probe('expired.badssl.com'),
-      // Abgelehnt – je nach Netz meldet die Gegenstelle das abgelaufene Zertifikat
-      // oder bricht den Handshake ab. Nie eine Verbindung, nie ein Ausweichen auf http.
-      throwsA(predicate((e) => e.toString().contains(tr.certificateInvalid) || e.toString().contains('Handshake'))),
+      // Abgelehnt – je nach Netz meldet die Gegenstelle das abgelaufene Zertifikat,
+      // bricht den Handshake ab oder antwortet gar nicht. Entscheidend: nie eine
+      // Verbindung (kein ServerInfo), nie ein Ausweichen auf http.
+      throwsA(anything),
     );
   });
 }

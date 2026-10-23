@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -51,5 +52,25 @@ Future<bool> demoServerRunning() async {
   } catch (_) {
     markTestSkipped('Demo-Server läuft nicht');
     return false;
+  }
+}
+
+/// Benutzerdaten von Titeln des Demo-Servers sichern bzw. genau so wiederherstellen –
+/// damit ein Test die Daten für spätere Tests (z. B. Jahresrückblick) nicht verändert.
+Future<Map<String, String>> saveUserData(List<String> ids) async {
+  final saved = <String, String>{};
+  for (final id in ids) {
+    final request = await HttpClient().getUrl(Uri.parse('$demoServer/debug/userdata/$id'));
+    saved[id] = await utf8.decoder.bind(await request.close()).join();
+  }
+  return saved;
+}
+
+Future<void> restoreUserData(Map<String, String> saved) async {
+  for (final MapEntry(key: id, value: json) in saved.entries) {
+    if (json == 'null') continue;
+    final request = await HttpClient().openUrl('PUT', Uri.parse('$demoServer/debug/userdata/$id'));
+    request.write(json);
+    await (await request.close()).drain<void>();
   }
 }
