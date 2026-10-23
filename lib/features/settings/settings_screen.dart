@@ -19,6 +19,7 @@ import '../../widgets/theme_picker.dart';
 import '../../widgets/layout_picker.dart';
 import '../../core/image_cache.dart';
 import 'about_section.dart';
+import 'home_rows_dialog.dart';
 import '../../core/profile_pin.dart';
 import '../../widgets/pin_dialog.dart';
 import '../../core/downloads.dart' show formatBytes;
@@ -242,6 +243,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               trailing: _Toggle(
                                 value: s.bannerTrailers,
                                 onChanged: (v) => ctrl.update((s) => s.copyWith(bannerTrailers: v)),
+                              ),
+                            ),
+                            _Row(
+                              title: tr.homeRows,
+                              subtitle: tr.homeRowsSettingsHint,
+                              trailing: TextButton.icon(
+                                onPressed: () => showHomeRowsDialog(context),
+                                icon: const Icon(Icons.view_agenda_outlined, size: 18),
+                                label: Text(tr.customize),
                               ),
                             ),
                             _Row(

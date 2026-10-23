@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/strings.dart';
 import 'format.dart';
+import 'home_rows.dart';
 import 'image_cache.dart';
 import 'layouts.dart';
 import '../theme.dart';
@@ -58,6 +59,7 @@ class AppSettings {
     this.imageCacheMb = 300,
     this.layoutId = 'cinema',
     this.themeMusic = false,
+    this.homeRows = HomeRows.all,
     this.updateCheck = false,
     this.seasonalThemes = true,
     this.ambilight = AmbilightMode.window,
@@ -96,6 +98,9 @@ class AppSettings {
 
   /// Titelmusik auf Detailseiten (Standard: aus).
   final bool themeMusic;
+
+  /// Reihen der Startseite (Reihenfolge, "!" = ausgeblendet), siehe [HomeRows].
+  final List<String> homeRows;
 
   /// Beim Start nach einer neuen Version fragen (Standard: aus).
   final bool updateCheck;
@@ -149,6 +154,7 @@ class AppSettings {
     int? imageCacheMb,
     String? layoutId,
     bool? themeMusic,
+    List<String>? homeRows,
     bool? updateCheck,
     bool? seasonalThemes,
     AmbilightMode? ambilight,
@@ -172,6 +178,7 @@ class AppSettings {
     imageCacheMb: imageCacheMb ?? this.imageCacheMb,
     layoutId: layoutId ?? this.layoutId,
     themeMusic: themeMusic ?? this.themeMusic,
+    homeRows: homeRows ?? this.homeRows,
     updateCheck: updateCheck ?? this.updateCheck,
     seasonalThemes: seasonalThemes ?? this.seasonalThemes,
     ambilight: ambilight ?? this.ambilight,
@@ -197,6 +204,7 @@ class AppSettings {
     'imageCacheMb': imageCacheMb,
     'layoutId': layoutId,
     'themeMusic': themeMusic,
+    'homeRows': homeRows,
     'updateCheck': updateCheck,
     'seasonalThemes': seasonalThemes,
     'ambilight': ambilight.name,
@@ -223,6 +231,7 @@ class AppSettings {
     updateCheck: json['updateCheck'] as bool? ?? false,
     layoutId: json['layoutId'] as String? ?? 'cinema',
     themeMusic: json['themeMusic'] as bool? ?? false,
+    homeRows: HomeRows.encode(HomeRows.parse([for (final r in (json['homeRows'] as List?) ?? HomeRows.all) '$r'])),
     seasonalThemes: json['seasonalThemes'] as bool? ?? true,
     ambilight: AmbilightMode.values.asNameMap()[json['ambilight']] ?? AmbilightMode.window,
     quizHighscore: (json['quizHighscore'] as num?)?.toInt() ?? 0,

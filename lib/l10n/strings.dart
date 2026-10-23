@@ -253,6 +253,32 @@ class S {
   String get goodEvening => _t('Good evening', 'Guten Abend');
   String get coverStory => _t('Cover story', 'Titelgeschichte');
   String get layout => _t('Layout', 'Layout');
+  String get homeRows => _t('Home page rows', 'Reihen der Startseite');
+  String get homeRowsHint => _t(
+    'Drag to reorder, switch off what you don’t need. Changes apply right away.',
+    'Ziehen zum Umsortieren, Unnötiges ausschalten. Gilt sofort.',
+  );
+  String get homeRowsSettingsHint => _t(
+    'Order and visibility of the rows on the home page.',
+    'Reihenfolge und Sichtbarkeit der Reihen auf der Startseite.',
+  );
+  String get customize => _t('Customize', 'Anpassen');
+  String get moveUp => _t('Move up', 'Nach oben');
+  String get moveDown => _t('Move down', 'Nach unten');
+  String get resetToDefault => _t('Reset to default', 'Standard wiederherstellen');
+  String homeRowName(String id) => switch (id) {
+    'resume' => continueWatching,
+    'nextUp' => nextUp,
+    'watchlist' => watchlist,
+    'seasonal' => _t('Seasonal row', 'Saison-Reihe'),
+    'latest' => _t('New in your libraries', 'Neu in deinen Bibliotheken'),
+    'favorites' => yourFavorites,
+    'recommendations' => recommendations,
+    'collections' => collections,
+    'genres' => _t('Genre rows', 'Genre-Reihen'),
+    'libraries' => libraries,
+    _ => id,
+  };
   String get watchlist => _t('Watchlist', 'Merkliste');
   String get myLists => _t('My lists', 'Meine Listen');
   String get addToWatchlist => _t('Add to watchlist', 'Auf die Merkliste');

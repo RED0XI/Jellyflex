@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_shell.dart';
+import '../../core/home_rows.dart';
 import '../../core/images.dart';
+import '../../core/lists.dart';
+import '../../core/settings.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../theme.dart';
@@ -89,35 +92,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 ...home.when(
                   data: (data) {
-                    // Saison-Reihe direkt nach "Weiterschauen"/"Als Nächstes".
-                    final sections = [...data.sections];
-                    if (seasonal != null) {
-                      final at = sections.where((s) => s.style == SectionStyle.landscape).length;
-                      sections.insert(at, seasonal);
-                    }
+                    // Reihen in der eingestellten Reihenfolge; Empfehlungen, Sammlungen
+                    // und Genres erscheinen, sobald sie geladen sind.
+                    final all = [
+                      ...data.sections,
+                      ?seasonal,
+                      ...ref.watch(discoverProvider).value ?? const <HomeSection>[],
+                    ];
+                    final rows = <Widget>[
+                      for (final row in HomeRows.parse(ref.watch(settingsProvider.select((s) => s.homeRows))))
+                        if (row.visible)
+                          ...switch (row.id) {
+                            'libraries' => [if (data.libraries.isNotEmpty) _LibrariesRow(libraries: data.libraries)],
+                            'watchlist' => [
+                              if (ref.watch(watchlistProvider).value case final items? when items.isNotEmpty)
+                                _SectionRow(
+                                  section: HomeSection(tr.watchlist, items, SectionStyle.poster, group: 'watchlist'),
+                                ),
+                            ],
+                            final id => [
+                              for (final section in all.where((s) => s.group == id)) _SectionRow(section: section),
+                            ],
+                          },
+                    ];
                     return [
                       SliverList.separated(
-                        itemCount: sections.length,
+                        itemCount: rows.length,
                         separatorBuilder: (_, _) => SizedBox(height: appLayout.rowGap),
-                        itemBuilder: (context, i) => _SectionRow(section: sections[i]),
+                        itemBuilder: (context, i) => rows[i],
                       ),
-                      // Empfehlungen, Sammlungen, Genres – erscheinen, sobald geladen.
-                      SliverList.list(
-                        children: [
-                          for (final section in ref.watch(discoverProvider).value ?? const <HomeSection>[])
-                            Padding(
-                              padding: EdgeInsets.only(top: appLayout.rowGap),
-                              child: _SectionRow(section: section),
-                            ),
-                        ],
-                      ),
-                      if (data.libraries.isNotEmpty)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: EdgeInsets.only(top: appLayout.rowGap),
-                            child: _LibrariesRow(libraries: data.libraries),
-                          ),
-                        ),
                     ];
                   },
                   loading: () => [const SliverToBoxAdapter(child: RowsSkeleton())],
