@@ -1245,4 +1245,6 @@ final class _Es extends S {
   String downloadsCancelled(int count) => 'Descargas canceladas ($count)';
   @override
   String get keepDownloading => 'Seguir descargando';
+  @override
+  String get scenes => 'Escenas';
 }

@@ -22,6 +22,7 @@ import '../../widgets/top_scrim.dart';
 import '../home/hero_banner.dart';
 import '../home/home_providers.dart';
 import '../../widgets/focusable.dart';
+import '../../widgets/jf_image.dart';
 import 'media_info_dialog.dart';
 import 'theme_music.dart';
 import '../lists/list_actions.dart';
@@ -212,6 +213,10 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                     title: item.seasonName ?? tr.moreEpisodes,
                     highlightId: item.id,
                   ),
+                ),
+              if (!item.isSeries && !item.isCollection && item.chapters.length > 1)
+                SliverToBoxAdapter(
+                  child: _ScenesRow(item: item, mediaSourceId: _sourceId),
                 ),
               if (people.isNotEmpty)
                 SliverToBoxAdapter(
@@ -917,6 +922,90 @@ class _EpisodesRow extends ConsumerWidget {
           );
         },
       ),
+    );
+  }
+}
+
+/// Kapitel als "Szenen" mit Vorschaubild – ein Klick spielt ab dieser Stelle.
+class _ScenesRow extends ConsumerWidget {
+  const _ScenesRow({required this.item, this.mediaSourceId});
+
+  final BaseItem item;
+  final String? mediaSourceId;
+
+  static const _width = 260.0;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chapters = item.chapters;
+    if (chapters.length < 2) return const SizedBox.shrink();
+    final api = ref.read(apiProvider);
+    return MediaRow(
+      title: tr.scenes,
+      itemCount: chapters.length,
+      height: _width * 9 / 16 + 52,
+      itemBuilder: (context, i) {
+        final chapter = chapters[i];
+        final name = chapter.name.isEmpty ? tr.chapterN(i + 1) : chapter.name;
+        return Focusable(
+          semanticLabel: '$name ${formatTimecode(chapter.start)}',
+          onTap: () {
+            final ticks = durationToTicks(chapter.start);
+            final query = Uri(queryParameters: {if (ticks > 0) 'start': '$ticks', 'source': ?mediaSourceId}).query;
+            context.push('/play/${item.id}${query.isEmpty ? '' : '?$query'}');
+          },
+          builder: (context, hovered) => SizedBox(
+            width: _width,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AnimatedScale(
+                  scale: hovered ? 1.04 : 1,
+                  duration: const Duration(milliseconds: 180),
+                  child: Container(
+                    height: _width * 9 / 16,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceHigh,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: hovered ? Colors.white : Colors.transparent, width: 2),
+                    ),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        JfImage(
+                          url: api.chapterImageUrl(item, chapter, i),
+                          fallback: Center(child: Icon(Icons.movie_filter_outlined, color: AppColors.textMuted)),
+                        ),
+                        Positioned(
+                          right: 8,
+                          bottom: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(4)),
+                            child: Text(
+                              formatTimecode(chapter.start),
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                        if (hovered) const Center(child: Icon(Icons.play_circle_fill_rounded, size: 46)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

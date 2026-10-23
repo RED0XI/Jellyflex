@@ -958,4 +958,8 @@ class S {
   String get cancelDownloads => _t('Cancel downloads', 'Downloads abbrechen');
   String downloadsCancelled(int count) => _t('Downloads cancelled ($count)', 'Downloads abgebrochen ($count)');
   String get keepDownloading => _t('Keep downloading', 'Weiter laden');
+
+  // --- Szenen ----------------------------------------------------------------
+
+  String get scenes => _t('Scenes', 'Szenen');
 }

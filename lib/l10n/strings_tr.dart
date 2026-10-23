@@ -1240,4 +1240,6 @@ final class _Tr extends S {
   String downloadsCancelled(int count) => 'İndirmeler iptal edildi ($count)';
   @override
   String get keepDownloading => 'İndirmeye devam et';
+  @override
+  String get scenes => 'Sahneler';
 }

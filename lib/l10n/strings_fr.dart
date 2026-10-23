@@ -1248,4 +1248,6 @@ final class _Fr extends S {
   String downloadsCancelled(int count) => 'Téléchargements annulés ($count)';
   @override
   String get keepDownloading => 'Continuer';
+  @override
+  String get scenes => 'Scènes';
 }

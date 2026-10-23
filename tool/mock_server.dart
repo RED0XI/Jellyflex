@@ -375,6 +375,12 @@ void _seed() {
         lastPlayed: const {3, 5, 6, 8, 9}.contains(i) ? '2026-0${i % 9 + 1}-1${i % 9}T21:${10 + i}:00Z' : null,
         favorite: i % 5 == 1,
       ),
+      // Kapitel (Szenen) mit Vorschaubildern.
+      if (i == 0)
+        'Chapters': [
+          for (final (n, name) in const [(0, 'Anfang'), (1, 'Die Reise'), (2, 'Der Sturm'), (3, 'Heimkehr')])
+            {'StartPositionTicks': n * 20 * 60 * 10000000, 'Name': name, 'ImageTag': 'c$n'},
+        ],
       // "Das Echo der Sterne" gibt es in zwei Fassungen (4K + 1080p).
       'MediaSources': i == 0 ? _twoVersions(id, _movieNames[i]) : [_source(id, 'mkv', width: 1920, height: 1080)],
     };
