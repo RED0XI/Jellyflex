@@ -1250,4 +1250,14 @@ final class _Fr extends S {
   String get keepDownloading => 'Continuer';
   @override
   String get scenes => 'Scènes';
+  @override
+  String get updateVerifiedHint =>
+      'Jellyflex télécharge l’installateur et vérifie d’abord sa signature numérique – un fichier modifié ou endommagé n’est jamais lancé.';
+  @override
+  String get updateVerifyFailed =>
+      'La mise à jour n’a pas pu être téléchargée ou sa signature est incorrecte – rien n’a été installé.';
+  @override
+  String get updateReleasePage => 'Page des versions';
+  @override
+  String get updateInstall => 'Télécharger et installer';
 }

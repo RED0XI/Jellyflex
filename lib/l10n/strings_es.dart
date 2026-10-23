@@ -1247,4 +1247,14 @@ final class _Es extends S {
   String get keepDownloading => 'Seguir descargando';
   @override
   String get scenes => 'Escenas';
+  @override
+  String get updateVerifiedHint =>
+      'Jellyflex descarga el instalador y primero comprueba su firma digital: un archivo modificado o dañado nunca se ejecuta.';
+  @override
+  String get updateVerifyFailed =>
+      'No se pudo descargar la actualización o su firma no es válida: no se ha instalado nada.';
+  @override
+  String get updateReleasePage => 'Página de versiones';
+  @override
+  String get updateInstall => 'Descargar e instalar';
 }

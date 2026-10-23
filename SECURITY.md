@@ -15,9 +15,16 @@ Statistik, keine Schriften oder Bilder von fremden Diensten.
 - **Adressen vom Server** (Transcoding, Untertitel) werden nur geöffnet, wenn sie
   zum eigenen Server gehören. Kennungen vom Server werden geprüft, bevor sie
   Ordnernamen oder App-Adressen werden.
-- **Downloads:** liegen je Konto getrennt im Download-Ordner; gelöscht wird nie
-  außerhalb davon. Manipulierte Einträge in `downloads.json` werden ignoriert.
-  Andere Konten sehen fremde Downloads nicht.
+- **Downloads:** liegen je Konto getrennt im Download-Ordner (immer ein Unterordner
+  "Jellyflex"; Systemordner wie Windows, Programme, AppData sind gesperrt).
+  Gelöscht wird nur, was genau wie ein Download-Ordner heißt und in einem bekannten
+  Download-Ordner liegt. Manipulierte Einträge in `downloads.json` werden ignoriert.
+  Andere Konten sehen fremde Downloads nicht. Vor jedem Download wird der freie
+  Platz geprüft (1 GB bleibt immer frei).
+- **Updates:** Die App installiert nur auf Klick und nur Installer mit gültiger
+  Ed25519-Signatur (öffentlicher Schlüssel fest in der App, geheimer Schlüssel nur
+  beim Herausgeber unter `%APPDATA%\JellyflexRelease`, nie im Repository). Ein
+  ausgetauschter oder beschädigter Installer wird nicht gestartet.
 - **Eigenes Logo:** Größe und Dateityp begrenzt, nur verkleinert dekodiert.
 
 ## Bekannte, bewusst akzeptierte Grenzen

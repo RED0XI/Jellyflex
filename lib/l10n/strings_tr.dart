@@ -1242,4 +1242,13 @@ final class _Tr extends S {
   String get keepDownloading => 'İndirmeye devam et';
   @override
   String get scenes => 'Sahneler';
+  @override
+  String get updateVerifiedHint =>
+      'Jellyflex yükleyiciyi indirir ve önce dijital imzasını kontrol eder – değiştirilmiş veya bozuk bir dosya asla başlatılmaz.';
+  @override
+  String get updateVerifyFailed => 'Güncelleme indirilemedi veya imzası yanlış – hiçbir şey yüklenmedi.';
+  @override
+  String get updateReleasePage => 'Sürüm sayfası';
+  @override
+  String get updateInstall => 'İndir ve yükle';
 }

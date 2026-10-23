@@ -962,4 +962,17 @@ class S {
   // --- Szenen ----------------------------------------------------------------
 
   String get scenes => _t('Scenes', 'Szenen');
+
+  // --- Geprüfte Updates ------------------------------------------------------
+
+  String get updateVerifiedHint => _t(
+    'Jellyflex downloads the installer and checks its digital signature first – a modified or damaged file is never started.',
+    'Jellyflex lädt den Installer und prüft zuerst seine digitale Signatur – eine veränderte oder beschädigte Datei wird nie gestartet.',
+  );
+  String get updateVerifyFailed => _t(
+    'The update couldn’t be downloaded or its signature is wrong – nothing was installed.',
+    'Das Update ließ sich nicht laden oder die Signatur stimmt nicht – es wurde nichts installiert.',
+  );
+  String get updateReleasePage => _t('Release page', 'Versionsseite');
+  String get updateInstall => _t('Download & install', 'Laden & installieren');
 }

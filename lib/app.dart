@@ -115,8 +115,10 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
     // Freiwillige Update-Prüfung (Standard: aus) – einmal pro Start, etwas verzögert.
     if (ref.read(settingsProvider).updateCheck) {
       Future<void>.delayed(const Duration(seconds: 8), () async {
-        final latest = await UpdateCheck.latestVersion();
-        if (mounted && latest != null && UpdateCheck.isNewer(latest)) showUpdateNotice(latest);
+        final latest = await UpdateCheck.latestRelease();
+        if (!mounted || latest == null || !UpdateCheck.isNewer(latest.version)) return;
+        final router = ref.read(routerProvider);
+        showUpdateNotice(latest, () => router.routerDelegate.navigatorKey.currentContext);
       });
     }
     // Eigener Name/Logo: Fenstertitel und Taskleisten-Symbol mitziehen.
