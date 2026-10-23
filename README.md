@@ -149,7 +149,9 @@ Screenshots end up in `build/screenshots/`.
 ### Publishing a release (maintainers)
 
 1. Raise the version in `pubspec.yaml` and `lib/core/version.dart`.
-2. Build the installer (see above) – it is signed automatically. The secret key lives only on the
+2. Commit, then build with `powershell -ExecutionPolicy Bypass -File tool/build_release.ps1`.
+   It builds in a neutral folder (`C:\JellyflexBuild`) so no path with your Windows user name ends up
+   in the program, checks every file for it, and signs the installer. The secret key lives only on the
    maintainer's PC (`%APPDATA%\JellyflexRelease`, created once with `dart run tool/sign_update.dart --new-key`)
    and must never be committed.
 3. Create a GitHub release with tag `v<version>` and attach **both** `Jellyflex-Setup-<version>.exe`
