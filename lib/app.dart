@@ -15,6 +15,7 @@ import 'features/login/login_screen.dart';
 import 'features/person/person_screen.dart';
 import 'features/player/player_screen.dart';
 import 'features/roulette/roulette_screen.dart';
+import 'features/screensaver/screensaver.dart';
 import 'features/search/search_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/splash_screen.dart';
@@ -112,9 +113,12 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
       routerConfig: router,
       scrollBehavior: const _AppScrollBehavior(),
       scaffoldMessengerKey: appMessengerKey,
-      builder: (context, child) => LiveHandler(
+      builder: (context, child) => Screensaver(
         router: router,
-        child: WindowFrame(router: router, child: child!),
+        child: LiveHandler(
+          router: router,
+          child: WindowFrame(router: router, child: child!),
+        ),
       ),
     );
   }

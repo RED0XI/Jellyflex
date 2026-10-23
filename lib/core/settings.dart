@@ -57,7 +57,11 @@ class AppSettings {
     this.bannerTrailers = true,
     this.appName,
     this.logoPath,
+    this.screensaverMinutes = 5,
   });
+
+  /// Bildschirmschoner nach so vielen Minuten ohne Eingabe; 0 = aus.
+  final int screensaverMinutes;
 
   /// Eigener App-Name (Titelleiste, Fenstertitel, Anmeldung …); `null` = "Jellyflex".
   final String? appName;
@@ -104,6 +108,7 @@ class AppSettings {
     bool? bannerTrailers,
     String? Function()? appName,
     String? Function()? logoPath,
+    int? screensaverMinutes,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -116,6 +121,7 @@ class AppSettings {
     bannerTrailers: bannerTrailers ?? this.bannerTrailers,
     appName: appName != null ? appName() : this.appName,
     logoPath: logoPath != null ? logoPath() : this.logoPath,
+    screensaverMinutes: screensaverMinutes ?? this.screensaverMinutes,
   );
 
   Map<String, dynamic> toJson() => {
@@ -130,6 +136,7 @@ class AppSettings {
     'bannerTrailers': bannerTrailers,
     'appName': appName,
     'logoPath': logoPath,
+    'screensaverMinutes': screensaverMinutes,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -144,6 +151,7 @@ class AppSettings {
     bannerTrailers: json['bannerTrailers'] as bool? ?? true,
     appName: json['appName'] as String?,
     logoPath: json['logoPath'] as String?,
+    screensaverMinutes: (json['screensaverMinutes'] as num?)?.toInt() ?? 5,
   );
 }
 

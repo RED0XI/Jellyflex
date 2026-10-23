@@ -19,6 +19,10 @@ abstract final class GamepadInput {
   /// Vom Player gesetzt; `true` = Eingabe verarbeitet.
   static bool Function(PadAction action)? playerHandler;
 
+  /// Bekommt jede Eingabe vor allen anderen (z. B. der Bildschirmschoner,
+  /// der sich bei Tastendruck schließt); `true` = Eingabe verarbeitet.
+  static bool Function(PadAction action)? overlayHandler;
+
   static final _pressed = <GamepadButton>{};
   static PadAction? _stickDirection;
   static Timer? _repeat;
@@ -91,6 +95,7 @@ abstract final class GamepadInput {
   static void _dispatch(PadAction action) {
     // Im UI-Thread nach dem aktuellen Frame ausführen.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (overlayHandler?.call(action) ?? false) return;
       if (playerHandler?.call(action) ?? false) return;
       _onAction?.call(action);
     });

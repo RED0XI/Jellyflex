@@ -38,6 +38,11 @@ const _months = [
 /// "12. März 1975"
 String formatDate(DateTime d) => '${d.day}. ${_months[d.month - 1]} ${d.year}';
 
+const _weekdays = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+
+/// "Donnerstag, 23. Oktober"
+String formatWeekdayDate(DateTime d) => '${_weekdays[d.weekday - 1]}, ${d.day}. ${_months[d.month - 1]}';
+
 /// Alter in Jahren am Tag [at] (Standard: heute).
 int ageAt(DateTime birth, [DateTime? at]) {
   final day = at ?? DateTime.now();

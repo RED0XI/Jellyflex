@@ -6,6 +6,7 @@ import '../../core/branding.dart';
 import '../../core/jellyfin_api.dart';
 import '../../core/session.dart';
 import '../../core/settings.dart';
+import '../screensaver/screensaver.dart';
 import '../../theme.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/buttons.dart';
@@ -196,6 +197,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               trailing: _Toggle(
                                 value: s.bannerTrailers,
                                 onChanged: (v) => ctrl.update((s) => s.copyWith(bannerTrailers: v)),
+                              ),
+                            ),
+                            _Row(
+                              title: 'Bildschirmschoner',
+                              subtitle:
+                                  'Zeigt nach einer Weile ohne Eingabe Bilder deiner Filme und Serien mit Uhr. '
+                                  'Nie während der Wiedergabe.',
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Jetzt anzeigen',
+                                    onPressed: () => screensaverPreview.value++,
+                                    icon: const Icon(Icons.play_circle_outline_rounded),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  _Choice<int>(
+                                    value: s.screensaverMinutes,
+                                    label: s.screensaverMinutes == 0 ? 'Aus' : 'Nach ${s.screensaverMinutes} Min.',
+                                    options: const [
+                                      (0, 'Aus'),
+                                      (2, 'Nach 2 Min.'),
+                                      (5, 'Nach 5 Min.'),
+                                      (10, 'Nach 10 Min.'),
+                                      (15, 'Nach 15 Min.'),
+                                      (30, 'Nach 30 Min.'),
+                                    ],
+                                    onChanged: (v) => ctrl.update((s) => s.copyWith(screensaverMinutes: v)),
+                                  ),
+                                ],
                               ),
                             ),
                             _Row(
