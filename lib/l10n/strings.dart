@@ -236,6 +236,8 @@ class S {
   String get goodEvening => _t('Good evening', 'Guten Abend');
   String get coverStory => _t('Cover story', 'Titelgeschichte');
   String get layout => _t('Layout', 'Layout');
+  String downloadFinished(String name) => _t('“$name” is downloaded', '„$name“ ist heruntergeladen');
+  String downloadsFinished(int n) => _t('$n downloads finished', '$n Downloads fertig');
   String get themeMusic => _t('Theme music', 'Titelmusik');
   String get themeMusicHint => _t(
     'Plays a title’s theme song quietly on its page (if your server has one).',

@@ -10,6 +10,7 @@ import 'core/ui_sounds.dart';
 import 'core/system_certs.dart';
 import 'core/redact.dart';
 import 'core/app_log.dart';
+import 'core/download_notify.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +48,7 @@ Future<void> main() async {
     titleBarStyle: TitleBarStyle.hidden,
   );
   windowManager.waitUntilReadyToShow(options, () async {
+    taskbarReady = true;
     await windowManager.show();
     await windowManager.focus();
   });

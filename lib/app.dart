@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/branding.dart';
+import 'core/download_notify.dart';
 import 'core/update_check.dart';
 import 'features/settings/about_section.dart';
 import 'core/route_observer.dart';
@@ -159,11 +160,14 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
         router: router,
         child: LiveHandler(
           router: router,
-          child: WindowFrame(
-            router: router,
-            child: LayoutShell(
+          child: DownloadNotifier(
+            messenger: appMessengerKey,
+            child: WindowFrame(
               router: router,
-              child: OfflineBanner(router: router, child: child!),
+              child: LayoutShell(
+                router: router,
+                child: OfflineBanner(router: router, child: child!),
+              ),
             ),
           ),
         ),
