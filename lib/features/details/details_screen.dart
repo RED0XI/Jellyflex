@@ -636,22 +636,21 @@ class _SeasonsSectionState extends ConsumerState<_SeasonsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          height: 44,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
-            itemCount: seasons.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (context, i) {
-              final season = seasons[i];
-              return _SeasonChip(
-                label: season.name,
-                watched: season.userData.played,
-                selected: season.id == selected,
-                onTap: () => setState(() => _selectedSeasonId = season.id),
-              );
-            },
+        // Viele Staffeln brechen in die nächste Zeile um, statt rechts aus dem Fenster zu laufen.
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final season in seasons)
+                _SeasonChip(
+                  label: season.name,
+                  watched: season.userData.played,
+                  selected: season.id == selected,
+                  onTap: () => setState(() => _selectedSeasonId = season.id),
+                ),
+            ],
           ),
         ),
         _SeasonTools(
@@ -707,8 +706,8 @@ class _SeasonChipState extends State<_SeasonChip> {
       onTap: widget.onTap,
       builder: (context, hovered) => AnimatedContainer(
         duration: const Duration(milliseconds: 180),
+        height: 44,
         padding: const EdgeInsets.symmetric(horizontal: 18),
-        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: widget.selected ? Colors.white : Colors.white.withValues(alpha: hovered ? 0.16 : 0.08),
           borderRadius: BorderRadius.circular(22),

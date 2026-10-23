@@ -411,7 +411,8 @@ void _seed() {
     byId[seriesId] = ser;
     seasons[seriesId] = [];
 
-    for (var n = 1; n <= 2; n++) {
+    // "Orbit" hat viele Staffeln (Staffel-Auswahl darf nicht aus dem Fenster laufen).
+    for (var n = 1; n <= (s == 5 ? 18 : 2); n++) {
       final seasonId = '${seriesId}_s$n';
       final season = <String, dynamic>{
         'Id': seasonId,

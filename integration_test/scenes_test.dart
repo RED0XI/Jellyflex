@@ -67,4 +67,33 @@ void main() {
       PlayerScreen.debugBeforeOpen = null;
     }
   });
+
+  testWidgets('Viele Staffeln bleiben im Fenster', (tester) async {
+    if (!await demoServerRunning()) return;
+    await windowManager.ensureInitialized();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [sessionProvider.overrideWith(DemoSession.new), settingsProvider.overrideWith(() => testSettings())],
+        child: RepaintBoundary(key: shotKey, child: const JellyflexApp()),
+      ),
+    );
+    await pumpFor(tester, const Duration(seconds: 2));
+    final container = ProviderScope.containerOf(tester.element(find.byType(JellyflexApp)));
+    container.read(routerProvider).push('/item/series5');
+    await pumpFor(tester, const Duration(seconds: 3));
+    final last = find.text('Staffel 18');
+    await tester.ensureVisible(last);
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(tester.getRect(last).right, lessThan(width), reason: 'Letzte Staffel sichtbar im Fenster');
+    final chip = find.ancestor(of: last, matching: find.byType(AnimatedContainer)).first;
+    expect(tester.getSize(chip).width, lessThan(220), reason: 'Knopf so breit wie sein Text');
+    expect(tester.getSize(chip).height, 44);
+    expect(tester.getRect(last).top, greaterThan(tester.getRect(find.text('Staffel 1')).top), reason: 'Umbruch');
+    await tester.tap(last);
+    await pumpFor(tester, const Duration(seconds: 1));
+    await tester.ensureVisible(find.text('Staffel 1'));
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    await saveShot(tester, 'many_seasons');
+  });
 }
