@@ -29,6 +29,11 @@ final _sockets = <WebSocket>{};
 /// Bytes pro Sekunde beim Ausliefern von Videos (0 = so schnell wie möglich).
 var _throttleBps = 0;
 
+/// Wiedergabelisten (Merkliste, eigene Listen): Liste → Einträge (Eintrags-ID, Titel-ID).
+final _playlists = <String, Map<String, dynamic>>{};
+final _playlistEntries = <String, List<({String entry, String id})>>{};
+var _entryCounter = 0;
+
 /// Zuletzt angefragte Titelmusik (für Tests).
 String? _lastThemeSong;
 
@@ -640,6 +645,17 @@ Object? _handle(HttpRequest req) {
       },
     ];
   }
+  if (path == '/Items' && q['includeItemTypes'] == 'Playlist') {
+    return _page([
+      for (final pl in _playlists.values) {...pl, 'ChildCount': _playlistEntries[pl['Id']]!.length},
+    ], q);
+  }
+  if (seg.length == 3 && seg[0] == 'Playlists' && seg[2] == 'Items' && req.method == 'GET') {
+    return _page([
+      for (final e in _playlistEntries[seg[1]] ?? const <({String entry, String id})>[])
+        if (byId[e.id] != null) {...byId[e.id]!, 'PlaylistItemId': e.entry},
+    ], q);
+  }
   if (path == '/Items' && q['parentId'] == 'boxset0') return _page(movies.take(3).toList(), q);
   if (path == '/Items' && q['ids'] != null) {
     return _page([for (final id in q['ids']!.split(',')) ?byId[id]], q);
@@ -802,6 +818,57 @@ Future<void> main() async {
       if (seg.length == 6 && seg[0] == 'Videos' && seg[3] == 'Subtitles') {
         res.headers.contentType = ContentType('application', 'x-subrip', charset: 'utf-8');
         res.write('1\n00:00:01,000 --> 00:00:04,000\nExterner Untertitel (Demo)\n');
+        await res.close();
+        continue;
+      }
+      // Wiedergabelisten anlegen, füllen, leeren, löschen (wie Jellyfin).
+      if (req.uri.path == '/Playlists' && req.method == 'POST') {
+        final body = jsonDecode(await utf8.decoder.bind(req).join()) as Map<String, dynamic>;
+        final id = 'pl${_playlists.length + 1}x${_rand.nextInt(1 << 20)}';
+        _playlists[id] = {
+          'Id': id,
+          'Name': body['Name'],
+          'Type': 'Playlist',
+          'MediaType': 'Video',
+          'IsPublic': body['IsPublic'],
+          'UserData': _userData(),
+        };
+        _playlistEntries[id] = [
+          for (final i in (body['Ids'] as List?) ?? const []) (entry: 'e${_entryCounter++}', id: i as String),
+        ];
+        res.headers.contentType = ContentType.json;
+        res.write(jsonEncode({'Id': id}));
+        await res.close();
+        continue;
+      }
+      if (seg.length == 3 && seg[0] == 'Playlists' && seg[2] == 'Items' && req.method != 'GET') {
+        final entries = _playlistEntries[seg[1]];
+        if (entries != null && req.method == 'POST') {
+          for (final i in (req.uri.queryParameters['ids'] ?? '').split(',').where((s) => s.isNotEmpty)) {
+            entries.add((entry: 'e${_entryCounter++}', id: i));
+          }
+        }
+        if (entries != null && req.method == 'DELETE') {
+          final remove = (req.uri.queryParameters['entryIds'] ?? '').split(',').toSet();
+          entries.removeWhere((e) => remove.contains(e.entry));
+        }
+        res.statusCode = entries == null ? 404 : 204;
+        await res.close();
+        continue;
+      }
+      if (seg.length == 2 && seg[0] == 'Items' && req.method == 'DELETE' && _playlists.containsKey(seg[1])) {
+        _playlists.remove(seg[1]);
+        _playlistEntries.remove(seg[1]);
+        res.statusCode = 204;
+        await res.close();
+        continue;
+      }
+      if (req.uri.path == '/debug/playlists') {
+        res.headers.contentType = ContentType.json;
+        res.write(jsonEncode([
+          for (final pl in _playlists.values)
+            {...pl, 'Items': _playlistEntries[pl['Id']]!.map((e) => e.id).toList()},
+        ]));
         await res.close();
         continue;
       }

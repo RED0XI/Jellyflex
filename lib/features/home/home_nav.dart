@@ -133,6 +133,7 @@ class ProfileMenuButton extends ConsumerWidget {
         entry('/quiz', Icons.quiz_outlined, tr.movieQuiz),
         entry('/roulette', Icons.casino_outlined, tr.surpriseMe),
       ],
+      entry('/lists', Icons.bookmarks_outlined, tr.myLists),
       entry('switch', Icons.switch_account_outlined, tr.switchUser),
       entry('/wrapped', Icons.auto_graph_rounded, tr.yearlyRecap),
       entry('/settings', Icons.settings_outlined, tr.settings),
@@ -378,6 +379,13 @@ class SideNav extends ConsumerWidget {
               padding: EdgeInsets.zero,
               children: [
                 for (final e in entries) _SideLink(icon: e.icon, label: e.label, active: isActive(e), onTap: e.onTap),
+                const SizedBox(height: 14),
+                _SideLink(
+                  icon: Icons.bookmarks_outlined,
+                  label: tr.myLists,
+                  active: path == '/lists',
+                  onTap: () => router.go('/lists'),
+                ),
                 const SizedBox(height: 14),
                 _SideHeading(tr.more),
                 _SideLink(

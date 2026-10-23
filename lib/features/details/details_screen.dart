@@ -23,6 +23,7 @@ import '../home/home_providers.dart';
 import '../../widgets/focusable.dart';
 import 'media_info_dialog.dart';
 import 'theme_music.dart';
+import '../lists/list_actions.dart';
 import '../../l10n/strings.dart';
 
 final itemProvider = FutureProvider.autoDispose.family<BaseItem, String>((ref, id) async {
@@ -520,6 +521,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
           activeColor: const Color(0xFFFF5C8A),
           onPressed: _toggleFavorite,
         ),
+        if (!item.isCollection) WatchlistButton(item: item),
         if (!item.isSeries && !item.isCollection) _DownloadButton(item: item, mediaSourceId: _chosenSourceId),
         if (source != null && !item.isSeries && !item.isCollection)
           CircleIconButton(

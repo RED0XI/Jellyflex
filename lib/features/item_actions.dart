@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/downloads.dart';
+import '../core/lists.dart';
 import '../core/models.dart';
 import '../core/session.dart';
 import '../theme.dart';
 import 'details/details_screen.dart';
 import 'downloads/downloads_screen.dart';
+import 'lists/list_actions.dart';
 import '../l10n/strings.dart';
 
 import 'package:flutter/scheduler.dart';
@@ -21,6 +23,8 @@ enum _ItemAction {
   markUnplayed,
   favorite,
   unfavorite,
+  watchlist,
+  addToList,
   forget,
   download,
   removeDownload,
@@ -36,6 +40,8 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
   final data = item.userData;
   final canPlay = !item.isSeries && !item.isSeason && !item.isCollection;
   final downloaded = container.read(downloadsProvider.notifier).entryFor(item.id);
+  // Stand der Merkliste, soweit schon geladen (der Schalter meldet danach das Ergebnis).
+  final onWatchlist = container.read(onWatchlistProvider(item.id));
 
   PopupMenuItem<_ItemAction> entry(_ItemAction value, IconData icon, String label) => PopupMenuItem(
     value: value,
@@ -79,6 +85,13 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
         entry(_ItemAction.unfavorite, Icons.heart_broken_rounded, tr.removeFavorite)
       else
         entry(_ItemAction.favorite, Icons.favorite_border_rounded, tr.addFavorite),
+      if (!item.isCollection)
+        entry(
+          _ItemAction.watchlist,
+          onWatchlist ? Icons.bookmark_remove_outlined : Icons.bookmark_add_outlined,
+          onWatchlist ? tr.removeFromWatchlist : tr.addToWatchlist,
+        ),
+      if (!item.isCollection) entry(_ItemAction.addToList, Icons.playlist_add_rounded, tr.addToListMenu),
       if (data.hasResumePosition) entry(_ItemAction.forget, Icons.history_toggle_off_rounded, tr.forget),
       if (canPlay) const PopupMenuDivider(),
       if (canPlay && downloaded == null) entry(_ItemAction.download, Icons.download_rounded, tr.download),
@@ -126,6 +139,15 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
       if (!context.mounted || !await confirmRemoveDownload(context, item.name)) return;
       await container.read(downloadsProvider.notifier).remove(item.id);
       messenger?.showSnackBar(_snack(tr.downloadDeleted));
+    case _ItemAction.watchlist:
+      try {
+        final now = await container.read(listsProvider).toggleWatchlist(item);
+        messenger?.showSnackBar(_snack(now ? tr.addedToWatchlist(item.name) : tr.removedFromWatchlist(item.name)));
+      } catch (_) {
+        messenger?.showSnackBar(_snack(tr.didNotWork));
+      }
+    case _ItemAction.addToList:
+      if (context.mounted) await showAddToListDialog(context, container, [item]);
     case _ItemAction.forget:
       await run(() => api.clearResumePosition(item.id), tr.removedFromContinue);
   }

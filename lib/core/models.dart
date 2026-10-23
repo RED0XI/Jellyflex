@@ -90,6 +90,9 @@ class BaseItem {
 
   // --- Benutzerdaten, Personen, Medienquellen -------------------------------
 
+  /// Eintrag in einer Wiedergabeliste (zum Entfernen aus der Liste).
+  String? get playlistItemId => raw['PlaylistItemId'] as String?;
+
   UserData get userData => UserData((raw['UserData'] as Map?)?.cast<String, dynamic>() ?? const {});
 
   List<Person> get people =>

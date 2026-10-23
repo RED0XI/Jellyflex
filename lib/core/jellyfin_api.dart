@@ -314,6 +314,35 @@ class JellyfinApi {
     'limit': limit,
   });
 
+  // --- Listen (Wiedergabelisten auf dem Server) ------------------------------
+
+  Future<List<BaseItem>> getPlaylists() => _getItems('/Items', {
+    'userId': userId,
+    'includeItemTypes': 'Playlist',
+    'recursive': true,
+    'fields': 'ChildCount',
+    'sortBy': 'SortName',
+  });
+
+  Future<List<BaseItem>> getPlaylistItems(String id) => _getItems('/Playlists/$id/Items', {..._common});
+
+  /// Neue Liste – immer privat (nur dieser Benutzer sieht sie).
+  Future<String?> createPlaylist(String name, {List<String> ids = const []}) async {
+    final res = await dio.post(
+      '/Playlists',
+      data: {'Name': name, 'Ids': ids, 'UserId': userId, 'MediaType': 'Video', 'IsPublic': false},
+    );
+    return (res.data is Map) ? (res.data as Map)['Id'] as String? : null;
+  }
+
+  Future<void> addToPlaylist(String id, List<String> ids) =>
+      dio.post('/Playlists/$id/Items', queryParameters: {'ids': ids.join(','), 'userId': userId});
+
+  Future<void> removeFromPlaylist(String id, List<String> entryIds) =>
+      dio.delete('/Playlists/$id/Items', queryParameters: {'entryIds': entryIds.join(',')});
+
+  Future<void> deletePlaylist(String id) => dio.delete('/Items/$id');
+
   /// Personen (Schauspieler, Regie …) nach Namen suchen.
   Future<List<Person>> searchPeople(String term, {int limit = 20}) async {
     final items = await _getItems('/Persons', {

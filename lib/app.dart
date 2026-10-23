@@ -15,6 +15,7 @@ import 'features/downloads/downloads_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/live_handler.dart';
 import 'features/library/library_screen.dart';
+import 'features/lists/lists_screen.dart';
 import 'features/login/login_screen.dart';
 import 'features/person/person_screen.dart';
 import 'features/player/player_screen.dart';
@@ -70,6 +71,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       _route('/quiz', (_) => const QuizScreen()),
       _route('/wrapped', (_) => const WrappedScreen()),
       _route('/settings', (_) => const SettingsScreen()),
+      _route('/lists', (_) => const ListsScreen()),
       _route(
         '/library/:id',
         (state) => LibraryScreen(

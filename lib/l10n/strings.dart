@@ -253,6 +253,34 @@ class S {
   String get goodEvening => _t('Good evening', 'Guten Abend');
   String get coverStory => _t('Cover story', 'Titelgeschichte');
   String get layout => _t('Layout', 'Layout');
+  String get watchlist => _t('Watchlist', 'Merkliste');
+  String get myLists => _t('My lists', 'Meine Listen');
+  String get addToWatchlist => _t('Add to watchlist', 'Auf die Merkliste');
+  String get removeFromWatchlist => _t('Remove from watchlist', 'Von der Merkliste nehmen');
+  String addedToWatchlist(String name) => _t('“$name” is on your watchlist', '„$name“ steht auf der Merkliste');
+  String removedFromWatchlist(String name) =>
+      _t('“$name” removed from your watchlist', '„$name“ von der Merkliste genommen');
+  String get addToList => _t('Add to list', 'Zu Liste hinzufügen');
+  String get addToListMenu => _t('Add to list …', 'Zu Liste hinzufügen …');
+  String addedToList(String list) => _t('Added to “$list”', 'Zu „$list“ hinzugefügt');
+  String get newList => _t('New list', 'Neue Liste');
+  String get listNameHint => _t('Name, e.g. “Movie night”', 'Name, z. B. „Filmabend“');
+  String get listsHint => _t(
+    'Private lists on your Jellyfin server – available on all your devices.',
+    'Private Listen auf deinem Jellyfin-Server – auf all deinen Geräten verfügbar.',
+  );
+  String get noListsYet => _t(
+    'No lists yet. Use the bookmark on a title or “Add to list”.',
+    'Noch keine Listen. Nutze das Lesezeichen bei einem Titel oder „Zu Liste hinzufügen“.',
+  );
+  String get listEmpty => _t('This list is empty.', 'Diese Liste ist leer.');
+  String get deleteList => _t('Delete list', 'Liste löschen');
+  String deleteListQuestion(String name) => _t('Delete “$name”?', '„$name“ löschen?');
+  String get deleteListText => _t(
+    'The list is deleted on your server. The titles themselves stay.',
+    'Die Liste wird auf deinem Server gelöscht. Die Titel selbst bleiben.',
+  );
+  String removeFromList(String name) => _t('Remove “$name” from the list', '„$name“ aus der Liste entfernen');
   String get shortcuts => _t('Keyboard shortcuts', 'Tastenkürzel');
   String get shortcutsEverywhere => _t('Everywhere', 'Überall');
   String get shortcutsPlayer => _t('Player', 'Player');
