@@ -12,6 +12,7 @@ import '../../widgets/focusable.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/top_scrim.dart';
 import '../../l10n/strings.dart';
+import '../../core/platform/app_paths.dart';
 
 /// Alle Downloads: laufende mit Fortschritt, fertige zum Offline-Schauen.
 class DownloadsScreen extends ConsumerStatefulWidget {
@@ -73,7 +74,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                           icon: Icons.folder_open_rounded,
                           onPressed: () {
                             manager.root.createSync(recursive: true);
-                            Process.run('explorer', [manager.root.path]);
+                            AppPaths.openFolder(manager.root.path);
                           },
                         ),
                       ],

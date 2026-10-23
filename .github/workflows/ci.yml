@@ -1,0 +1,45 @@
+# Bei jedem Push und Pull Request: prüfen, dass Windows UND macOS bauen und die Tests
+# bestehen – so fällt sofort auf, wenn eine Änderung nur auf einem System funktioniert.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Eine Flutter-Version für beide Systeme (auch in release.yml anpassen).
+  FLUTTER_VERSION: '3.47.8'
+
+jobs:
+  test:
+    name: ${{ matrix.os == 'windows-latest' && 'Windows' || 'macOS' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - name: Bauen (Windows)
+        if: runner.os == 'Windows'
+        run: flutter build windows --release
+      - name: Bauen (macOS)
+        if: runner.os == 'macOS'
+        run: flutter build macos --release

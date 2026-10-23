@@ -82,7 +82,8 @@ void main() {
     container.read(routerProvider).push('/item/series5');
     await pumpFor(tester, const Duration(seconds: 3));
     final last = find.text('Staffel 18');
-    await tester.ensureVisible(last);
+    // In die Mitte holen – am oberen Rand läge die Titelleiste (Zurück-Pfeil) darüber.
+    Scrollable.ensureVisible(tester.element(last), alignment: 0.5);
     await pumpFor(tester, const Duration(milliseconds: 500));
     final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
     expect(tester.getRect(last).right, lessThan(width), reason: 'Letzte Staffel sichtbar im Fenster');

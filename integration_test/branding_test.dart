@@ -49,7 +49,12 @@ void main() {
       expect(await tester.runAsync(windowManager.getTitle), defaultAppName);
 
       // Logo aus den Projektdateien importieren (wie über "Bild wählen …").
-      final logo = await tester.runAsync(() => importLogo('${Directory.current.path}\\assets\\icon.png', dir: temp));
+      final logo = await tester.runAsync(
+        () => importLogo(
+          '${Directory.current.path}${Platform.pathSeparator}assets${Platform.pathSeparator}icon.png',
+          dir: temp,
+        ),
+      );
       final ico = File('${logo!.substring(0, logo.lastIndexOf('.'))}.ico');
       expect(ico.existsSync(), isTrue);
       final icoBytes = ico.readAsBytesSync();

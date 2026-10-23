@@ -26,7 +26,7 @@ Write-Host "Fertig: dist\Jellyflex-Setup-$version.exe"
 
 # Signieren (für "Laden & installieren" in der App) und gleich gegenprüfen.
 $installer = "dist\Jellyflex-Setup-$version.exe"
-if (Test-Path "$env:APPDATA\JellyflexRelease\update_signing_key.json") {
+if ($env:JELLYFLEX_UPDATE_SIGNING_KEY -or (Test-Path "$env:APPDATA\JellyflexRelease\update_signing_key.json")) {
   dart run tool/sign_update.dart $installer
   if ($LASTEXITCODE -ne 0) { throw 'Signieren fehlgeschlagen' }
   flutter test test/update_key_check.dart "--dart-define=SIGNED=$installer"

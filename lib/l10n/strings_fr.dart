@@ -705,7 +705,7 @@ final class _Fr extends S {
   @override
   String get surpriseMe => 'Surprends-moi';
   @override
-  String get searchCtrlF => 'Rechercher (Ctrl+F)';
+  String get searchCtrlF => _isMac ? 'Rechercher (⌘F)' : 'Rechercher (Ctrl+F)';
   @override
   String get profile => 'Profil';
   @override
@@ -1142,8 +1142,9 @@ final class _Fr extends S {
   @override
   String get chooseFolder => 'Choisir le dossier';
   @override
-  String get folderNotAllowed =>
-      'Les téléchargements ne peuvent pas aller dans les dossiers système (Windows, Program Files, AppData). Choisis un autre dossier.';
+  String get folderNotAllowed => _isMac
+      ? 'Les téléchargements ne peuvent pas aller dans les dossiers système (System, Applications, Library). Choisis un autre dossier.'
+      : 'Les téléchargements ne peuvent pas aller dans les dossiers système (Windows, Program Files, AppData). Choisis un autre dossier.';
   @override
   String folderNotWritable(String error) => 'Jellyflex ne peut pas écrire dans ce dossier ($error).';
   @override
@@ -1182,8 +1183,9 @@ final class _Fr extends S {
   @override
   String get unmeteredOnly => 'Uniquement en Wi-Fi ou filaire';
   @override
-  String get unmeteredOnlyHint =>
-      'Pas de téléchargement via données mobiles, partage de connexion ou réseaux que Windows marque comme limités.';
+  String get unmeteredOnlyHint => _isMac
+      ? 'Pas de téléchargement via partage de connexion ou réseaux en mode données réduites.'
+      : 'Pas de téléchargement via données mobiles, partage de connexion ou réseaux que Windows marque comme limités.';
   @override
   String get speedLimit => 'Limite de vitesse';
   @override

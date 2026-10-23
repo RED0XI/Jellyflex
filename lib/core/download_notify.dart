@@ -1,7 +1,9 @@
 import 'dart:ffi';
+import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -28,10 +30,10 @@ double? runningProgress(Iterable<DownloadEntry> entries) {
   return running.total > 0 ? (running.received / running.total).clamp(0.0, 1.0) : 0;
 }
 
-/// Zeigt den Download-Fortschritt am Taskleisten-Symbol. Wird ein Download
-/// fertig, während die App im Hintergrund ist, blinkt ihr Taskleisten-Knopf
-/// (Windows-üblich, ohne Zusatzprogramme); die Meldung erscheint, sobald man
-/// zurückkommt. Im Vordergrund erscheint sie sofort.
+/// Zeigt den Download-Fortschritt am Taskleisten- bzw. Dock-Symbol. Wird ein
+/// Download fertig, während die App im Hintergrund ist, blinkt ihr Taskleisten-Knopf
+/// (Windows) bzw. hüpft ihr Dock-Symbol einmal (macOS) – ohne Zusatzprogramme; die
+/// Meldung erscheint, sobald man zurückkommt. Im Vordergrund erscheint sie sofort.
 class DownloadNotifier extends ConsumerStatefulWidget {
   const DownloadNotifier({super.key, required this.messenger, required this.child});
 
@@ -110,8 +112,19 @@ class _DownloadNotifierState extends ConsumerState<DownloadNotifier> with Window
   @override
   void onWindowBlur() => _focused = false;
 
-  /// Taskleisten-Knopf blinken lassen, bis das Fenster wieder vorne ist (FlashWindowEx).
+  /// Taskleisten-Knopf blinken lassen, bis das Fenster wieder vorne ist (FlashWindowEx);
+  /// unter macOS hüpft das Dock-Symbol einmal.
   Future<void> _flashTaskbar(bool on) async {
+    if (Platform.isMacOS) {
+      if (!on) return;
+      try {
+        await const MethodChannel('jellyflex/shell').invokeMethod<void>('requestAttention');
+      } catch (e) {
+        debugPrint('Dock-Symbol hüpft nicht: $e');
+      }
+      return;
+    }
+    if (!Platform.isWindows) return;
     try {
       final hwnd = await windowManager.getId();
       final info = calloc<_FlashInfo>();

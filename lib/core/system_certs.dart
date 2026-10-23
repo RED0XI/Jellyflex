@@ -4,18 +4,21 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'settings.dart' show appDataDir;
+import 'platform/app_paths.dart';
 
 /// Zertifikatsprüfung für den Video-Player.
 ///
 /// mpv (bzw. sein TLS über mbedTLS) prüft Zertifikate von sich aus NICHT und
-/// kennt unter Windows auch keine vertrauenswürdigen Stammzertifikate. Ohne das
+/// kennt auch keine vertrauenswürdigen Stammzertifikate des Systems. Ohne das
 /// könnte sich jemand im Netz als der Server ausgeben und bekäme mit den
 /// Video-Anfragen das Anmelde-Token. Deshalb:
-/// 1. die Stammzertifikate von Windows (dem System vertraut) als PEM-Datei
-///    exportieren – exakt dieselben, denen auch Windows vertraut,
+/// 1. die Stammzertifikate des Systems als PEM-Datei exportieren – exakt dieselben,
+///    denen auch Windows bzw. macOS vertraut (inkl. selbst hinzugefügter, z. B. einer
+///    eigenen Zertifizierungsstelle fürs Heimnetz),
 /// 2. dem Player `tls-verify=yes` und diese Datei geben.
 abstract final class SystemCerts {
   static Future<String?>? _caFile;
@@ -38,14 +41,16 @@ abstract final class SystemCerts {
     }
   }
 
+  static const _shell = MethodChannel('jellyflex/shell');
+
   static Future<String?> _export() async {
-    if (!Platform.isWindows) return null;
+    if (!Platform.isWindows && !Platform.isMacOS) return null;
     try {
-      final pem = _windowsRootsAsPem();
+      final pem = Platform.isWindows ? _windowsRootsAsPem() : await _macRootsAsPem();
       if (pem.isEmpty) return null;
       final dir = appDataDir;
       await dir.create(recursive: true);
-      final file = File('${dir.path}\\ca-roots.pem');
+      final file = File(AppPaths.join(dir.path, 'ca-roots.pem'));
       if (!await file.exists() || await file.readAsString() != pem) {
         final tmp = File('${file.path}.tmp');
         await tmp.writeAsString(pem, flush: true);
@@ -56,6 +61,35 @@ abstract final class SystemCerts {
       debugPrint('Stammzertifikate nicht exportiert: $e');
       return null;
     }
+  }
+
+  /// macOS: vertrauenswürdige Stammzertifikate (System, Administrator, Benutzer) vom
+  /// Runner (macos/Runner/AppShell.swift) als DER-Liste.
+  static Future<String> _macRootsAsPem() async {
+    final List<Object?>? roots;
+    try {
+      roots = await _shell.invokeMethod<List<Object?>>('trustedRoots');
+    } on MissingPluginException {
+      return '';
+    }
+    final out = StringBuffer();
+    for (final der in roots ?? const []) {
+      if (der is Uint8List && !usesBrokenHash(der)) out.write(derToPem(der));
+    }
+    return out.toString();
+  }
+
+  /// Ein Zertifikat (DER) als PEM-Block.
+  @visibleForTesting
+  static String derToPem(Uint8List der) {
+    final out = StringBuffer();
+    final b64 = base64.encode(der);
+    out.writeln('-----BEGIN CERTIFICATE-----');
+    for (var i = 0; i < b64.length; i += 64) {
+      out.writeln(b64.substring(i, i + 64 > b64.length ? b64.length : i + 64));
+    }
+    out.writeln('-----END CERTIFICATE-----');
+    return out.toString();
   }
 
   /// Alle Zertifikate aus dem Windows-Speicher "ROOT" (vertrauenswürdige
@@ -84,14 +118,7 @@ abstract final class SystemCerts {
       var cert = enumerate(store, nullptr);
       while (cert != nullptr) {
         final der = cert.ref.pbCertEncoded.asTypedList(cert.ref.cbCertEncoded);
-        if (!usesBrokenHash(der)) {
-          final b64 = base64.encode(der);
-          out.writeln('-----BEGIN CERTIFICATE-----');
-          for (var i = 0; i < b64.length; i += 64) {
-            out.writeln(b64.substring(i, i + 64 > b64.length ? b64.length : i + 64));
-          }
-          out.writeln('-----END CERTIFICATE-----');
-        }
+        if (!usesBrokenHash(der)) out.write(derToPem(der));
         // Gibt den vorherigen Kontext selbst frei.
         cert = enumerate(store, cert);
       }

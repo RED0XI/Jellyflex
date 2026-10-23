@@ -17,6 +17,7 @@ import '../../widgets/buttons.dart';
 import '../../widgets/jf_image.dart';
 import 'wrapped_stats.dart';
 import '../../l10n/strings.dart';
+import '../../core/platform/app_paths.dart';
 
 /// Gesehene Filme, Folgen und die zugehörigen Serien (für alle Jahre).
 final _wrappedDataProvider = FutureProvider.autoDispose<(List<BaseItem>, List<BaseItem>, Map<String, BaseItem>)>((
@@ -103,23 +104,20 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
       final image = await boundary.toImage(pixelRatio: 2);
       final png = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
-      final dir = Directory('${Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path}\\Pictures');
+      final dir = Directory(AppPaths.pictures);
       await dir.create(recursive: true);
       final name = '${tr.recapFileName(appDisplayName(ref.read(settingsProvider)), stats.year)}.png'.replaceAll(
         RegExp(r'[\\/:*?"<>|]'),
         '',
       );
-      final file = File('${dir.path}\\$name');
+      final file = File(AppPaths.join(dir.path, name));
       await file.writeAsBytes(png!.buffer.asUint8List());
       messenger?.showSnackBar(
         SnackBar(
           content: Text(tr.savedToPictures(name)),
           behavior: SnackBarBehavior.floating,
           width: 520,
-          action: SnackBarAction(
-            label: tr.show,
-            onPressed: () => Process.run('explorer.exe', ['/select,${file.path}']),
-          ),
+          action: SnackBarAction(label: tr.show, onPressed: () => AppPaths.reveal(file.path)),
         ),
       );
     } catch (_) {

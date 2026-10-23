@@ -4,9 +4,14 @@
 //
 // Verwendung überall (auch ohne BuildContext): `tr.downloads`, `tr.endsAt('22:41')`.
 
+import 'dart:io' show Platform;
+
 part 'strings_es.dart';
 part 'strings_fr.dart';
 part 'strings_tr.dart';
+
+/// Unter macOS heißen die Tastenkürzel ⌘ statt Strg/Ctrl.
+final bool _isMac = Platform.isMacOS;
 
 enum AppLanguage {
   en('English'),
@@ -639,7 +644,7 @@ class S {
   String get libraries => _t('Libraries', 'Bibliotheken');
   String get movieQuiz => _t('Movie quiz', 'Film-Quiz');
   String get surpriseMe => _t('Surprise me', 'Überrasch mich');
-  String get searchCtrlF => _t('Search (Ctrl+F)', 'Suchen (Strg+F)');
+  String get searchCtrlF => _isMac ? _t('Search (⌘F)', 'Suchen (⌘F)') : _t('Search (Ctrl+F)', 'Suchen (Strg+F)');
   String get profile => _t('Profile', 'Profil');
   String get switchUser => _t('Switch user', 'Benutzer wechseln');
   String get yearlyRecap => _t('Year in review', 'Jahresrückblick');
@@ -865,10 +870,15 @@ class S {
     'Du bist über eine getaktete Verbindung online – der Download startet, sobald du im WLAN oder LAN bist.',
   );
   String get chooseFolder => _t('Choose folder', 'Ordner wählen');
-  String get folderNotAllowed => _t(
-    'Downloads can’t be saved in system folders (Windows, Program Files, AppData). Please choose another folder.',
-    'In Systemordnern (Windows, Programme, AppData) können keine Downloads liegen. Bitte wähle einen anderen Ordner.',
-  );
+  String get folderNotAllowed => _isMac
+      ? _t(
+          'Downloads can’t be saved in system folders (System, Applications, Library). Please choose another folder.',
+          'In Systemordnern (System, Programme, Library) können keine Downloads liegen. Bitte wähle einen anderen Ordner.',
+        )
+      : _t(
+          'Downloads can’t be saved in system folders (Windows, Program Files, AppData). Please choose another folder.',
+          'In Systemordnern (Windows, Programme, AppData) können keine Downloads liegen. Bitte wähle einen anderen Ordner.',
+        );
   String folderNotWritable(String error) =>
       _t('Jellyflex can’t write to this folder ($error).', 'Jellyflex kann in diesem Ordner nicht speichern ($error).');
   String get folderProblem => _t('Folder can’t be used', 'Ordner nicht nutzbar');
@@ -900,10 +910,15 @@ class S {
   String downloadFolderHint(String path) =>
       _t('$path · Existing downloads stay where they are.', '$path · Vorhandene Downloads bleiben, wo sie sind.');
   String get unmeteredOnly => _t('Only on Wi-Fi or LAN', 'Nur über WLAN oder LAN');
-  String get unmeteredOnlyHint => _t(
-    'No downloads over mobile data, phone hotspots or networks Windows marks as metered.',
-    'Keine Downloads über mobile Daten, Handy-Hotspot oder Netze, die Windows als getaktet kennzeichnet.',
-  );
+  String get unmeteredOnlyHint => _isMac
+      ? _t(
+          'No downloads over phone hotspots or networks set to Low Data Mode.',
+          'Keine Downloads über Handy-Hotspot oder Netze mit „Geringe Datennutzung“.',
+        )
+      : _t(
+          'No downloads over mobile data, phone hotspots or networks Windows marks as metered.',
+          'Keine Downloads über mobile Daten, Handy-Hotspot oder Netze, die Windows als getaktet kennzeichnet.',
+        );
   String get speedLimit => _t('Speed limit', 'Geschwindigkeit begrenzen');
   String get speedLimitHint => _t(
     'So downloads don’t slow down the rest of your internet.',

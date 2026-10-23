@@ -1,0 +1,5 @@
+#include "../../Flutter/Flutter-Release.xcconfig"
+#include "Warnings.xcconfig"
+
+// Hardened Runtime (Voraussetzung für die Notarisierung durch Apple).
+ENABLE_HARDENED_RUNTIME = YES

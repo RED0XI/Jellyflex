@@ -11,6 +11,7 @@ import 'layouts.dart';
 import '../theme.dart';
 import 'themes.dart';
 import 'ui_sounds.dart';
+import 'platform/app_paths.dart';
 
 /// Wählbare Sprachen für Ton und Untertitel (ISO 639-2, wie Jellyfin/mpv sie liefern).
 const settingsLanguages = ['ger', 'eng', 'jpn', 'fre', 'spa', 'ita', 'tur', 'kor', 'rus', 'por', 'chi'];
@@ -338,20 +339,23 @@ class AppSettings {
 }
 
 /// Ordner für Einstellungen und eigene Dateien (z. B. das eigene Logo).
-Directory get appDataDir => Directory('${Platform.environment['APPDATA'] ?? Directory.systemTemp.path}\\Jellyflex');
+Directory get appDataDir => AppPaths.appData;
 
-/// Lädt/speichert die Einstellungen als JSON unter `%APPDATA%\Jellyflex\settings.json`.
+/// Lädt/speichert die Einstellungen als JSON unter `%APPDATA%\Jellyflex\settings.json`
+/// (macOS: `~/Library/Application Support/Jellyflex/settings.json`).
 class SettingsController extends Notifier<AppSettings> {
   SettingsController([this._fileOverride]);
 
   final File? _fileOverride;
 
-  File get _file => _fileOverride ?? File('${appDataDir.path}\\settings.json');
+  File get _file => _fileOverride ?? File(AppPaths.join(appDataDir.path, 'settings.json'));
 
   @override
   AppSettings build() {
     // Tests mit eigener Einstellungsdatei bekommen auch einen eigenen Bild-Zwischenspeicher.
-    if (_fileOverride case final file?) ImageDiskCache.instance.directory = Directory('${file.parent.path}\\images');
+    if (_fileOverride case final file?) {
+      ImageDiskCache.instance.directory = Directory(AppPaths.join(file.parent.path, 'images'));
+    }
     try {
       if (_file.existsSync()) {
         final loaded = AppSettings.fromJson(jsonDecode(_file.readAsStringSync()) as Map<String, dynamic>);

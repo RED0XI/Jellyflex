@@ -126,7 +126,12 @@ void main() {
       metered = false;
       manager.recheckNetwork();
       expect(await _waitFor(tester, () => manager.entryFor('movie3')!.isDone), isTrue);
-      expect(File(manager.entryFor('movie3')!.mediaFile!).lengthSync(), 41482147);
+      // Vollständig: so groß wie das Testvideo, das der Demo-Server ausliefert.
+      final video = File(
+        Platform.environment['JELLYFLEX_TEST_VIDEO'] ??
+            '${Directory.systemTemp.path}${Platform.pathSeparator}jellyflex_test.mkv',
+      );
+      expect(File(manager.entryFor('movie3')!.mediaFile!).lengthSync(), video.lengthSync());
       await tester.runAsync(() => manager.remove('movie3'));
     } finally {
       await cleanUp(tester);

@@ -705,7 +705,7 @@ final class _Es extends S {
   @override
   String get surpriseMe => 'Sorpréndeme';
   @override
-  String get searchCtrlF => 'Buscar (Ctrl+F)';
+  String get searchCtrlF => _isMac ? 'Buscar (⌘F)' : 'Buscar (Ctrl+F)';
   @override
   String get profile => 'Perfil';
   @override
@@ -1140,8 +1140,9 @@ final class _Es extends S {
   @override
   String get chooseFolder => 'Elegir carpeta';
   @override
-  String get folderNotAllowed =>
-      'Las descargas no se pueden guardar en carpetas del sistema (Windows, Archivos de programa, AppData). Elige otra carpeta.';
+  String get folderNotAllowed => _isMac
+      ? 'Las descargas no se pueden guardar en carpetas del sistema (System, Aplicaciones, Library). Elige otra carpeta.'
+      : 'Las descargas no se pueden guardar en carpetas del sistema (Windows, Archivos de programa, AppData). Elige otra carpeta.';
   @override
   String folderNotWritable(String error) => 'Jellyflex no puede escribir en esta carpeta ($error).';
   @override
@@ -1180,8 +1181,9 @@ final class _Es extends S {
   @override
   String get unmeteredOnly => 'Solo con Wi-Fi o LAN';
   @override
-  String get unmeteredOnlyHint =>
-      'Sin descargas con datos móviles, punto de acceso del móvil o redes que Windows marca como de uso medido.';
+  String get unmeteredOnlyHint => _isMac
+      ? 'Sin descargas con punto de acceso del móvil o redes en modo de datos reducidos.'
+      : 'Sin descargas con datos móviles, punto de acceso del móvil o redes que Windows marca como de uso medido.';
   @override
   String get speedLimit => 'Límite de velocidad';
   @override

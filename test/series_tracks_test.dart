@@ -11,7 +11,7 @@ void main() {
   tearDown(() => dir.deleteSync(recursive: true));
 
   test('Sprachen je Serie und Konto, auch nach Neustart', () {
-    final file = File('${dir.path}\\series_tracks.json');
+    final file = File('${dir.path}${Platform.pathSeparator}series_tracks.json');
     final store = SeriesTracks.forFile(file);
     store.setAudio('konto1', 'serieA', 'jpn');
     store.setSubtitle('konto1', 'serieA', 'ger');
@@ -25,7 +25,7 @@ void main() {
   });
 
   test('Beschädigte Datei → neu anfangen', () {
-    final file = File('${dir.path}\\series_tracks.json')..writeAsStringSync('{kaputt');
+    final file = File('${dir.path}${Platform.pathSeparator}series_tracks.json')..writeAsStringSync('{kaputt');
     final store = SeriesTracks.forFile(file);
     expect(store.get('k', 's'), (audio: null, subtitle: null));
     store.setAudio('k', 's', 'eng');

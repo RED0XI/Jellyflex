@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -7,13 +7,15 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
+import 'platform/app_paths.dart';
+
 /// Bilder vom Server (Poster, Hintergründe …) auf der Festplatte zwischenspeichern:
 /// Beim nächsten Start sind sie sofort da und müssen nicht erneut geladen werden.
 ///
 /// - Feste Obergrenze ([maxBytes]); darüber werden die am längsten nicht
 ///   benutzten Bilder gelöscht.
 /// - Nur Bilder, keine Zugangsdaten (Bildadressen von Jellyfin brauchen kein Token).
-/// - Liegt in %LOCALAPPDATA% (wird nicht mit dem Benutzerprofil synchronisiert)
+/// - Liegt in %LOCALAPPDATA% bzw. ~/Library/Caches (wird nicht synchronisiert/gesichert)
 ///   und lässt sich in den Einstellungen leeren.
 class ImageDiskCache {
   ImageDiskCache._();
@@ -23,9 +25,7 @@ class ImageDiskCache {
   /// Größte Bilddatei, die angenommen wird (Schutz vor riesigen Antworten).
   static const maxImageBytes = 20 * 1024 * 1024;
 
-  Directory directory = Directory(
-    '${Platform.environment['LOCALAPPDATA'] ?? Directory.systemTemp.path}\\Jellyflex\\ImageCache',
-  );
+  Directory directory = Directory(AppPaths.join(AppPaths.cache.path, 'ImageCache'));
 
   /// Obergrenze in Bytes; 0 = nichts auf der Festplatte speichern.
   int maxBytes = 300 * 1024 * 1024;
@@ -97,7 +97,7 @@ class ImageDiskCache {
       hash = (hash ^ unit) * 0x100000001b3;
     }
     String half(int v) => (v & 0xFFFFFFFF).toRadixString(16).padLeft(8, '0');
-    return File('${directory.path}\\${half(hash >>> 32)}${half(hash)}.img');
+    return File(AppPaths.join(directory.path, '${half(hash >>> 32)}${half(hash)}.img'));
   }
 
   Future<Uint8List?> _read(File file, String url) async {

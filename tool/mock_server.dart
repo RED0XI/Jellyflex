@@ -47,7 +47,8 @@ var _offline = false;
 
 /// Testvideo für alle Streams (siehe lib/dev/player_harness.dart).
 final _videoFile = File(
-  Platform.environment['JELLYFLEX_TEST_VIDEO'] ?? '${Directory.systemTemp.path}\\jellyflex_test.mkv',
+  Platform.environment['JELLYFLEX_TEST_VIDEO'] ??
+      '${Directory.systemTemp.path}${Platform.pathSeparator}jellyflex_test.mkv',
 );
 
 /// Liefert das Testvideo aus – mit Range-Unterstützung, damit Spulen klappt.

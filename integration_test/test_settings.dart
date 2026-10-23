@@ -14,10 +14,10 @@ import 'package:jellyflex/l10n/strings.dart';
 SettingsController testSettings([Directory? dir, AppLanguage language = AppLanguage.de]) {
   final folder = dir ?? Directory.systemTemp.createTempSync('jellyflex_test_settings_');
   // Auch Anmeldedaten (Konten, PIN) nur in einer Temp-Datei – nie im echten Speicher.
-  SecureStore.instance = SecureStore.forFile(File('${folder.path}\\secure.bin'));
-  SeriesTracks.instance = SeriesTracks.forFile(File('${folder.path}\\series_tracks.json'));
+  SecureStore.instance = SecureStore.forFile(File('${folder.path}${Platform.pathSeparator}secure.bin'));
+  SeriesTracks.instance = SeriesTracks.forFile(File('${folder.path}${Platform.pathSeparator}series_tracks.json'));
   DownloadManager.testDirectory = folder;
-  final file = File('${folder.path}\\settings.json');
+  final file = File('${folder.path}${Platform.pathSeparator}settings.json');
   if (!file.existsSync()) file.writeAsStringSync(jsonEncode({'language': language.name}));
   return SettingsController(file);
 }

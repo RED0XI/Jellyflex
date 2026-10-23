@@ -34,6 +34,7 @@ import '../live_handler.dart' show appMessengerKey;
 import '../../l10n/strings.dart';
 import '../../core/system_certs.dart';
 import '../../core/redact.dart';
+import '../../core/platform/app_paths.dart';
 
 part 'player_tracks_panel.dart';
 part 'player_extras.dart';
@@ -1670,22 +1671,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     try {
       final bytes = await _player.screenshot(format: 'image/png');
       if (bytes == null) throw StateError('Kein Bild');
-      final folder =
-          debugScreenshotFolder ??
-          Directory('${Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path}\\Pictures\\Jellyflex');
+      final folder = debugScreenshotFolder ?? Directory(AppPaths.join(AppPaths.pictures, 'Jellyflex'));
       await folder.create(recursive: true);
       final position = formatTimecode(_player.state.position).replaceAll(':', '-');
-      final file = File('${folder.path}\\${_safeFileName(_item?.name ?? 'Jellyflex')} $position.png');
+      final file = File(AppPaths.join(folder.path, '${_safeFileName(_item?.name ?? 'Jellyflex')} $position.png'));
       await file.writeAsBytes(bytes);
       messenger?.showSnackBar(
         SnackBar(
           content: Text(tr.screenshotSaved),
           behavior: SnackBarBehavior.floating,
           width: 420,
-          action: SnackBarAction(
-            label: tr.show,
-            onPressed: () => Process.run('explorer.exe', ['/select,${file.path}']),
-          ),
+          action: SnackBarAction(label: tr.show, onPressed: () => AppPaths.reveal(file.path)),
         ),
       );
     } catch (e) {

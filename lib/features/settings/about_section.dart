@@ -14,6 +14,7 @@ import '../../core/version.dart';
 import '../../l10n/strings.dart';
 import '../../theme.dart';
 import '../live_handler.dart';
+import '../../core/platform/app_paths.dart';
 
 void _notice(String text, {required String action, required VoidCallback onAction}) {
   appMessengerKey.currentState?.showSnackBar(
@@ -225,8 +226,8 @@ Future<void> showErrorReport(BuildContext context, WidgetRef ref) {
               final file = File(location.path);
               await file.writeAsString(report);
               if (context.mounted) Navigator.pop(context);
-              // Im Explorer zeigen.
-              await Process.run('explorer.exe', ['/select,${file.path}']);
+              // Im Explorer bzw. Finder zeigen.
+              await AppPaths.reveal(file.path);
             },
             icon: const Icon(Icons.save_alt_rounded, size: 18),
             label: Text(tr.saveAs),

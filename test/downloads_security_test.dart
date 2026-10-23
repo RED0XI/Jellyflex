@@ -42,7 +42,9 @@ void main() {
   ProviderContainer makeContainer() => ProviderContainer(
     overrides: [
       sessionProvider.overrideWith(_TestSession.new),
-      settingsProvider.overrideWith(() => SettingsController(File('${root.path}\\settings.json'))),
+      settingsProvider.overrideWith(
+        () => SettingsController(File('${root.path}${Platform.pathSeparator}settings.json')),
+      ),
       downloadsProvider.overrideWith(() => DownloadManager(root, () async => false)),
     ],
   );
@@ -77,7 +79,11 @@ void main() {
     await manager.enqueue(movie('abc123'));
     final entry = manager.entryFor('abc123')!;
     expect(entry.folder.startsWith(root.path), isTrue);
-    expect(entry.folder, isNot('${root.path}\\abc123'), reason: 'Ordner enthält eine Konto-Kennung');
+    expect(
+      entry.folder,
+      isNot('${root.path}${Platform.pathSeparator}abc123'),
+      reason: 'Ordner enthält eine Konto-Kennung',
+    );
   });
 
   test('Ein anderes Konto sieht fremde Downloads nicht', () async {
@@ -94,8 +100,8 @@ void main() {
   test('Löschen nie außerhalb des Download-Ordners', () async {
     // Manipulierter Eintrag in der Liste: Ordner zeigt nach außerhalb.
     final outside = Directory.systemTemp.createTempSync('jellyflex_outside_');
-    File('${outside.path}\\wichtig.txt').writeAsStringSync('bitte nicht löschen');
-    File('${root.path}\\downloads.json').writeAsStringSync(
+    File('${outside.path}${Platform.pathSeparator}wichtig.txt').writeAsStringSync('bitte nicht löschen');
+    File('${root.path}${Platform.pathSeparator}downloads.json').writeAsStringSync(
       jsonEncode([
         {
           'itemId': 'evil',
@@ -114,16 +120,16 @@ void main() {
     expect(fresh.read(downloadsProvider), isEmpty);
     // … und selbst wenn: Löschen bleibt im Download-Ordner.
     await fresh.read(downloadsProvider.notifier).remove('evil');
-    expect(File('${outside.path}\\wichtig.txt').existsSync(), isTrue);
+    expect(File('${outside.path}${Platform.pathSeparator}wichtig.txt').existsSync(), isTrue);
     fresh.dispose();
     outside.deleteSync(recursive: true);
   });
 
   test('Gespeicherte Videodatei außerhalb des Download-Ordners wird ignoriert', () async {
-    File('${root.path}\\downloads.json').writeAsStringSync(
+    File('${root.path}${Platform.pathSeparator}downloads.json').writeAsStringSync(
       jsonEncode([
         for (final (id, media) in [
-          ('good', '${root.path}\\${folderName('good')}\\media.mkv'),
+          ('good', '${root.path}${Platform.pathSeparator}${folderName('good')}${Platform.pathSeparator}media.mkv'),
           ('bad', r'C:\Windows\notepad.exe'),
         ])
           {
@@ -132,7 +138,7 @@ void main() {
             'userId': _parent.userId,
             'name': id,
             'type': 'Movie',
-            'folder': '${root.path}\\${folderName(id)}',
+            'folder': '${root.path}${Platform.pathSeparator}${folderName(id)}',
             'mediaFile': media,
             'status': 'done',
           },
@@ -146,16 +152,16 @@ void main() {
 
   test('Ordner mit falschem Namen oder in fremdem Ordner wird ignoriert', () async {
     final other = Directory.systemTemp.createTempSync('jellyflex_other_root_');
-    File('${root.path}\\downloads.json').writeAsStringSync(
+    File('${root.path}${Platform.pathSeparator}downloads.json').writeAsStringSync(
       jsonEncode({
         'version': 2,
         'roots': [root.path, other.path],
         'entries': [
           for (final (id, folder) in [
-            ('inroot', '${root.path}\\${folderName('inroot')}'),
-            ('second', '${other.path}\\${folderName('second')}'),
-            ('wrongname', '${root.path}\\Dokumente'),
-            ('foreign', '${Directory.systemTemp.path}\\${folderName('foreign')}'),
+            ('inroot', '${root.path}${Platform.pathSeparator}${folderName('inroot')}'),
+            ('second', '${other.path}${Platform.pathSeparator}${folderName('second')}'),
+            ('wrongname', '${root.path}${Platform.pathSeparator}Dokumente'),
+            ('foreign', '${Directory.systemTemp.path}${Platform.pathSeparator}${folderName('foreign')}'),
           ])
             {
               'itemId': id,
@@ -177,7 +183,7 @@ void main() {
   });
 
   test('Altes Listenformat wird weiter gelesen', () async {
-    File('${root.path}\\downloads.json').writeAsStringSync(
+    File('${root.path}${Platform.pathSeparator}downloads.json').writeAsStringSync(
       jsonEncode([
         {
           'itemId': 'old1',
@@ -185,7 +191,7 @@ void main() {
           'userId': _parent.userId,
           'name': 'Alt',
           'type': 'Movie',
-          'folder': '${root.path}\\${folderName('old1')}',
+          'folder': '${root.path}${Platform.pathSeparator}${folderName('old1')}',
           'status': 'paused',
         },
       ]),
@@ -196,15 +202,34 @@ void main() {
     fresh.dispose();
   });
 
-  test('Download-Ordner: Unterordner "Jellyflex", Systemordner gesperrt', () {
-    expect(DownloadFolder.fromPicked(r'D:\Filme'), r'D:\Filme\Jellyflex');
-    expect(DownloadFolder.fromPicked(r'D:\'), r'D:\Jellyflex');
-    expect(DownloadFolder.fromPicked(r'D:\Medien\jellyflex\'), r'D:\Medien\jellyflex');
+  test('Download-Ordner: Unterordner "Jellyflex", Systemordner gesperrt (Windows)', () {
+    expect(DownloadFolder.fromPicked(r'D:\Filme', windows: true), r'D:\Filme\Jellyflex');
+    expect(DownloadFolder.fromPicked(r'D:\', windows: true), r'D:\Jellyflex');
+    expect(DownloadFolder.fromPicked(r'D:\Medien\jellyflex\', windows: true), r'D:\Medien\jellyflex');
+    if (!Platform.isWindows) return;
     final windows = Platform.environment['SystemRoot'] ?? r'C:\Windows';
     expect(DownloadFolder.isForbidden('$windows\\Jellyflex'), isTrue);
-    expect(DownloadFolder.isForbidden('${Platform.environment['APPDATA']}\\Jellyflex'), isTrue);
+    expect(DownloadFolder.isForbidden('${Platform.environment['APPDATA']}${Platform.pathSeparator}Jellyflex'), isTrue);
     expect(DownloadFolder.isForbidden(r'D:\Filme\..\Windows'), isTrue);
     expect(DownloadFolder.isForbidden(r'D:\Filme\Jellyflex'), isFalse);
     expect(DownloadFolder.freeBytes(Directory.systemTemp.path), greaterThan(0));
+  });
+
+  test('Download-Ordner: Unterordner "Jellyflex", Systemordner gesperrt (macOS)', () {
+    expect(DownloadFolder.fromPicked('/Volumes/Filme', windows: false), '/Volumes/Filme/Jellyflex');
+    expect(DownloadFolder.fromPicked('/', windows: false), '/Jellyflex');
+    expect(DownloadFolder.fromPicked('/Users/a/Movies/jellyflex/', windows: false), '/Users/a/Movies/jellyflex');
+    if (!Platform.isMacOS) return;
+    final home = Platform.environment['HOME']!;
+    expect(DownloadFolder.isForbidden('/System/Jellyflex'), isTrue);
+    expect(DownloadFolder.isForbidden('/Applications/Jellyflex'), isTrue);
+    expect(DownloadFolder.isForbidden('$home/Library/Application Support/Jellyflex'), isTrue);
+    expect(DownloadFolder.isForbidden('$home/Movies/../Library/Jellyflex'), isTrue);
+    expect(DownloadFolder.isForbidden('/'), isTrue);
+    expect(DownloadFolder.isForbidden('Filme/Jellyflex'), isTrue, reason: 'relativer Pfad');
+    expect(DownloadFolder.isForbidden('$home/Movies/Jellyflex'), isFalse);
+    expect(DownloadFolder.isForbidden('/Volumes/Filme/Jellyflex'), isFalse);
+    expect(DownloadFolder.freeBytes(Directory.systemTemp.path), greaterThan(0));
+    expect(DownloadFolder.defaultPath, '$home/Movies/Jellyflex');
   });
 }
