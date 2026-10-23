@@ -5,11 +5,14 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'core/ui_sounds.dart';
+import 'core/system_certs.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
   UiSounds.preload();
+  // Stammzertifikate für den Video-Player schon beim Start bereitlegen.
+  SystemCerts.caFile();
   await windowManager.ensureInitialized();
 
   const options = WindowOptions(

@@ -9,8 +9,15 @@ void main() {
       MaterialApp(
         home: Column(
           children: [
-            Focusable(onTap: () {}, builder: (_, _) => const Column(children: [Text('Atlas'), Text('2022')])),
-            Focusable(onTap: () {}, semanticLabel: 'Theme Midnight', builder: (_, _) => const SizedBox(width: 50, height: 50)),
+            Focusable(
+              onTap: () {},
+              builder: (_, _) => const Column(children: [Text('Atlas'), Text('2022')]),
+            ),
+            Focusable(
+              onTap: () {},
+              semanticLabel: 'Theme Midnight',
+              builder: (_, _) => const SizedBox(width: 50, height: 50),
+            ),
           ],
         ),
       ),

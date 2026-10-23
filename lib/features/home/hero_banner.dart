@@ -18,6 +18,7 @@ import '../../widgets/jf_image.dart';
 import '../../widgets/media_cards.dart';
 import 'home_providers.dart';
 import '../../l10n/strings.dart';
+import '../../core/system_certs.dart';
 
 /// Großes Banner oben auf der Startseite. Wechselt alle paar Sekunden
 /// mit Überblendung und langsamem Zoom ("Ken-Burns-Effekt").
@@ -147,6 +148,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
       if (done && mounted && _trailerItemId == item.id) _advance(_index + 1);
     });
     await player.setVolume(_muted ? 0 : 70);
+    // Zertifikate prüfen, bevor mit dem Anmelde-Token gestreamt wird.
+    await SystemCerts.secure(player);
     final sourceId = trailer.mediaSources.firstOrNull?.id ?? trailer.id;
     await player.open(
       Media(

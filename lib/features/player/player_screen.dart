@@ -28,6 +28,7 @@ import '../details/details_screen.dart';
 import 'player_overlays.dart';
 import '../../widgets/focusable.dart';
 import '../../l10n/strings.dart';
+import '../../core/system_certs.dart';
 
 part 'player_tracks_panel.dart';
 part 'player_widgets.dart';
@@ -465,6 +466,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         ..add(_player.stream.error.listen(_onPlayerError));
 
       final start = widget.startTicks != null ? ticksToDuration(widget.startTicks!) : null;
+      // Zertifikate prüfen, bevor mit dem Anmelde-Token gestreamt wird.
+      await SystemCerts.secure(_player);
       await PlayerScreen.debugBeforeOpen?.call(_player);
       await _openStream(start);
 

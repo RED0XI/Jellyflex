@@ -386,6 +386,14 @@ class S {
     'Öffne Jellyfin auf einem angemeldeten Gerät → Profil → Quick Connect und gib diesen Code ein:',
   );
   String get otherServer => _t('Other server', 'Anderer Server');
+  String get certificateInvalid => _t(
+    'The server’s security certificate is invalid. For your safety, Jellyflex won’t connect.',
+    'Das Sicherheitszertifikat des Servers ist ungültig. Zu deiner Sicherheit verbindet Jellyflex nicht.',
+  );
+  String get unencryptedWarning => _t(
+    'Unencrypted connection: your password and data can be read on the network. Only use this at home.',
+    'Unverschlüsselte Verbindung: Passwort und Daten sind im Netz mitlesbar. Nur im eigenen Heimnetz nutzen.',
+  );
   String get signIn => _t('Sign in', 'Anmelden');
   String get username => _t('Username', 'Benutzername');
   String get password => _t('Password', 'Passwort');

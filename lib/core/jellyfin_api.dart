@@ -12,7 +12,32 @@ class ServerInfo {
   final String url;
   final String name;
   final String version;
+
+  /// Unverschlüsselte Verbindung (http) – Passwort und Token wären mitlesbar.
+  bool get insecure => url.toLowerCase().startsWith('http://');
 }
+
+/// Gehört [host] zum eigenen Netz (localhost, private IP-Bereiche, *.local)?
+/// Nur dort darf ohne Angabe automatisch auf unverschlüsseltes http
+/// ausgewichen werden.
+bool isLocalHost(String host) {
+  final h = host.toLowerCase();
+  if (h == 'localhost' || h.endsWith('.local') || h.endsWith('.localhost') || h.endsWith('.lan')) return true;
+  final ip = InternetAddress.tryParse(h.replaceAll('[', '').replaceAll(']', ''));
+  if (ip == null) return false;
+  if (ip.isLoopback || ip.isLinkLocal) return true;
+  final b = ip.rawAddress;
+  if (ip.type == InternetAddressType.IPv4) {
+    return b[0] == 10 || (b[0] == 172 && b[1] >= 16 && b[1] <= 31) || (b[0] == 192 && b[1] == 168);
+  }
+  return (b[0] & 0xFE) == 0xFC; // IPv6 fc00::/7 (private)
+}
+
+/// Fehler wegen eines ungültigen Zertifikats?
+bool isCertificateError(Object e) =>
+    e is HandshakeException ||
+    e is TlsException ||
+    (e is DioException && (e.type == DioExceptionType.badCertificate || isCertificateError(e.error ?? '')));
 
 class AuthResult {
   const AuthResult({required this.token, required this.userId, required this.userName, this.userImageTag});
@@ -111,11 +136,19 @@ class JellyfinApi {
   }
 
   /// Prüft, ob unter der Adresse ein Jellyfin-Server antwortet.
-  /// Ohne angegebenes Schema wird erst https, dann http probiert.
+  ///
+  /// Ohne angegebenes Schema wird https probiert; nur bei Adressen im eigenen
+  /// Netz (z. B. 192.168.x.x) danach auch http. Ein Zertifikatsfehler führt nie
+  /// zu einem Ausweichen auf unverschlüsseltes http – sonst könnte ein Angreifer
+  /// https blockieren und das Passwort im Klartext abgreifen.
   static Future<ServerInfo> probe(String input) async {
     final trimmed = input.trim();
     final hasScheme = trimmed.startsWith(RegExp(r'https?://', caseSensitive: false));
-    final candidates = <String>[normalizeUrl(trimmed), if (!hasScheme) normalizeUrl('http://$trimmed')];
+    final host = Uri.tryParse(normalizeUrl(trimmed))?.host ?? '';
+    final candidates = <String>[
+      normalizeUrl(trimmed),
+      if (!hasScheme && isLocalHost(host)) normalizeUrl('http://$trimmed'),
+    ];
 
     Object? lastError;
     for (final url in candidates) {
@@ -132,6 +165,7 @@ class JellyfinApi {
           version: (data['Version'] as String?) ?? '',
         );
       } catch (e) {
+        if (isCertificateError(e)) throw Exception(tr.certificateInvalid);
         lastError = e;
       }
     }

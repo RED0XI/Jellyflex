@@ -337,6 +337,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ],
         ),
+        if (server.insecure) ...[
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0x33FFB020),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0x66FFB020)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.lock_open_rounded, size: 20, color: Color(0xFFFFC14D)),
+                const SizedBox(width: 10),
+                Expanded(child: Text(tr.unencryptedWarning, style: const TextStyle(fontSize: 13))),
+              ],
+            ),
+          ),
+        ],
         if (_publicUsers.isNotEmpty) ...[
           const SizedBox(height: 22),
           Wrap(
