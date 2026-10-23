@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/downloads.dart';
+import '../downloads/downloads_screen.dart';
 import '../../core/format.dart';
 import '../../core/images.dart';
 import '../../core/models.dart';
@@ -465,7 +466,9 @@ class _DownloadButton extends ConsumerWidget {
         tooltip: 'Heruntergeladen – klicken zum Löschen',
         active: true,
         activeColor: AppColors.accentAlt,
-        onPressed: () => manager.remove(item.id),
+        onPressed: () async {
+          if (await confirmRemoveDownload(context, item.name)) manager.remove(item.id);
+        },
       );
     }
     // Läuft gerade oder wartet: Fortschrittsring, Klick pausiert bzw. setzt fort.
@@ -540,12 +543,17 @@ class _SeasonsSectionState extends ConsumerState<_SeasonsSection> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
-              onPressed: () {
+              onPressed: () async {
                 final episodes = ref.read(episodesProvider((widget.series.id, selected))).value ?? const <BaseItem>[];
-                ref.read(downloadsProvider.notifier).enqueueAll(episodes);
-                ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                final messenger = ScaffoldMessenger.maybeOf(context);
+                final added = await ref.read(downloadsProvider.notifier).enqueueAll(episodes);
+                messenger?.showSnackBar(
                   SnackBar(
-                    content: Text('${episodes.length} Folgen werden heruntergeladen'),
+                    content: Text(
+                      added == 0
+                          ? 'Alle Folgen dieser Staffel sind schon heruntergeladen'
+                          : '$added ${added == 1 ? 'Folge wird' : 'Folgen werden'} heruntergeladen',
+                    ),
                     behavior: SnackBarBehavior.floating,
                     width: 420,
                   ),

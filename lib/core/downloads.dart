@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'images.dart';
@@ -28,6 +29,10 @@ class DownloadEntry {
     this.total = 0,
     this.mediaFile,
     this.error,
+    this.positionTicks = 0,
+    this.played = false,
+    this.watchedAt,
+    this.needsSync = false,
   });
 
   final String itemId;
@@ -48,6 +53,14 @@ class DownloadEntry {
   final String? mediaFile;
   final String? error;
 
+  /// Zuletzt lokal geschaute Stelle (auch ohne Verbindung zum Server).
+  final int positionTicks;
+  final bool played;
+  final DateTime? watchedAt;
+
+  /// Lokaler Fortschritt wurde noch nicht an den Server gemeldet.
+  final bool needsSync;
+
   double get progress => total > 0 ? (received / total).clamp(0, 1).toDouble() : 0;
   bool get isDone => status == DownloadStatus.done && mediaFile != null;
   bool get isActive => status == DownloadStatus.queued || status == DownloadStatus.downloading;
@@ -56,12 +69,31 @@ class DownloadEntry {
   String get backdropPath => '$folder${Platform.pathSeparator}backdrop.jpg';
   String get itemJsonPath => '$folder${Platform.pathSeparator}item.json';
 
+  /// Mitgeladene externe Untertiteldatei für den Jellyfin-Streamindex.
+  String? subtitleFile(int streamIndex) {
+    try {
+      final prefix = 'subtitle_$streamIndex.';
+      return Directory(folder)
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.uri.pathSegments.last.startsWith(prefix))
+          .firstOrNull
+          ?.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
   DownloadEntry copyWith({
     DownloadStatus? status,
     int? received,
     int? total,
     String? Function()? mediaFile,
     String? Function()? error,
+    int? positionTicks,
+    bool? played,
+    DateTime? watchedAt,
+    bool? needsSync,
   }) => DownloadEntry(
     itemId: itemId,
     serverUrl: serverUrl,
@@ -76,6 +108,10 @@ class DownloadEntry {
     total: total ?? this.total,
     mediaFile: mediaFile != null ? mediaFile() : this.mediaFile,
     error: error != null ? error() : this.error,
+    positionTicks: positionTicks ?? this.positionTicks,
+    played: played ?? this.played,
+    watchedAt: watchedAt ?? this.watchedAt,
+    needsSync: needsSync ?? this.needsSync,
   );
 
   Map<String, dynamic> toJson() => {
@@ -92,6 +128,10 @@ class DownloadEntry {
     'total': total,
     'mediaFile': mediaFile,
     'error': error,
+    'positionTicks': positionTicks,
+    'played': played,
+    'watchedAt': watchedAt?.toUtc().toIso8601String(),
+    'needsSync': needsSync,
   };
 
   factory DownloadEntry.fromJson(Map<String, dynamic> j) => DownloadEntry(
@@ -108,14 +148,27 @@ class DownloadEntry {
     total: (j['total'] as num?)?.toInt() ?? 0,
     mediaFile: j['mediaFile'] as String?,
     error: j['error'] as String?,
+    positionTicks: (j['positionTicks'] as num?)?.toInt() ?? 0,
+    played: j['played'] == true,
+    watchedAt: DateTime.tryParse((j['watchedAt'] as String?) ?? ''),
+    needsSync: j['needsSync'] == true,
   );
 
-  /// Gespeicherte Infos des Titels (für die Anzeige ohne Server).
+  /// Gespeicherte Infos des Titels (für die Anzeige ohne Server) – mit dem
+  /// lokal geschauten Fortschritt, falls der neuer ist.
   BaseItem? loadItem() {
     try {
       final file = File(itemJsonPath);
       if (!file.existsSync()) return null;
-      return BaseItem((jsonDecode(file.readAsStringSync()) as Map).cast<String, dynamic>());
+      final raw = (jsonDecode(file.readAsStringSync()) as Map).cast<String, dynamic>();
+      if (watchedAt != null) {
+        raw['UserData'] = {
+          ...((raw['UserData'] as Map?)?.cast<String, dynamic>() ?? const {}),
+          'PlaybackPositionTicks': positionTicks,
+          'Played': played,
+        };
+      }
+      return BaseItem(raw);
     } catch (_) {
       return null;
     }
@@ -123,14 +176,18 @@ class DownloadEntry {
 }
 
 /// Lädt Titel im Hintergrund herunter (einer nach dem anderen), mit Pausieren,
-/// Fortsetzen nach Abbruch (HTTP-Range) und Offline-Abspielen.
+/// Fortsetzen nach Abbruch (HTTP-Range) und Offline-Abspielen. Offline
+/// Geschautes wird gemerkt und später an den Server gemeldet.
 class DownloadManager extends Notifier<List<DownloadEntry>> {
   DownloadManager([this._rootOverride]);
 
   final Directory? _rootOverride;
   CancelToken? _cancel;
   String? _runningId;
+  Future<void>? _running;
   Timer? _saveTimer;
+  Timer? _syncTimer;
+  bool _syncing = false;
   DateTime _lastProgressUpdate = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Standardordner: Videos\Jellyflex im Benutzerprofil.
@@ -144,17 +201,29 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   List<DownloadEntry> build() {
     ref.onDispose(() {
       _cancel?.cancel('App beendet');
-      _saveTimer?.cancel();
+      _syncTimer?.cancel();
+      // Noch nicht gespeicherte Änderungen nicht verlieren.
+      if (_saveTimer?.isActive ?? false) {
+        _saveTimer!.cancel();
+        _save();
+      }
     });
+    // Nach dem Anmelden bzw. regelmäßig: offline Geschautes nachmelden.
+    ref.listen(sessionProvider, (_, _) => syncPending());
+    _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) => syncPending());
+
     try {
       if (_indexFile.existsSync()) {
         final list = (jsonDecode(_indexFile.readAsStringSync()) as List)
             .map((e) => DownloadEntry.fromJson((e as Map).cast<String, dynamic>()))
-            // Beim letzten Beenden unterbrochene Downloads gelten als pausiert.
+            // Beim letzten Beenden unterbrochene Downloads gelten als wartend.
             .map((e) => e.status == DownloadStatus.downloading ? e.copyWith(status: DownloadStatus.queued) : e)
             .toList();
         // Wartende Downloads fortsetzen, sobald die App läuft.
-        Future.microtask(_pump);
+        Future.microtask(() {
+          _pump();
+          syncPending();
+        });
         return list;
       }
     } catch (_) {}
@@ -186,16 +255,21 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     _pump();
   }
 
-  /// Alle Folgen einer Staffel vormerken.
-  Future<void> enqueueAll(List<BaseItem> items) async {
+  /// Alle Folgen einer Staffel vormerken. Liefert die Anzahl neuer Downloads.
+  Future<int> enqueueAll(List<BaseItem> items) async {
+    var added = 0;
     for (final item in items) {
+      if (entryFor(item.id) != null) continue;
       await enqueue(item);
+      if (entryFor(item.id) != null) added++;
     }
+    return added;
   }
 
   void pause(String itemId) {
-    if (_runningId == itemId) _cancel?.cancel('pausiert');
+    // Erst den Status setzen, damit der laufende Download den Abbruch als Pause erkennt.
     _update(itemId, (e) => e.copyWith(status: DownloadStatus.paused));
+    if (_runningId == itemId) _cancel?.cancel('pausiert');
   }
 
   void resume(String itemId) {
@@ -207,17 +281,93 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   Future<void> remove(String itemId) async {
     final entry = entryFor(itemId);
     if (entry == null) return;
-    if (_runningId == itemId) _cancel?.cancel('gelöscht');
     _set(state.where((e) => e.itemId != itemId).toList());
-    try {
-      final dir = Directory(entry.folder);
-      if (await dir.exists()) await dir.delete(recursive: true);
-    } catch (_) {}
+    if (_runningId == itemId) {
+      _cancel?.cancel('gelöscht');
+      // Windows kann geöffnete Dateien nicht löschen → erst den Download beenden lassen.
+      try {
+        await _running;
+      } catch (_) {}
+    }
+    final dir = Directory(entry.folder);
+    for (var attempt = 0; attempt < 5; attempt++) {
+      try {
+        if (await dir.exists()) await dir.delete(recursive: true);
+        break;
+      } catch (_) {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      }
+    }
     _pump();
   }
 
   /// Belegter Speicherplatz aller Downloads (Bytes).
   int get usedBytes => state.fold(0, (sum, e) => sum + (e.isDone ? e.total : e.received));
+
+  // --- Offline geschaut -------------------------------------------------------
+
+  /// Merkt sich die Stelle, an der ein heruntergeladener Titel gerade läuft.
+  /// [synced] = der Server hat den Stand bereits (Wiedergabe online gemeldet).
+  void savePlayback(String itemId, {required int positionTicks, int? runtimeTicks, required bool synced}) {
+    if (entryFor(itemId) == null) return;
+    // Wie Jellyfin: unter 5 % zählt nicht als angefangen, ab 90 % als gesehen.
+    final runtime = runtimeTicks ?? 0;
+    final played = runtime > 0 && positionTicks >= runtime * 0.9;
+    final position = played || (runtime > 0 && positionTicks < runtime * 0.05) ? 0 : positionTicks;
+    _update(
+      itemId,
+      (e) => e.copyWith(positionTicks: position, played: played, watchedAt: DateTime.now(), needsSync: !synced),
+    );
+  }
+
+  /// Offline geschauten Fortschritt an den Server melden (sofern erreichbar und
+  /// dort nicht inzwischen woanders weitergeschaut wurde).
+  Future<void> syncPending() async {
+    if (_syncing) return;
+    final session = ref.read(sessionProvider).value;
+    if (session == null) return;
+    final pending = state
+        .where((e) => e.needsSync && e.serverUrl == session.serverUrl && e.userId == session.userId)
+        .toList();
+    if (pending.isEmpty) return;
+    _syncing = true;
+    final api = ref.read(apiProvider);
+    try {
+      for (final entry in pending) {
+        final watchedAt = entry.watchedAt ?? DateTime.now();
+        try {
+          final item = await api.getItem(entry.itemId);
+          final serverDate = DateTime.tryParse((item.userData.raw['LastPlayedDate'] as String?) ?? '');
+          if (serverDate == null || serverDate.isBefore(watchedAt)) {
+            await api.updateUserData(entry.itemId, {
+              'PlaybackPositionTicks': entry.positionTicks,
+              'Played': entry.played,
+              'LastPlayedDate': watchedAt.toUtc().toIso8601String(),
+            });
+          }
+          _update(entry.itemId, (e) => e.watchedAt == entry.watchedAt ? e.copyWith(needsSync: false) : e);
+        } catch (e) {
+          debugPrint('Offline-Fortschritt noch nicht gemeldet (${entry.name}): $e');
+          break; // Server vermutlich nicht erreichbar – später erneut.
+        }
+      }
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  /// Nächste heruntergeladene Folge derselben Serie (für "Nächste Folge" offline).
+  BaseItem? nextDownloadedEpisode(BaseItem episode) {
+    final seriesId = episode.seriesId;
+    if (seriesId == null) return null;
+    int order(BaseItem i) => (i.parentIndexNumber ?? 0) * 10000 + (i.indexNumber ?? 0);
+    final current = order(episode);
+    final candidates = [
+      for (final e in state)
+        if (e.isDone && e.type == 'Episode' && e.itemId != episode.id) ?e.loadItem(),
+    ].where((i) => i.seriesId == seriesId && order(i) > current).toList()..sort((a, b) => order(a).compareTo(order(b)));
+    return candidates.firstOrNull;
+  }
 
   // --- Interna --------------------------------------------------------------
 
@@ -225,7 +375,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     if (_runningId != null) return;
     final next = state.where((e) => e.status == DownloadStatus.queued).firstOrNull;
     if (next == null) return;
-    _run(next);
+    _running = _run(next);
   }
 
   Future<void> _run(DownloadEntry entry) async {
@@ -236,8 +386,9 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       return;
     }
     final api = ref.read(apiProvider);
+    final cancel = CancelToken();
     _runningId = entry.itemId;
-    _cancel = CancelToken();
+    _cancel = cancel;
     _update(entry.itemId, (e) => e.copyWith(status: DownloadStatus.downloading, error: () => null));
 
     try {
@@ -248,6 +399,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       await File(entry.itemJsonPath).writeAsString(jsonEncode(item.raw));
       await _downloadImages(api, item, entry);
       await _downloadSubtitles(api, item, source, entry);
+      if (cancel.isCancelled) return;
 
       final ext = (source.container ?? 'mkv').split(',').first;
       final target = File('${entry.folder}\\media.$ext');
@@ -257,23 +409,41 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       final dio = Dio(BaseOptions(headers: {'Authorization': api.authorizationHeader}));
       final response = await dio.get<ResponseBody>(
         api.streamUrl(item.id, mediaSourceId: source.id),
-        options: Options(responseType: ResponseType.stream, headers: {if (already > 0) 'Range': 'bytes=$already-'}),
-        cancelToken: _cancel,
+        options: Options(
+          responseType: ResponseType.stream,
+          headers: {if (already > 0) 'Range': 'bytes=$already-'},
+          // 416 = die Teildatei ist schon vollständig (Abbruch kurz vor dem Umbenennen).
+          validateStatus: (s) => s != null && ((s >= 200 && s < 300) || (s == 416 && already > 0)),
+        ),
+        cancelToken: cancel,
       );
-      // Server ignoriert Range → von vorn beginnen.
-      final resumed = response.statusCode == 206;
-      final contentLength = int.tryParse(response.headers.value(Headers.contentLengthHeader) ?? '') ?? 0;
-      var received = resumed ? already : 0;
-      final total = resumed ? already + contentLength : contentLength;
-      final sink = part.openWrite(mode: resumed ? FileMode.append : FileMode.write);
-      try {
-        await for (final chunk in response.data!.stream) {
-          sink.add(chunk);
-          received += chunk.length;
-          _reportProgress(entry.itemId, received, total);
+
+      var received = 0;
+      var total = 0;
+      if (response.statusCode == 416) {
+        received = total = already;
+      } else {
+        // Server ignoriert Range → von vorn beginnen.
+        final resumed = response.statusCode == 206;
+        final contentLength = int.tryParse(response.headers.value(Headers.contentLengthHeader) ?? '') ?? 0;
+        received = resumed ? already : 0;
+        total = contentLength > 0 ? (resumed ? already : 0) + contentLength : 0;
+        final sink = part.openWrite(mode: resumed ? FileMode.append : FileMode.write);
+        try {
+          await for (final chunk in response.data!.stream) {
+            if (cancel.isCancelled) break;
+            sink.add(chunk);
+            received += chunk.length;
+            _reportProgress(entry.itemId, received, total);
+          }
+        } finally {
+          await sink.close();
         }
-      } finally {
-        await sink.close();
+      }
+      // Abgebrochen (Pause/Löschen): Teildatei bleibt für später liegen.
+      if (cancel.isCancelled) return;
+      if (total > 0 && received < total) {
+        throw Exception('Verbindung unterbrochen (${formatBytes(received)} von ${formatBytes(total)})');
       }
       if (await target.exists()) await target.delete();
       await part.rename(target.path);
@@ -282,17 +452,17 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
         (e) =>
             e.copyWith(status: DownloadStatus.done, received: received, total: received, mediaFile: () => target.path),
       );
-    } on DioException catch (e) {
-      if (CancelToken.isCancel(e)) {
-        // Pausiert oder gelöscht – Status wurde schon gesetzt.
-      } else {
-        _update(
-          entry.itemId,
-          (x) => x.copyWith(status: DownloadStatus.failed, error: () => e.message ?? 'Netzwerkfehler'),
-        );
-      }
     } catch (e) {
-      _update(entry.itemId, (x) => x.copyWith(status: DownloadStatus.failed, error: () => '$e'));
+      // Pausiert oder gelöscht – Status wurde schon gesetzt. Beim Abbruch kann
+      // auch ein anderer Fehler als DioException entstehen (abgebrochene Verbindung).
+      if (!cancel.isCancelled) {
+        final message = switch (e) {
+          DioException(:final response?) => 'Server-Fehler ${response.statusCode}',
+          DioException() => 'Keine Verbindung zum Server',
+          _ => '$e'.replaceFirst('Exception: ', ''),
+        };
+        _update(entry.itemId, (x) => x.copyWith(status: DownloadStatus.failed, error: () => message));
+      }
     } finally {
       _runningId = null;
       _cancel = null;

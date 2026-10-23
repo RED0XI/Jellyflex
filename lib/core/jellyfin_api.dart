@@ -515,8 +515,11 @@ class JellyfinApi {
   }
 
   /// Fortschritt zurücksetzen → verschwindet aus "Weiterschauen".
-  Future<void> clearResumePosition(String itemId) =>
-      dio.post('/UserItems/$itemId/UserData', queryParameters: {'userId': userId}, data: {'PlaybackPositionTicks': 0});
+  Future<void> clearResumePosition(String itemId) => updateUserData(itemId, {'PlaybackPositionTicks': 0});
+
+  /// Benutzerdaten setzen (Fortschritt, gesehen, zuletzt geschaut …).
+  Future<void> updateUserData(String itemId, Json data) =>
+      dio.post('/UserItems/$itemId/UserData', queryParameters: {'userId': userId}, data: data);
 
   /// Die Folge nach [episode] (auch über Staffelgrenzen hinweg), sonst `null`.
   Future<BaseItem?> getNextEpisode(BaseItem episode) async {

@@ -56,6 +56,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   );
   late final VideoController _video = VideoController(_player);
   late final JellyfinApi _api = ref.read(apiProvider);
+  late final DownloadManager _downloads = ref.read(downloadsProvider.notifier);
   final _focus = FocusNode();
   final _subscriptions = <StreamSubscription<dynamic>>[];
 
@@ -197,11 +198,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           _selectSubtitle('jf:$index');
         } else {
           final external = _externalSubtitles.where((s) => s.index == index).firstOrNull;
-          _selectSubtitle(
-            external != null
-                ? _api.subtitleUrl(widget.itemId, _source!.id, external)
-                : (_mpvIdFor(_source!, 'Subtitle', index) ?? ''),
-          );
+          _selectSubtitle(external != null ? _subtitleUri(external) : (_mpvIdFor(_source!, 'Subtitle', index) ?? ''));
         }
       default:
         return false;
@@ -252,6 +249,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (!_closing && _reportedStart) {
       _api.reportPlaybackStopped(_progressBody()).ignore();
     }
+    if (!_closing) _saveLocalPlayback(synced: false);
     windowFullscreen.removeListener(_onFullscreenChanged);
     if (RemoteControl.onPlaystate == _onRemotePlaystate) RemoteControl.onPlaystate = null;
     if (RemoteControl.onGeneral == _onRemoteGeneral) RemoteControl.onGeneral = null;
@@ -274,7 +272,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Future<void> _start() async {
     try {
       // Heruntergeladen? Dann die lokale Datei nehmen – offline auch ohne Server.
-      final download = ref.read(downloadsProvider.notifier).entryFor(widget.itemId);
+      final download = _downloads.entryFor(widget.itemId);
       if (download != null && download.isDone && File(download.mediaFile!).existsSync()) {
         _localFile = download.mediaFile;
       }
@@ -313,6 +311,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       });
       if (item.isEpisode) {
         _api.getNextEpisode(item).then((next) {
+          // Ohne Server: nächste heruntergeladene Folge.
+          next ??= _downloads.nextDownloadedEpisode(item);
           if (mounted) setState(() => _nextEpisode = next);
           _updateMediaSession();
         });
@@ -346,7 +346,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       } catch (e) {
         debugPrint('Wiedergabestart konnte nicht gemeldet werden: $e');
       }
-      _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) => _reportProgress());
+      _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+        _reportProgress();
+        _saveLocalPlayback(synced: _reportedStart);
+      });
     } catch (e) {
       if (mounted) setState(() => _error = '$e'.replaceFirst('Exception: ', ''));
     }
@@ -470,6 +473,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _api.reportPlaybackProgress(_progressBody()).ignore();
   }
 
+  /// Heruntergeladene Titel: Stelle auch lokal merken – für offline und zum
+  /// späteren Nachmelden, falls der Server gerade nicht erreichbar ist.
+  void _saveLocalPlayback({required bool synced}) {
+    final item = _item;
+    if (_localFile == null || item == null) return;
+    final duration = _player.state.duration;
+    _downloads.savePlayback(
+      widget.itemId,
+      positionTicks: durationToTicks(_player.state.position),
+      runtimeTicks: duration > Duration.zero ? durationToTicks(duration) : item.runTimeTicks,
+      synced: synced,
+    );
+  }
+
   void _onPlayingChanged(bool playing) {
     _reportProgress();
     MediaSession.setPlaying(playing);
@@ -541,8 +558,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   List<MediaStream> get _externalSubtitles =>
       _source?.mediaStreams.where((s) => s.type == 'Subtitle' && s.isExternal).toList() ?? const [];
 
+  /// Externe Untertitel: bei Downloads die mitgeladene Datei, sonst vom Server.
+  String _subtitleUri(MediaStream stream) {
+    if (_localFile != null) {
+      final file = _downloads.entryFor(widget.itemId)?.subtitleFile(stream.index);
+      if (file != null) return file;
+    }
+    return _api.subtitleUrl(widget.itemId, _source!.id, stream);
+  }
+
   SubtitleTrack _externalTrack(MediaStream stream) => SubtitleTrack.uri(
-    _api.subtitleUrl(widget.itemId, _source!.id, stream),
+    _subtitleUri(stream),
     title: stream.displayTitle ?? languageName(stream.language),
     language: stream.language,
   );
@@ -578,11 +604,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _progressTimer?.cancel();
     final body = _progressBody();
     await _player.pause();
+    var reported = false;
     if (_reportedStart) {
       try {
         await _api.reportPlaybackStopped(body).timeout(const Duration(seconds: 4));
+        reported = true;
       } catch (_) {}
     }
+    _saveLocalPlayback(synced: reported);
     if (windowFullscreen.value != _restoreFullscreen) await setWindowFullscreen(_restoreFullscreen);
     if (!mounted) return;
     final item = _item;
@@ -599,11 +628,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _progressTimer?.cancel();
     final body = _progressBody();
     await _player.pause();
+    var reported = false;
     if (_reportedStart) {
       try {
         await _api.reportPlaybackStopped(body).timeout(const Duration(seconds: 4));
+        reported = true;
       } catch (_) {}
     }
+    _saveLocalPlayback(synced: reported);
     if (!mounted) return;
     final item = _item;
     if (item != null) refreshItemData(ref, item);
@@ -1115,10 +1147,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       (id: 'no', label: 'Aus'),
       for (final t in tracks) (id: t.id, label: _trackLabel('Subtitle', t.id, t.title, t.language, t.codec)),
       for (final s in _externalSubtitles)
-        (
-          id: _api.subtitleUrl(widget.itemId, _source!.id, s),
-          label: '${s.displayTitle ?? languageName(s.language)}  (Datei)',
-        ),
+        (id: _subtitleUri(s), label: '${s.displayTitle ?? languageName(s.language)}  (Datei)'),
     ];
   }
 
@@ -1145,7 +1174,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _subtitleIndex = -1;
       return;
     }
-    final ext = _externalSubtitles.where((s) => _api.subtitleUrl(widget.itemId, _source!.id, s) == id).firstOrNull;
+    final ext = _externalSubtitles.where((s) => _subtitleUri(s) == id).firstOrNull;
     if (ext != null) {
       _player.setSubtitleTrack(_externalTrack(ext));
       _subtitleIndex = ext.index;

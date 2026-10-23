@@ -7,6 +7,7 @@ import '../core/models.dart';
 import '../core/session.dart';
 import '../theme.dart';
 import 'details/details_screen.dart';
+import 'downloads/downloads_screen.dart';
 
 enum _ItemAction {
   play,
@@ -121,6 +122,7 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
       await container.read(downloadsProvider.notifier).enqueue(item);
       messenger?.showSnackBar(_snack('Download gestartet: ${item.name}'));
     case _ItemAction.removeDownload:
+      if (!context.mounted || !await confirmRemoveDownload(context, item.name)) return;
       await container.read(downloadsProvider.notifier).remove(item.id);
       messenger?.showSnackBar(_snack('Download gelöscht'));
     case _ItemAction.forget:

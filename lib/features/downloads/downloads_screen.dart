@@ -162,6 +162,29 @@ class _LocalPoster extends StatelessWidget {
   }
 }
 
+/// Fragt nach, bevor ein Download (samt Datei) gelöscht wird.
+Future<bool> confirmRemoveDownload(BuildContext context, String name) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: const Text('Download löschen?'),
+      content: Text('„$name“ wird von diesem PC gelöscht. Auf dem Server bleibt alles erhalten.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
+        FilledButton(autofocus: true, onPressed: () => Navigator.pop(context, true), child: const Text('Löschen')),
+      ],
+    ),
+  );
+  return ok ?? false;
+}
+
+/// Spielt einen fertigen Download ab – an der zuletzt geschauten Stelle.
+void playDownload(BuildContext context, DownloadEntry entry) {
+  final ticks = entry.loadItem()?.userData.playbackPositionTicks ?? entry.positionTicks;
+  context.push('/play/${entry.itemId}${ticks > 0 ? '?start=$ticks' : ''}');
+}
+
 String _title(DownloadEntry e) => e.seriesName ?? e.name;
 String? _subtitle(DownloadEntry e) => e.seriesName != null ? [?e.episodeLabel, e.name].join(' · ') : null;
 
@@ -221,8 +244,8 @@ class _ActiveRow extends ConsumerWidget {
             )
           else
             CircleIconButton(
-              icon: Icons.play_arrow_rounded,
-              tooltip: 'Fortsetzen',
+              icon: entry.status == DownloadStatus.failed ? Icons.refresh_rounded : Icons.play_arrow_rounded,
+              tooltip: entry.status == DownloadStatus.failed ? 'Erneut versuchen' : 'Fortsetzen',
               size: 44,
               onPressed: () => manager.resume(entry.itemId),
             ),
@@ -231,7 +254,9 @@ class _ActiveRow extends ConsumerWidget {
             icon: Icons.close_rounded,
             tooltip: 'Abbrechen und löschen',
             size: 44,
-            onPressed: () => manager.remove(entry.itemId),
+            onPressed: () async {
+              if (await confirmRemoveDownload(context, _title(entry))) manager.remove(entry.itemId);
+            },
           ),
         ],
       ),
@@ -269,18 +294,25 @@ class _DoneCard extends ConsumerWidget {
     if (!context.mounted) return;
     switch (choice) {
       case 'play':
-        context.push('/play/${entry.itemId}');
+        playDownload(context, entry);
       case 'details':
         context.push('/item/${entry.itemId}');
       case 'delete':
-        ref.read(downloadsProvider.notifier).remove(entry.itemId);
+        if (await confirmRemoveDownload(context, _title(entry))) {
+          ref.read(downloadsProvider.notifier).remove(entry.itemId);
+        }
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final item = entry.loadItem();
+    final runtime = item?.runTimeTicks ?? 0;
+    final position = item?.userData.playbackPositionTicks ?? 0;
+    final watched = runtime > 0 && position > 0 ? (position / runtime).clamp(0.0, 1.0) : 0.0;
+    final played = item?.userData.played ?? false;
     return Focusable(
-      onTap: () => context.push('/play/${entry.itemId}'),
+      onTap: () => playDownload(context, entry),
       onSecondaryTap: (pos) => _menu(context, ref, pos),
       builder: (context, hovered) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -305,11 +337,30 @@ class _DoneCard extends ConsumerWidget {
                       child: const Icon(Icons.play_circle_fill_rounded, size: 56),
                     ),
                   ),
-                  const Positioned(
+                  Positioned(
                     top: 8,
                     right: 8,
-                    child: Icon(Icons.download_done_rounded, size: 20, color: AppColors.accentAlt),
+                    child: Icon(
+                      played ? Icons.check_circle_rounded : Icons.download_done_rounded,
+                      size: 20,
+                      color: AppColors.accentAlt,
+                    ),
                   ),
+                  if (watched > 0)
+                    Positioned(
+                      left: 10,
+                      right: 10,
+                      bottom: 10,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: watched,
+                          minHeight: 4,
+                          backgroundColor: Colors.white24,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

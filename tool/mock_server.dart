@@ -4,8 +4,14 @@
 // In der App als Server-Adresse eingeben:  http://localhost:8097
 // Beliebiger Benutzername/Passwort funktioniert.
 //
-// Liefert fiktive Filme/Serien und erzeugt farbige Platzhalterbilder.
-// Videos gibt es keine – der Player zeigt hier also einen Fehler.
+// Liefert fiktive Filme/Serien und erzeugt farbige Platzhalterbilder. Als Video
+// dient für alle Titel %TEMP%\jellyflex_test.mkv (siehe lib/dev/player_harness.dart).
+//
+// Testschnittstellen (nur hier, nicht bei Jellyfin):
+//   POST /debug/send       {"MessageType": …, "Data": …} an alle Live-Verbindungen
+//   POST /debug/throttle?bps=200000   Videos langsam ausliefern (0 = normal)
+//   POST /debug/offline?on=1          Server "nicht erreichbar" spielen (503)
+//   GET  /debug/userdata/{id}         Benutzerdaten eines Titels ansehen
 
 import 'dart:async';
 import 'dart:convert';
@@ -18,8 +24,16 @@ const port = 8097;
 /// Offene Live-Verbindungen (WebSocket).
 final _sockets = <WebSocket>{};
 
+/// Bytes pro Sekunde beim Ausliefern von Videos (0 = so schnell wie möglich).
+var _throttleBps = 0;
+
+/// Simuliert einen nicht erreichbaren Server.
+var _offline = false;
+
 /// Testvideo für alle Streams (siehe lib/dev/player_harness.dart).
-final _videoFile = File(Platform.environment['JELLYFLEX_TEST_VIDEO'] ?? '${Directory.systemTemp.path}\\jellyflex_test.mkv');
+final _videoFile = File(
+  Platform.environment['JELLYFLEX_TEST_VIDEO'] ?? '${Directory.systemTemp.path}\\jellyflex_test.mkv',
+);
 
 /// Liefert das Testvideo aus – mit Range-Unterstützung, damit Spulen klappt.
 Future<void> _serveVideo(HttpRequest req) async {
@@ -44,7 +58,27 @@ Future<void> _serveVideo(HttpRequest req) async {
   }
   res.contentLength = end - start + 1;
   try {
-    await res.addStream(_videoFile.openRead(start, end + 1));
+    if (_throttleBps <= 0) {
+      await res.addStream(_videoFile.openRead(start, end + 1));
+    } else {
+      // In kleinen Stücken mit Pausen – zum Testen von Pause/Fortschritt beim Download.
+      final file = await _videoFile.open();
+      try {
+        await file.setPosition(start);
+        final step = math.max(1024, _throttleBps ~/ 10);
+        var pos = start;
+        while (pos <= end) {
+          final chunk = await file.read(math.min(step, end - pos + 1));
+          if (chunk.isEmpty) break;
+          res.add(chunk);
+          await res.flush();
+          pos += chunk.length;
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+        }
+      } finally {
+        await file.close();
+      }
+    }
   } catch (_) {
     // Abbruch durch den Player (z. B. beim Spulen) – normal.
   }
@@ -153,6 +187,15 @@ void _seed() {
             {'Type': 'Video', 'Index': 0, 'Codec': 'hevc'},
             {'Type': 'Audio', 'Index': 1, 'Language': 'ger', 'DisplayTitle': 'Deutsch - EAC3 - 5.1 - Standard'},
             {'Type': 'Audio', 'Index': 2, 'Language': 'eng', 'DisplayTitle': 'Englisch - TrueHD - 7.1'},
+            if (i == 0)
+              {
+                'Type': 'Subtitle',
+                'Index': 3,
+                'Language': 'ger',
+                'Codec': 'srt',
+                'IsExternal': true,
+                'DisplayTitle': 'Deutsch - SRT - Extern',
+              },
           ],
         },
       ],
@@ -381,11 +424,24 @@ Object? _handle(HttpRequest req) {
   if (path == '/Items/Latest') {
     return q['parentId'] == 'lib-shows' ? series.reversed.toList() : movies.reversed.toList();
   }
-  if (path == '/Genres') return {'Items': [for (final g in _genres) {'Name': g, 'Id': 'genre-$g'}]};
+  if (path == '/Genres')
+    return {
+      'Items': [
+        for (final g in _genres) {'Name': g, 'Id': 'genre-$g'},
+      ],
+    };
   if (path == '/Movies/Recommendations') {
     return [
-      {'RecommendationType': 'SimilarToRecentlyPlayed', 'BaselineItemName': movies[0]['Name'], 'Items': movies.skip(3).take(8).toList()},
-      {'RecommendationType': 'SimilarToLikedItem', 'BaselineItemName': movies[1]['Name'], 'Items': movies.skip(6).take(8).toList()},
+      {
+        'RecommendationType': 'SimilarToRecentlyPlayed',
+        'BaselineItemName': movies[0]['Name'],
+        'Items': movies.skip(3).take(8).toList(),
+      },
+      {
+        'RecommendationType': 'SimilarToLikedItem',
+        'BaselineItemName': movies[1]['Name'],
+        'Items': movies.skip(6).take(8).toList(),
+      },
     ];
   }
   if (path == '/Items' && q['parentId'] == 'boxset0') return _page(movies.take(3).toList(), q);
@@ -473,6 +529,45 @@ Future<void> main() async {
         continue;
       }
       // Testschnittstelle: POST /debug/send mit {"MessageType": …, "Data": …} an alle Clients.
+      if (req.uri.path == '/debug/throttle') {
+        _throttleBps = int.tryParse(req.uri.queryParameters['bps'] ?? '') ?? 0;
+        res.write('{"bps": $_throttleBps}');
+        await res.close();
+        continue;
+      }
+      if (req.uri.path == '/debug/offline') {
+        _offline = req.uri.queryParameters['on'] == '1';
+        res.write('{"offline": $_offline}');
+        await res.close();
+        continue;
+      }
+      if (seg.length == 3 && seg[0] == 'debug' && seg[1] == 'userdata') {
+        res.headers.contentType = ContentType.json;
+        res.write(jsonEncode(byId[seg[2]]?['UserData']));
+        await res.close();
+        continue;
+      }
+      if (_offline) {
+        res.statusCode = HttpStatus.serviceUnavailable;
+        await res.close();
+        continue;
+      }
+      // Benutzerdaten setzen (Fortschritt, gesehen, zuletzt geschaut).
+      if (seg.length == 3 && seg[0] == 'UserItems' && seg[2] == 'UserData' && req.method == 'POST') {
+        final body = jsonDecode(await utf8.decoder.bind(req).join()) as Map<String, dynamic>;
+        final data = byId[seg[1]]?['UserData'] as Map<String, dynamic>?;
+        data?.addAll(body);
+        res.headers.contentType = ContentType.json;
+        res.write(jsonEncode(data ?? {}));
+        await res.close();
+        continue;
+      }
+      if (seg.length == 6 && seg[0] == 'Videos' && seg[3] == 'Subtitles') {
+        res.headers.contentType = ContentType('application', 'x-subrip', charset: 'utf-8');
+        res.write('1\n00:00:01,000 --> 00:00:04,000\nExterner Untertitel (Demo)\n');
+        await res.close();
+        continue;
+      }
       if (req.uri.path == '/debug/send' && req.method == 'POST') {
         final body = await utf8.decoder.bind(req).join();
         for (final s in _sockets) {
@@ -481,7 +576,8 @@ Future<void> main() async {
         res.write('{"sent": ${_sockets.length}}');
         await res.close();
         continue;
-      }      if (seg.length == 3 && seg[0] == 'Videos' && seg[2] == 'stream') {
+      }
+      if (seg.length == 3 && seg[0] == 'Videos' && seg[2] == 'stream') {
         // Nicht abwarten: Streams laufen parallel zu anderen Anfragen.
         unawaited(_serveVideo(req));
         continue;

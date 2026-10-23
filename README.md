@@ -28,7 +28,8 @@ flutter build windows --release
 
 ## Ausprobieren ohne echten Server
 
-Ein kleiner Demo-Server mit fiktiven Filmen und Serien (ohne Videos):
+Ein kleiner Demo-Server mit fiktiven Filmen und Serien (als Video dient für alle Titel das
+Testvideo `%TEMP%\jellyflex_test.mkv`, falls vorhanden):
 
 ```bash
 dart run tool/mock_server.dart
@@ -43,6 +44,13 @@ zwei Untertitelspuren, siehe `lib/dev/player_harness.dart`):
 flutter test integration_test/player_tracks_test.dart -d windows
 ```
 
+**Downloads-Test** (braucht den laufenden Demo-Server und das Testvideo; prüft Laden, Pause,
+Löschen, Offline-Schauen und das Nachmelden des Fortschritts):
+
+```bash
+flutter test integration_test/downloads_test.dart -d windows
+```
+
 ## Funktionen
 
 - Anmeldung mit Passwort oder **Quick Connect**; Login wird mit Windows-DPAPI verschlüsselt gespeichert
@@ -54,6 +62,8 @@ flutter test integration_test/player_tracks_test.dart -d windows
 - **Intro/Rückblick überspringen** (Media Segments, z. B. vom Intro-Skipper-Plugin)
 - **Nächste Folge** mit Countdown, **Trickplay**-Vorschaubilder beim Spulen
 - Fortschritt wird laufend an den Server gemeldet
+- **Downloads zum Offline-Schauen** (Filme, Folgen, ganze Staffeln) mit Pause/Fortsetzen –
+  samt Untertiteldateien; offline Geschautes wird gemerkt und später an den Server gemeldet
 - Windows-Medienanzeige (Titel/Bild im Lautstärke-Overlay) und Medientasten
 - Einstellungen: bevorzugte Sprachen, Intro automatisch überspringen, Untertitelgröße …
 
