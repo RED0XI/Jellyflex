@@ -26,7 +26,9 @@ void main() {
       log: [
         'GET https://media.example-family.de:8920/jellyfin/Users/a1b2c3d4e5f6/Items?api_key=tok_0123456789abcdef',
         'Benutzer Maximilian auf Familien-NAS angemeldet (device-xyz-123)',
-        r'Datei: ' '$profile' r'\Videos\Jellyflex\x\media.mkv',
+        r'Datei: '
+            '$profile'
+            r'\Videos\Jellyflex\x\media.mkv',
         'Fehler bei http://192.168.1.20:8096/System/Info',
       ],
     );

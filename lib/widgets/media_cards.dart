@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/format.dart';
 import '../core/images.dart';
+import '../core/layouts.dart';
 import '../core/models.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
@@ -12,9 +13,12 @@ import '../theme.dart';
 import 'focusable.dart';
 import 'jf_image.dart';
 
-const double kPosterWidth = 168;
-const double kLandscapeWidth = 320;
-const double kCardTextHeight = 52;
+/// Kartengrößen – abhängig vom Layout (siehe [AppLayout.cardScale]).
+double get kPosterWidth => 168 * appLayout.cardScale;
+double get kLandscapeWidth => 320 * appLayout.cardScale;
+
+/// Platz für Titel unter den Karten (0, wenn das Layout sie im Bild zeigt).
+double get kCardTextHeight => appLayout.cardTitles ? 52 : 0;
 
 /// Öffnet die Detailseite eines Eintrags.
 void openItem(BuildContext context, BaseItem item) => context.push('/item/${item.id}');
@@ -29,7 +33,10 @@ void playItem(BuildContext context, BaseItem item, {bool fromStart = false, Stri
 
 /// Gemeinsame Hover-Logik: leicht vergrößern, Schatten, Rahmen.
 class _HoverCard extends StatefulWidget {
-  const _HoverCard({required this.builder, required this.onTap, this.onContextMenu});
+  const _HoverCard({required this.builder, required this.onTap, this.onContextMenu, this.label});
+
+  /// Name für Bildschirmleser (in Layouts, die den Titel nur beim Auswählen zeigen).
+  final String? label;
 
   final Widget Function(bool hovered) builder;
   final VoidCallback onTap;
@@ -47,48 +54,158 @@ class _HoverCardState extends State<_HoverCard> {
     return Focusable(
       onTap: widget.onTap,
       onSecondaryTap: widget.onContextMenu,
+      semanticLabel: appLayout.cardTitles ? null : widget.label,
       builder: (context, highlighted) => widget.builder(highlighted),
     );
   }
 }
 
 class _CardFrame extends StatelessWidget {
-  const _CardFrame({required this.hovered, required this.aspectRatio, required this.child});
+  const _CardFrame({
+    required this.hovered,
+    required this.aspectRatio,
+    required this.child,
+    this.title,
+    this.subtitle,
+    this.alwaysShowTitle = false,
+  });
 
   final bool hovered;
   final double aspectRatio;
   final Widget child;
 
+  /// Titel im Bild – nur in Layouts ohne Titel unter den Karten.
+  final String? title;
+  final String? subtitle;
+
+  /// Titel immer zeigen (Querformat), sonst nur beim Auswählen.
+  final bool alwaysShowTitle;
+
   @override
   Widget build(BuildContext context) {
-    return AnimatedScale(
-      scale: hovered ? 1.05 : 1,
+    final layout = appLayout;
+    final radius = BorderRadius.circular(layout.radius);
+    final accent = AppColors.accent;
+    final (scale, lift, border, shadow) = switch (layout.focus) {
+      FocusStyle.zoom => (
+        hovered ? 1.05 : 1.0,
+        0.0,
+        Border.all(
+          color: hovered ? Colors.white.withValues(alpha: 0.85) : Colors.white.withValues(alpha: 0.06),
+          width: hovered ? 2 : 1,
+        ),
+        BoxShadow(
+          color: Colors.black.withValues(alpha: hovered ? 0.55 : 0.25),
+          blurRadius: hovered ? 28 : 10,
+          offset: Offset(0, hovered ? 12 : 4),
+        ),
+      ),
+      FocusStyle.glow => (
+        hovered ? 1.07 : 1.0,
+        0.0,
+        Border.all(color: hovered ? accent : Colors.white.withValues(alpha: 0.05), width: hovered ? 3 : 1),
+        BoxShadow(
+          color: hovered ? accent.withValues(alpha: 0.55) : Colors.black.withValues(alpha: 0.25),
+          blurRadius: hovered ? 34 : 10,
+          spreadRadius: hovered ? 2 : 0,
+        ),
+      ),
+      FocusStyle.outline => (
+        1.0,
+        0.0,
+        Border.all(color: hovered ? accent : Colors.white.withValues(alpha: 0.06), width: hovered ? 3 : 1),
+        BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 3)),
+      ),
+      FocusStyle.lift => (
+        1.0,
+        hovered ? -10.0 : 0.0,
+        Border.all(color: Colors.white.withValues(alpha: hovered ? 0.25 : 0.06)),
+        BoxShadow(
+          color: Colors.black.withValues(alpha: hovered ? 0.6 : 0.2),
+          blurRadius: hovered ? 30 : 8,
+          offset: Offset(0, hovered ? 18 : 3),
+        ),
+      ),
+    };
+    final showTitle = !layout.cardTitles && title != null && (alwaysShowTitle || hovered);
+
+    return AnimatedSlide(
+      offset: Offset(0, lift / 200),
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
-      child: AnimatedContainer(
+      child: AnimatedScale(
+        scale: scale,
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: hovered ? 0.55 : 0.25),
-              blurRadius: hovered ? 28 : 10,
-              offset: Offset(0, hovered ? 12 : 4),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(borderRadius: radius, boxShadow: [shadow]),
+          foregroundDecoration: BoxDecoration(borderRadius: radius, border: border),
+          child: ClipRRect(
+            borderRadius: radius,
+            child: AspectRatio(
+              aspectRatio: aspectRatio,
+              child: !layout.cardTitles && title != null
+                  ? Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        child,
+                        IgnorePointer(
+                          child: AnimatedOpacity(
+                            opacity: showTitle ? 1 : 0,
+                            duration: const Duration(milliseconds: 180),
+                            child: _TitleOverlay(title: title!, subtitle: subtitle),
+                          ),
+                        ),
+                      ],
+                    )
+                  : child,
             ),
-          ],
-        ),
-        foregroundDecoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: hovered ? Colors.white.withValues(alpha: 0.85) : Colors.white.withValues(alpha: 0.06),
-            width: hovered ? 2 : 1,
           ),
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: AspectRatio(aspectRatio: aspectRatio, child: child),
+      ),
+    );
+  }
+}
+
+/// Titel unten im Bild (Layouts ohne Titel unter den Karten).
+class _TitleOverlay extends StatelessWidget {
+  const _TitleOverlay({required this.title, this.subtitle});
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.bottomLeft,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.center,
+          colors: [Color(0xE6000000), Color(0x00000000)],
         ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+          ),
+          if (subtitle != null && subtitle!.isNotEmpty)
+            Text(
+              subtitle!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5, color: Color(0xCCFFFFFF)),
+            ),
+        ],
       ),
     );
   }
@@ -102,6 +219,7 @@ class _CardLabels extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!appLayout.cardTitles) return const SizedBox.shrink();
     return SizedBox(
       height: kCardTextHeight,
       child: Padding(
@@ -196,20 +314,24 @@ class _Badge extends StatelessWidget {
 
 /// Hochformat-Karte (Poster).
 class PosterCard extends ConsumerWidget {
-  const PosterCard({super.key, required this.item, this.width = kPosterWidth});
+  const PosterCard({super.key, required this.item, this.width});
 
   final BaseItem item;
-  final double width;
+
+  /// Breite (Standard: Größe des Layouts).
+  final double? width;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final api = ref.watch(apiProvider);
     final dpr = MediaQuery.devicePixelRatioOf(context);
     final poster = Images.poster(item);
+    final width = this.width ?? kPosterWidth;
     final h = _bucket(width * 1.5 * dpr);
     return SizedBox(
       width: width,
       child: _HoverCard(
+        label: [cardTitle(item), ?cardSubtitle(item)].join(', '),
         onTap: () => openItem(context, item),
         onContextMenu: (pos) => showItemContextMenu(context, item, pos),
         builder: (hovered) => Column(
@@ -218,6 +340,8 @@ class PosterCard extends ConsumerWidget {
             _CardFrame(
               hovered: hovered,
               aspectRatio: 2 / 3,
+              title: cardTitle(item),
+              subtitle: cardSubtitle(item),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -241,17 +365,12 @@ class PosterCard extends ConsumerWidget {
 
 /// Querformat-Karte (Weiterschauen, Episoden). Beim Hover erscheint ein Play-Knopf.
 class LandscapeCard extends ConsumerWidget {
-  const LandscapeCard({
-    super.key,
-    required this.item,
-    this.width = kLandscapeWidth,
-    this.onTap,
-    this.title,
-    this.subtitle,
-  });
+  const LandscapeCard({super.key, required this.item, this.width, this.onTap, this.title, this.subtitle});
 
   final BaseItem item;
-  final double width;
+
+  /// Breite (Standard: Größe des Layouts).
+  final double? width;
   final VoidCallback? onTap;
   final String? title;
   final String? subtitle;
@@ -261,10 +380,12 @@ class LandscapeCard extends ConsumerWidget {
     final api = ref.watch(apiProvider);
     final dpr = MediaQuery.devicePixelRatioOf(context);
     final image = Images.landscape(item, episodeImages: ref.watch(settingsProvider).episodeImagesInRows);
+    final width = this.width ?? kLandscapeWidth;
     final w = _bucket(width * dpr);
     return SizedBox(
       width: width,
       child: _HoverCard(
+        label: [title ?? cardTitle(item), ?(subtitle ?? cardSubtitle(item))].join(', '),
         onTap: onTap ?? () => openItem(context, item),
         onContextMenu: (pos) => showItemContextMenu(context, item, pos),
         builder: (hovered) => Column(
@@ -273,6 +394,9 @@ class LandscapeCard extends ConsumerWidget {
             _CardFrame(
               hovered: hovered,
               aspectRatio: 16 / 9,
+              title: title ?? cardTitle(item),
+              subtitle: subtitle ?? cardSubtitle(item),
+              alwaysShowTitle: true,
               child: Stack(
                 fit: StackFit.expand,
                 children: [

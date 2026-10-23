@@ -9,6 +9,15 @@ import 'package:flutter/widgets.dart';
 ///
 /// Gibt `false` zurück, wenn es in diese Richtung nichts mehr gibt.
 bool moveFocusInDirection(TraversalDirection direction) {
+  if (_moveWithinScope(direction)) return true;
+  // Am Rand angekommen: z. B. von der Seite in die Seitenleiste wechseln.
+  return focusEdgeHandler?.call(direction) ?? false;
+}
+
+/// Wird aufgerufen, wenn es in einer Richtung nichts mehr gibt (Seitenleiste).
+bool Function(TraversalDirection direction)? focusEdgeHandler;
+
+bool _moveWithinScope(TraversalDirection direction) {
   final current = FocusManager.instance.primaryFocus;
   final scope = (current is FocusScopeNode ? current : current?.nearestScope) ?? FocusManager.instance.rootScope;
 

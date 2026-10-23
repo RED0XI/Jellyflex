@@ -69,8 +69,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final movies = _results.where((i) => i.isMovie).toList();
     final series = _results.where((i) => i.isSeries).toList();
     final episodes = _results.where((i) => i.isEpisode).toList();
-    const posterHeight = kPosterWidth * 1.5 + kCardTextHeight;
-    const landscapeHeight = kLandscapeWidth * 9 / 16 + kCardTextHeight;
+    final posterHeight = kPosterWidth * 1.5 + kCardTextHeight;
+    final landscapeHeight = kLandscapeWidth * 9 / 16 + kCardTextHeight;
 
     return Scaffold(
       body: Stack(

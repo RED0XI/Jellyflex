@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/layouts.dart';
 import '../theme.dart';
 
 /// Horizontale Reihe mit Überschrift. Beim Überfahren erscheinen
@@ -11,7 +12,7 @@ class MediaRow extends StatefulWidget {
     required this.itemCount,
     required this.itemBuilder,
     required this.height,
-    this.spacing = 18,
+    this.spacing,
     this.trailing,
   });
 
@@ -21,7 +22,9 @@ class MediaRow extends StatefulWidget {
 
   /// Höhe der Karten inklusive Beschriftung.
   final double height;
-  final double spacing;
+
+  /// Abstand zwischen den Karten (Standard: aus dem Layout).
+  final double? spacing;
   final Widget? trailing;
 
   @override
@@ -82,10 +85,7 @@ class _MediaRowState extends State<MediaRow> {
               padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 0),
               child: Row(
                 children: [
-                  Text(
-                    widget.title!,
-                    style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700, letterSpacing: -0.2),
-                  ),
+                  Text(appLayout.heading(widget.title!), style: appLayout.headingStyle()),
                   const Spacer(),
                   ?widget.trailing,
                 ],
@@ -106,7 +106,7 @@ class _MediaRowState extends State<MediaRow> {
                     clipBehavior: Clip.none,
                     padding: const EdgeInsets.symmetric(horizontal: kPageGutter, vertical: _vPad),
                     itemCount: widget.itemCount,
-                    separatorBuilder: (_, _) => SizedBox(width: widget.spacing),
+                    separatorBuilder: (_, _) => SizedBox(width: widget.spacing ?? appLayout.cardGap),
                     itemBuilder: widget.itemBuilder,
                   ),
                 ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'core/layouts.dart';
 import 'core/themes.dart';
 
 /// Aktives Farbschema (wird aus den Einstellungen gesetzt).
@@ -36,12 +37,13 @@ const double kPageGutter = 56;
 /// Höhe der eigenen Fenster-Titelleiste.
 const double kTitleBarHeight = 36;
 
-/// [themeId] nur, damit sich das Ergebnis bei einem Theme-Wechsel ändert.
-ThemeData buildTheme([String? themeId]) {
+/// [key] nur, damit sich das Ergebnis bei einem Theme-/Layout-Wechsel ändert.
+ThemeData buildTheme([String? key]) {
+  final font = appLayout.bodyFont ?? appFontFamily;
   final base = ThemeData(
     brightness: Brightness.dark,
     useMaterial3: true,
-    fontFamily: appFontFamily,
+    fontFamily: font,
     fontFamilyFallback: appFontFallback,
     scaffoldBackgroundColor: AppColors.background,
     colorScheme: ColorScheme.dark(
@@ -55,7 +57,7 @@ ThemeData buildTheme([String? themeId]) {
   // Schrift des Systems (Windows 11: Segoe UI Variable) – nichts wird aus dem
   // Internet geladen, und die App bleibt kleiner.
   final textTheme = base.textTheme
-      .apply(fontFamily: appFontFamily, fontFamilyFallback: appFontFallback)
+      .apply(fontFamily: font, fontFamilyFallback: appFontFallback)
       .apply(bodyColor: AppColors.textPrimary, displayColor: AppColors.textPrimary);
 
   return base.copyWith(

@@ -229,6 +229,17 @@ class S {
       _t('Semi-transparent box behind the text.', 'Halbtransparenter Kasten hinter dem Text.');
   String get subtitlePreview => _t('This is how your subtitles look.', 'So sehen deine Untertitel aus.');
   String get home => _t('Home', 'Startseite');
+  String get search => _t('Search', 'Suchen');
+  String get more => _t('More', 'Mehr');
+  String get goodMorning => _t('Good morning', 'Guten Morgen');
+  String get goodAfternoon => _t('Good afternoon', 'Hallo');
+  String get goodEvening => _t('Good evening', 'Guten Abend');
+  String get coverStory => _t('Cover story', 'Titelgeschichte');
+  String get layout => _t('Layout', 'Layout');
+  String get layoutHint => _t(
+    'Changes how the whole app is built – navigation, banner, cards, type. Colours stay as chosen below.',
+    'Ändert den ganzen Aufbau – Navigation, Banner, Karten, Schrift. Die Farben bleiben wie unten gewählt.',
+  );
   String get bannerTrailers => _t('Trailers in the banner', 'Trailer im Banner');
   String get bannerTrailersHint => _t(
     'After a few seconds, plays the title’s trailer muted (if available).',

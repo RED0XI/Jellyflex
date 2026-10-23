@@ -16,6 +16,7 @@ import '../home/home_providers.dart';
 import '../../l10n/strings.dart';
 import '../../core/format.dart';
 import '../../widgets/theme_picker.dart';
+import '../../widgets/layout_picker.dart';
 import '../../core/image_cache.dart';
 import 'about_section.dart';
 import '../../core/downloads.dart' show formatBytes;
@@ -285,6 +286,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  Text(tr.layout, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
+                                  const SizedBox(height: 3),
+                                  Text(tr.layoutHint, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                                  const SizedBox(height: 14),
+                                  const LayoutPicker(),
+                                  const SizedBox(height: 28),
                                   Text(tr.theme, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
                                   const SizedBox(height: 3),
                                   Text(tr.themeHint, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),

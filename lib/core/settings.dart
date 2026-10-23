@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/strings.dart';
 import 'format.dart';
 import 'image_cache.dart';
+import 'layouts.dart';
 import '../theme.dart';
 import 'themes.dart';
 import 'ui_sounds.dart';
@@ -55,6 +56,7 @@ class AppSettings {
     this.logoPath,
     this.screensaverMinutes = 5,
     this.imageCacheMb = 300,
+    this.layoutId = 'cinema',
     this.updateCheck = false,
     this.seasonalThemes = true,
     this.ambilight = AmbilightMode.window,
@@ -87,6 +89,9 @@ class AppSettings {
 
   /// Obergrenze des Bild-Zwischenspeichers auf der Festplatte (MB, 0 = aus).
   final int imageCacheMb;
+
+  /// Layout (Aufbau der Oberfläche), siehe [appLayouts].
+  final String layoutId;
 
   /// Beim Start nach einer neuen Version fragen (Standard: aus).
   final bool updateCheck;
@@ -138,6 +143,7 @@ class AppSettings {
     String? Function()? logoPath,
     int? screensaverMinutes,
     int? imageCacheMb,
+    String? layoutId,
     bool? updateCheck,
     bool? seasonalThemes,
     AmbilightMode? ambilight,
@@ -159,6 +165,7 @@ class AppSettings {
     logoPath: logoPath != null ? logoPath() : this.logoPath,
     screensaverMinutes: screensaverMinutes ?? this.screensaverMinutes,
     imageCacheMb: imageCacheMb ?? this.imageCacheMb,
+    layoutId: layoutId ?? this.layoutId,
     updateCheck: updateCheck ?? this.updateCheck,
     seasonalThemes: seasonalThemes ?? this.seasonalThemes,
     ambilight: ambilight ?? this.ambilight,
@@ -182,6 +189,7 @@ class AppSettings {
     'logoPath': logoPath,
     'screensaverMinutes': screensaverMinutes,
     'imageCacheMb': imageCacheMb,
+    'layoutId': layoutId,
     'updateCheck': updateCheck,
     'seasonalThemes': seasonalThemes,
     'ambilight': ambilight.name,
@@ -206,6 +214,7 @@ class AppSettings {
     screensaverMinutes: (json['screensaverMinutes'] as num?)?.toInt() ?? 5,
     imageCacheMb: ((json['imageCacheMb'] as num?)?.toInt() ?? 300).clamp(0, 5000),
     updateCheck: json['updateCheck'] as bool? ?? false,
+    layoutId: json['layoutId'] as String? ?? 'cinema',
     seasonalThemes: json['seasonalThemes'] as bool? ?? true,
     ambilight: AmbilightMode.values.asNameMap()[json['ambilight']] ?? AmbilightMode.window,
     quizHighscore: (json['quizHighscore'] as num?)?.toInt() ?? 0,
@@ -247,6 +256,7 @@ class SettingsController extends Notifier<AppSettings> {
   void _apply(AppSettings s) {
     appLanguage = s.language;
     appPalette = paletteById(s.themeId);
+    appLayout = layoutById(s.layoutId);
     UiSounds.enabled = s.soundEffects;
     ImageDiskCache.instance.maxBytes = s.imageCacheMb * 1024 * 1024;
   }

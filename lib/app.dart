@@ -29,6 +29,7 @@ import 'widgets/window_frame.dart';
 import 'l10n/strings.dart';
 import 'features/home/home_providers.dart';
 import 'widgets/offline_banner.dart';
+import 'widgets/layout_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Bei jeder An-/Abmeldung die Weiterleitungen neu prüfen.
@@ -38,7 +39,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: '/splash',
-    observers: [appRouteObserver],
+    observers: [appRouteObserver, popupTracker],
     refreshListenable: refresh,
     redirect: (context, state) {
       final session = ref.read(sessionProvider);
@@ -64,6 +65,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/library/:id',
         builder: (_, state) => LibraryScreen(
+          // Eigener Schlüssel je Bibliothek – sonst blieben beim Wechsel die alten Titel stehen.
+          key: ValueKey('library-${state.pathParameters['id']}'),
           libraryId: state.pathParameters['id']!,
           name: state.uri.queryParameters['name'] ?? tr.library,
           collectionType: state.uri.queryParameters['type'],
@@ -118,18 +121,24 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
       (_, _) => applyWindowBranding(ref.read(settingsProvider)),
       fireImmediately: true,
     );
-    // Andere Sprache: alles neu zeichnen und Reihen mit Überschriften neu laden.
-    ref.listenManual(settingsProvider.select((s) => (s.language, s.themeId)), (_, _) {
-      ref.invalidate(homeProvider);
-      ref.invalidate(discoverProvider);
-      ref.invalidate(seasonalSectionProvider);
+    void rebuildAll() {
       void rebuild(Element element) {
         element.markNeedsBuild();
         element.visitChildren(rebuild);
       }
 
       (context as Element).visitChildren(rebuild);
+    }
+
+    // Andere Sprache: Reihen mit Überschriften neu laden und alles neu zeichnen.
+    ref.listenManual(settingsProvider.select((s) => s.language), (_, _) {
+      ref.invalidate(homeProvider);
+      ref.invalidate(discoverProvider);
+      ref.invalidate(seasonalSectionProvider);
+      rebuildAll();
     });
+    // Andere Farben oder anderes Layout: nur neu zeichnen – die Daten bleiben.
+    ref.listenManual(settingsProvider.select((s) => (s.themeId, s.layoutId)), (_, _) => rebuildAll());
   }
 
   @override
@@ -141,7 +150,7 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
       locale: Locale(ref.watch(settingsProvider.select((s) => s.language)).name),
       supportedLocales: [for (final l in AppLanguage.values) Locale(l.name)],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      theme: buildTheme(ref.watch(settingsProvider.select((s) => s.themeId))),
+      theme: buildTheme(ref.watch(settingsProvider.select((s) => '${s.themeId}/${s.layoutId}'))),
       routerConfig: router,
       scrollBehavior: const _AppScrollBehavior(),
       scaffoldMessengerKey: appMessengerKey,
@@ -151,7 +160,10 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
           router: router,
           child: WindowFrame(
             router: router,
-            child: OfflineBanner(router: router, child: child!),
+            child: LayoutShell(
+              router: router,
+              child: OfflineBanner(router: router, child: child!),
+            ),
           ),
         ),
       ),
