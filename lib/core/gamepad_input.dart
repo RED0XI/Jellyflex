@@ -92,9 +92,13 @@ abstract final class GamepadInput {
     });
   }
 
+  /// Zählt jede Controller-Eingabe (z. B. für die Sperre nach Inaktivität).
+  static final activity = ValueNotifier<int>(0);
+
   static void _dispatch(PadAction action) {
     // Im UI-Thread nach dem aktuellen Frame ausführen.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      activity.value++;
       if (overlayHandler?.call(action) ?? false) return;
       if (playerHandler?.call(action) ?? false) return;
       _onAction?.call(action);

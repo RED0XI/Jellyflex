@@ -21,6 +21,7 @@ import 'features/person/person_screen.dart';
 import 'features/player/player_screen.dart';
 import 'features/quiz/quiz_screen.dart';
 import 'features/roulette/roulette_screen.dart';
+import 'features/lock/idle_lock.dart';
 import 'features/screensaver/screensaver.dart';
 import 'features/search/search_screen.dart';
 import 'features/settings/settings_screen.dart';
@@ -162,15 +163,18 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
       scaffoldMessengerKey: appMessengerKey,
       builder: (context, child) => Screensaver(
         router: router,
-        child: LiveHandler(
+        child: IdleLock(
           router: router,
-          child: DownloadNotifier(
-            messenger: appMessengerKey,
-            child: WindowFrame(
-              router: router,
-              child: LayoutShell(
+          child: LiveHandler(
+            router: router,
+            child: DownloadNotifier(
+              messenger: appMessengerKey,
+              child: WindowFrame(
                 router: router,
-                child: OfflineBanner(router: router, child: child!),
+                child: LayoutShell(
+                  router: router,
+                  child: OfflineBanner(router: router, child: child!),
+                ),
               ),
             ),
           ),

@@ -570,6 +570,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ),
                             const _PinRow(),
+                            if (session?.hasPin ?? false)
+                              _Row(
+                                title: tr.pinLock,
+                                subtitle: tr.pinLockHint,
+                                trailing: _Choice<int>(
+                                  value: s.pinLockMinutes,
+                                  label: s.pinLockMinutes == 0 ? tr.off : tr.afterMinutes(s.pinLockMinutes),
+                                  options: [
+                                    (0, tr.off),
+                                    for (final m in const [5, 15, 30, 60]) (m, tr.afterMinutes(m)),
+                                  ],
+                                  onChanged: (v) => ctrl.update((s) => s.copyWith(pinLockMinutes: v)),
+                                ),
+                              ),
                           ],
                         ),
 

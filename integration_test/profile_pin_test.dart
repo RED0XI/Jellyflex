@@ -5,6 +5,7 @@
 // Voraussetzung:  dart run tool/mock_server.dart
 // Start:          flutter test integration_test/profile_pin_test.dart -d windows
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,7 +14,9 @@ import 'package:integration_test/integration_test.dart';
 import 'package:jellyflex/app.dart';
 import 'package:jellyflex/core/session.dart';
 import 'package:jellyflex/core/settings.dart';
+import 'package:jellyflex/core/profile_pin.dart';
 import 'package:jellyflex/features/home/home_screen.dart';
+import 'package:jellyflex/features/lock/idle_lock.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -79,5 +82,58 @@ void main() {
     expect(container.read(sessionProvider).value?.userName, 'Demo');
     expect(find.byType(HomeScreen), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Profil mit PIN sperrt sich nach Inaktivität', (tester) async {
+    if (!await demoServerRunning()) return;
+    await windowManager.ensureInitialized();
+    IdleLock.debugDelay = const Duration(seconds: 2);
+    try {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            sessionProvider.overrideWith(DemoSession.new),
+            settingsProvider.overrideWith(() => testSettings()),
+          ],
+          child: RepaintBoundary(key: shotKey, child: const JellyflexApp()),
+        ),
+      );
+      await pumpFor(tester, const Duration(seconds: 2));
+      final container = ProviderScope.containerOf(tester.element(find.byType(JellyflexApp)));
+      container.read(settingsProvider.notifier).update((s) => s.copyWith(pinLockMinutes: 5));
+      await tester.runAsync(() async {
+        await container.read(sessionProvider.notifier).setPin(await ProfilePin.hash('2468'));
+      });
+      await pumpFor(tester, const Duration(seconds: 3));
+      expect(find.text('Gesperrt – weiter mit deiner PIN'), findsOneWidget);
+      await saveShot(tester, 'idle_lock');
+
+      // Falsche PIN: bleibt gesperrt. Richtige: weiter, wo man war.
+      await tester.tap(find.text('Entsperren'));
+      await pumpFor(tester, const Duration(milliseconds: 600));
+      await _typePin(tester, '1111');
+      expect(find.text('Falsche PIN'), findsOneWidget);
+      await _typePin(tester, '2468');
+      expect(find.text('Gesperrt – weiter mit deiner PIN'), findsNothing);
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(container.read(sessionProvider).value?.userName, 'Demo', reason: 'Gleiches Profil bleibt angemeldet');
+
+      // Eingaben verschieben die Sperre.
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: const Offset(300, 300));
+      for (var i = 0; i < 3; i++) {
+        await mouse.moveTo(Offset(300.0 + i * 20, 320));
+        await pumpFor(tester, const Duration(milliseconds: 1200));
+      }
+      expect(find.text('Gesperrt – weiter mit deiner PIN'), findsNothing);
+
+      // Während ein Video läuft, wird nicht gesperrt.
+      container.read(routerProvider).push('/play/movie1');
+      await pumpFor(tester, const Duration(seconds: 4));
+      expect(find.text('Gesperrt – weiter mit deiner PIN'), findsNothing);
+    } finally {
+      IdleLock.debugDelay = null;
+      await tester.pumpWidget(const SizedBox());
+    }
   });
 }

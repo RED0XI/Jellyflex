@@ -975,4 +975,15 @@ class S {
   );
   String get updateReleasePage => _t('Release page', 'Versionsseite');
   String get updateInstall => _t('Download & install', 'Laden & installieren');
+
+  // --- Sperre bei Abwesenheit ------------------------------------------------
+
+  String get profileLocked => _t('Locked – enter your PIN to continue', 'Gesperrt – weiter mit deiner PIN');
+  String get unlock => _t('Unlock', 'Entsperren');
+  String get switchProfile => _t('Switch profile', 'Profil wechseln');
+  String get pinLock => _t('Lock when away', 'Sperren bei Abwesenheit');
+  String get pinLockHint => _t(
+    'Asks for the PIN again after this long without input (not while a video is playing).',
+    'Fragt nach so langer Zeit ohne Eingabe wieder nach der PIN (nicht während ein Video läuft).',
+  );
 }

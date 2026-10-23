@@ -1257,4 +1257,14 @@ final class _Es extends S {
   String get updateReleasePage => 'Página de versiones';
   @override
   String get updateInstall => 'Descargar e instalar';
+  @override
+  String get profileLocked => 'Bloqueado: introduce tu PIN para continuar';
+  @override
+  String get unlock => 'Desbloquear';
+  @override
+  String get switchProfile => 'Cambiar de perfil';
+  @override
+  String get pinLock => 'Bloquear al ausentarse';
+  @override
+  String get pinLockHint => 'Vuelve a pedir el PIN tras este tiempo sin actividad (no mientras se reproduce un vídeo).';
 }

@@ -1251,4 +1251,14 @@ final class _Tr extends S {
   String get updateReleasePage => 'Sürüm sayfası';
   @override
   String get updateInstall => 'İndir ve yükle';
+  @override
+  String get profileLocked => 'Kilitli – devam etmek için PIN’ini gir';
+  @override
+  String get unlock => 'Kilidi aç';
+  @override
+  String get switchProfile => 'Profil değiştir';
+  @override
+  String get pinLock => 'Uzaktayken kilitle';
+  @override
+  String get pinLockHint => 'Bu süre boyunca giriş olmazsa PIN’i yeniden ister (video oynarken değil).';
 }

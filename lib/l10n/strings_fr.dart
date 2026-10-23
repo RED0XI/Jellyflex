@@ -1260,4 +1260,14 @@ final class _Fr extends S {
   String get updateReleasePage => 'Page des versions';
   @override
   String get updateInstall => 'Télécharger et installer';
+  @override
+  String get profileLocked => 'Verrouillé – saisis ton code PIN pour continuer';
+  @override
+  String get unlock => 'Déverrouiller';
+  @override
+  String get switchProfile => 'Changer de profil';
+  @override
+  String get pinLock => 'Verrouiller en cas d’absence';
+  @override
+  String get pinLockHint => 'Redemande le code PIN après ce délai sans action (pas pendant la lecture d’une vidéo).';
 }

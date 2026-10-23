@@ -77,6 +77,7 @@ class AppSettings {
     this.smartDownloads = false,
     this.smartEpisodes = 2,
     this.smartMaxGb = 0,
+    this.pinLockMinutes = 0,
   });
 
   /// Zuletzt eingestellte Lautstärke im Player (0–100).
@@ -108,6 +109,9 @@ class AppSettings {
 
   /// Höchstens so viel Platz (GB) für Smart Downloads; 0 = unbegrenzt.
   final int smartMaxGb;
+
+  /// Profil mit PIN nach so vielen Minuten ohne Eingabe sperren; 0 = aus.
+  final int pinLockMinutes;
 
   /// Klänge bei "Überrasch mich" und im Quiz.
   final bool soundEffects;
@@ -212,6 +216,7 @@ class AppSettings {
     bool? smartDownloads,
     int? smartEpisodes,
     int? smartMaxGb,
+    int? pinLockMinutes,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -246,6 +251,7 @@ class AppSettings {
     smartDownloads: smartDownloads ?? this.smartDownloads,
     smartEpisodes: smartEpisodes ?? this.smartEpisodes,
     smartMaxGb: smartMaxGb ?? this.smartMaxGb,
+    pinLockMinutes: pinLockMinutes ?? this.pinLockMinutes,
   );
 
   Map<String, dynamic> toJson() => {
@@ -282,6 +288,7 @@ class AppSettings {
     'smartDownloads': smartDownloads,
     'smartEpisodes': smartEpisodes,
     'smartMaxGb': smartMaxGb,
+    'pinLockMinutes': pinLockMinutes,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -318,6 +325,7 @@ class AppSettings {
     smartDownloads: json['smartDownloads'] as bool? ?? false,
     smartEpisodes: ((json['smartEpisodes'] as num?)?.toInt() ?? 2).clamp(1, 10),
     smartMaxGb: ((json['smartMaxGb'] as num?)?.toInt() ?? 0).clamp(0, 100000),
+    pinLockMinutes: ((json['pinLockMinutes'] as num?)?.toInt() ?? 0).clamp(0, 24 * 60),
   );
 }
 
