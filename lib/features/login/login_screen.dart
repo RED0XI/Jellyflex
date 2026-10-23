@@ -330,7 +330,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Text(tr.signIn, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
                   Text(
                     '${server.name} · Jellyfin ${server.version}',
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                   ),
                 ],
               ),
@@ -559,7 +559,7 @@ class _ProfileTileState extends State<_ProfileTile> {
                 widget.subtitle!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
               ),
           ],
         ),

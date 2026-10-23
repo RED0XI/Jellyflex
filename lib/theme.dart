@@ -1,22 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class AppColors {
-  static const background = Color(0xFF0A0B10);
-  static const surface = Color(0xFF14161F);
-  static const surfaceHigh = Color(0xFF1E2130);
-  static const border = Color(0xFF2A2E3F);
-  static const accent = Color(0xFF8B5CF6);
-  static const accentAlt = Color(0xFF00A4DC);
-  static const textPrimary = Color(0xFFF5F6FA);
-  static const textSecondary = Color(0xFFA3A8B8);
-  static const textMuted = Color(0xFF6B7080);
+import 'core/themes.dart';
 
-  static const accentGradient = LinearGradient(
-    colors: [accent, accentAlt],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
+/// Aktives Farbschema (wird aus den Einstellungen gesetzt).
+AppPalette appPalette = appPalettes.first;
+
+/// Farben des aktiven Themes – überall in der App verwendet.
+abstract final class AppColors {
+  static Color get background => appPalette.background;
+  static Color get surface => appPalette.surface;
+  static Color get surfaceHigh => appPalette.surfaceHigh;
+  static Color get border => appPalette.border;
+  static Color get accent => appPalette.accent;
+  static Color get accentAlt => appPalette.accentAlt;
+  static Color get textPrimary => appPalette.textPrimary;
+  static Color get textSecondary => appPalette.textSecondary;
+  static Color get textMuted => appPalette.textMuted;
+  static Color get button => appPalette.button;
+  static Color get onButton => appPalette.onButton;
+
+  static LinearGradient get accentGradient => gradientOf(appPalette);
+
+  /// Akzent-Verlauf eines bestimmten Themes (z. B. für Vorschauen).
+  static LinearGradient gradientOf(AppPalette p) =>
+      LinearGradient(colors: [p.accent, p.accentAlt], begin: Alignment.topLeft, end: Alignment.bottomRight);
 }
 
 /// Horizontaler Seitenabstand, den alle Screens teilen.
@@ -25,12 +33,13 @@ const double kPageGutter = 56;
 /// Höhe der eigenen Fenster-Titelleiste.
 const double kTitleBarHeight = 36;
 
-ThemeData buildTheme() {
+/// [themeId] nur, damit sich das Ergebnis bei einem Theme-Wechsel ändert.
+ThemeData buildTheme([String? themeId]) {
   final base = ThemeData(
     brightness: Brightness.dark,
     useMaterial3: true,
     scaffoldBackgroundColor: AppColors.background,
-    colorScheme: const ColorScheme.dark(
+    colorScheme: ColorScheme.dark(
       primary: AppColors.accent,
       secondary: AppColors.accentAlt,
       surface: AppColors.surface,
@@ -66,10 +75,10 @@ ThemeData buildTheme() {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+        borderSide: BorderSide(color: AppColors.accent, width: 1.5),
       ),
-      labelStyle: const TextStyle(color: AppColors.textSecondary),
-      hintStyle: const TextStyle(color: AppColors.textMuted),
+      labelStyle: TextStyle(color: AppColors.textSecondary),
+      hintStyle: TextStyle(color: AppColors.textMuted),
     ),
   );
 }

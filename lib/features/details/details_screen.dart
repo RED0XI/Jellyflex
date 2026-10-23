@@ -141,14 +141,18 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
             images: Images.backdrops(item).isNotEmpty ? Images.backdrops(item) : [?Images.backdrop(item)],
           ),
         ),
-        const Positioned.fill(
+        Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
                 stops: [0, 0.45, 0.85],
-                colors: [Color(0xF20A0B10), Color(0xA60A0B10), Color(0x200A0B10)],
+                colors: [
+                  AppColors.background.withAlpha(0xF2),
+                  AppColors.background.withAlpha(0xA6),
+                  AppColors.background.withAlpha(0x20),
+                ],
               ),
             ),
           ),
@@ -158,13 +162,17 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
           left: 0,
           right: 0,
           height: size.height * 0.82,
-          child: const DecoratedBox(
+          child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,
                 end: Alignment.topCenter,
                 stops: [0, 0.4, 1],
-                colors: [AppColors.background, Color(0x000A0B10), Color(0x660A0B10)],
+                colors: [
+                  AppColors.background,
+                  AppColors.background.withAlpha(0x00),
+                  AppColors.background.withAlpha(0x66),
+                ],
               ),
             ),
           ),
@@ -260,10 +268,7 @@ class _Header extends ConsumerWidget {
       if (source != null && !item.isSeries && !item.isCollection)
         for (final badge in qualityBadges(source!)) _QualityBadge(badge),
       if (remaining != null && !item.isSeries && remaining > Duration.zero)
-        Text(
-          tr.endsAt(formatClock(DateTime.now().add(remaining))),
-          style: const TextStyle(color: AppColors.textSecondary),
-        ),
+        Text(tr.endsAt(formatClock(DateTime.now().add(remaining))), style: TextStyle(color: AppColors.textSecondary)),
     ];
 
     return Align(
@@ -292,7 +297,7 @@ class _Header extends ConsumerWidget {
                   if (item.parentIndexNumber != null) tr.seasonN(item.parentIndexNumber!),
                   if (item.indexNumber != null) tr.episodeN(item.indexNumber!),
                 ].join(' · '),
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 15, fontWeight: FontWeight.w600),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 15, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
               Text(item.name, style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
@@ -310,7 +315,7 @@ class _Header extends ConsumerWidget {
             ),
             if (item.genres.isNotEmpty) ...[
               const SizedBox(height: 10),
-              Text(item.genres.join('  ·  '), style: const TextStyle(color: AppColors.textSecondary)),
+              Text(item.genres.join('  ·  '), style: TextStyle(color: AppColors.textSecondary)),
             ],
             if (item.taglines.isNotEmpty) ...[
               const SizedBox(height: 18),
@@ -418,7 +423,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
                     children: [
                       Text(versionLabel(s), style: const TextStyle(fontWeight: FontWeight.w600)),
                       if (versionDetails(s).isNotEmpty)
-                        Text(versionDetails(s), style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+                        Text(versionDetails(s), style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
                     ],
                   ),
                 ),
@@ -750,7 +755,7 @@ class _EpisodesRow extends ConsumerWidget {
                     ep.overview ?? '',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12.5, height: 1.45, color: AppColors.textMuted),
+                    style: TextStyle(fontSize: 12.5, height: 1.45, color: AppColors.textMuted),
                   ),
                 ),
               ],
@@ -805,7 +810,7 @@ class _CastRow extends ConsumerWidget {
                             url: api.imageUrlOrNull(Images.person(p), fillWidth: 240, fillHeight: 360),
                             blurHash: p.blurHash,
                             alignment: Alignment.topCenter,
-                            fallback: const Icon(Icons.person_rounded, size: 48, color: AppColors.textMuted),
+                            fallback: Icon(Icons.person_rounded, size: 48, color: AppColors.textMuted),
                           ),
                         ),
                       ),
@@ -825,7 +830,7 @@ class _CastRow extends ConsumerWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),
                 ],
               ),

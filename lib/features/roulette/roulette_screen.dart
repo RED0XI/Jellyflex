@@ -224,13 +224,17 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
                     ),
             ),
           ),
-          const Positioned.fill(
+          Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0xCC0A0B10), Color(0x990A0B10), AppColors.background],
+                  colors: [
+                    AppColors.background.withAlpha(0xCC),
+                    AppColors.background.withAlpha(0x99),
+                    AppColors.background,
+                  ],
                 ),
               ),
             ),
@@ -286,7 +290,7 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
                   Padding(
                     padding: const EdgeInsets.only(top: 18),
                     child: Center(
-                      child: Text(_message!, style: const TextStyle(color: AppColors.textSecondary)),
+                      child: Text(_message!, style: TextStyle(color: AppColors.textSecondary)),
                     ),
                   ),
                 AnimatedSwitcher(
@@ -447,12 +451,12 @@ class _ReelView extends ConsumerWidget {
               Positioned(
                 left: center - 10,
                 top: 0,
-                child: const Icon(Icons.arrow_drop_down_rounded, size: 34, color: AppColors.accent),
+                child: Icon(Icons.arrow_drop_down_rounded, size: 34, color: AppColors.accent),
               ),
               Positioned(
                 left: center - 10,
                 bottom: -6,
-                child: const Icon(Icons.arrow_drop_up_rounded, size: 34, color: AppColors.accent),
+                child: Icon(Icons.arrow_drop_up_rounded, size: 34, color: AppColors.accent),
               ),
               Positioned.fill(
                 child: IgnorePointer(
@@ -540,10 +544,10 @@ class _WinnerCard extends StatelessWidget {
                 style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -0.5),
               ),
               const SizedBox(height: 6),
-              Text(meta.join('  ·  '), style: const TextStyle(color: AppColors.textSecondary, fontSize: 15)),
+              Text(meta.join('  ·  '), style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
               if (item.genres.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text(item.genres.join('  ·  '), style: const TextStyle(color: AppColors.textMuted)),
+                Text(item.genres.join('  ·  '), style: TextStyle(color: AppColors.textMuted)),
               ],
               if (item.overview != null) ...[
                 const SizedBox(height: 14),

@@ -230,6 +230,19 @@ class S {
     'An image (PNG, JPG …) – shown before the name and as the taskbar icon.',
     'Ein Bild (PNG, JPG …) – wird vor dem Namen und als Symbol in der Taskleiste gezeigt.',
   );
+  String get theme => _t('Theme', 'Theme');
+  String get themeHint => _t('Colours of the whole app – changes instantly.', 'Farben der ganzen App – wirkt sofort.');
+  String themeName(String id) => switch (id) {
+    'midnight' => _t('Midnight', 'Mitternacht'),
+    'oled' => _t('OLED Black', 'OLED-Schwarz'),
+    'cinema' => _t('Cinema Red', 'Kinorot'),
+    'frost' => _t('Nordic Frost', 'Nordischer Frost'),
+    'sunset' => _t('Sunset', 'Sonnenuntergang'),
+    'synthwave' => _t('Synthwave', 'Synthwave'),
+    'emerald' => _t('Emerald', 'Smaragd'),
+    'noir' => _t('Noir Gold', 'Noir-Gold'),
+    _ => id,
+  };
   String get images => _t('Images', 'Bilder');
   String get loading => _t('Loading …', 'Lädt …');
   String get chooseImage => _t('Choose image …', 'Bild wählen …');

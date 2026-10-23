@@ -187,7 +187,7 @@ class _Hint extends StatelessWidget {
         children: [
           Icon(icon, size: 56, color: AppColors.textMuted),
           const SizedBox(height: 14),
-          Text(text, style: const TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+          Text(text, style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
         ],
       ),
     );

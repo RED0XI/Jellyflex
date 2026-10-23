@@ -202,7 +202,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> with TickerProviderStat
               ? const Center(child: CircularProgressIndicator())
               : _error != null
               ? Center(
-                  child: Text(_error!, style: const TextStyle(color: AppColors.textSecondary)),
+                  child: Text(_error!, style: TextStyle(color: AppColors.textSecondary)),
                 )
               : _finished
               ? _Result(
@@ -228,13 +228,13 @@ class _QuizScreenState extends ConsumerState<QuizScreen> with TickerProviderStat
       children: [
         Row(
           children: [
-            const Icon(Icons.quiz_rounded, color: AppColors.accent, size: 28),
+            Icon(Icons.quiz_rounded, color: AppColors.accent, size: 28),
             const SizedBox(width: 10),
             Text(tr.movieQuiz, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
             const SizedBox(width: 20),
             Text(
               tr.roundOf(_index + 1, _rounds.length),
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 15),
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 15),
             ),
             const Spacer(),
             Text(tr.points(_score), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
@@ -310,7 +310,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> with TickerProviderStat
                                 ),
                                 Text(
                                   '${round.answer.name}${round.answer.productionYear != null ? ' (${round.answer.productionYear})' : ''}',
-                                  style: const TextStyle(color: AppColors.textSecondary),
+                                  style: TextStyle(color: AppColors.textSecondary),
                                 ),
                               ],
                             ),
@@ -454,7 +454,7 @@ class _Result extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             tr.correctOf(correct, rounds, math.max(highscore, score)),
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 16),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
           ),
           const SizedBox(height: 28),
           PrimaryButton(label: tr.playAgain, icon: Icons.replay_rounded, onPressed: onAgain),

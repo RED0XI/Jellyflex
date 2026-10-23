@@ -205,7 +205,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           child: Row(
             children: [
               Expanded(child: Text(isEpisode ? tr.endOfThisEpisode : tr.endOfThisMovie)),
-              if (timer.mode == SleepMode.endOfItem) const Icon(Icons.check_rounded, size: 18, color: AppColors.accent),
+              if (timer.mode == SleepMode.endOfItem) Icon(Icons.check_rounded, size: 18, color: AppColors.accent),
             ],
           ),
         ),
@@ -1017,7 +1017,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           Text(
             _error!,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.textSecondary),
+            style: TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
           GlassButton(label: tr.back, icon: Icons.arrow_back_rounded, onPressed: _close),
@@ -1167,7 +1167,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
                       ),
                       if (subtitle != null && subtitle.isNotEmpty)
-                        Text(subtitle, style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                        Text(subtitle, style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
                     ],
                   ),
                 ),
@@ -1225,7 +1225,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                           padding: const EdgeInsets.only(right: 12),
                           child: Text(
                             tr.endsAt(formatClock(DateTime.now().add(remaining))),
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13.5),
+                            style: TextStyle(color: AppColors.textSecondary, fontSize: 13.5),
                           ),
                         );
                       },
@@ -1270,11 +1270,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                             if (label != null)
                               Text(
                                 label,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.accent,
-                                ),
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.accent),
                               ),
                             Builder(
                               builder: (buttonContext) => _PlayerIconButton(
@@ -1982,7 +1978,7 @@ class _TrackColumn extends StatelessWidget {
         if (entries.isEmpty || (entries.length == 1 && entries.first.id == 'no'))
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(emptyText, style: const TextStyle(color: AppColors.textMuted)),
+            child: Text(emptyText, style: TextStyle(color: AppColors.textMuted)),
           ),
         Flexible(
           child: ListView(
@@ -2027,7 +2023,7 @@ class _TrackRowState extends State<_TrackRow> {
           children: [
             SizedBox(
               width: 28,
-              child: widget.selected ? const Icon(Icons.check_rounded, size: 20, color: AppColors.accent) : null,
+              child: widget.selected ? Icon(Icons.check_rounded, size: 20, color: AppColors.accent) : null,
             ),
             Expanded(
               child: Text(

@@ -120,7 +120,7 @@ class _CardLabels extends StatelessWidget {
                 subtitle!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
               ),
           ],
         ),
@@ -149,7 +149,7 @@ class _ProgressBar extends StatelessWidget {
               Container(color: Colors.white.withValues(alpha: 0.25)),
               FractionallySizedBox(
                 widthFactor: value,
-                child: Container(decoration: const BoxDecoration(gradient: AppColors.accentGradient)),
+                child: Container(decoration: BoxDecoration(gradient: AppColors.accentGradient)),
               ),
             ],
           ),
@@ -333,7 +333,7 @@ class _PlayCircleState extends State<_PlayCircle> {
               color: Colors.white.withValues(alpha: 0.92),
               boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 16)],
             ),
-            child: const Icon(Icons.play_arrow_rounded, size: 36, color: AppColors.background),
+            child: Icon(Icons.play_arrow_rounded, size: 36, color: AppColors.background),
           ),
         ),
       ),
@@ -351,7 +351,7 @@ class _TitleFallback extends StatelessWidget {
     return Container(
       alignment: Alignment.center,
       padding: const EdgeInsets.all(12),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [AppColors.surfaceHigh, AppColors.surface],
           begin: Alignment.topCenter,
@@ -363,7 +363,7 @@ class _TitleFallback extends StatelessWidget {
         textAlign: TextAlign.center,
         maxLines: 3,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+        style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
       ),
     );
   }

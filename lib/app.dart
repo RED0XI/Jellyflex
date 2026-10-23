@@ -109,7 +109,7 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
       fireImmediately: true,
     );
     // Andere Sprache: alles neu zeichnen und Reihen mit Überschriften neu laden.
-    ref.listenManual(settingsProvider.select((s) => s.language), (_, _) {
+    ref.listenManual(settingsProvider.select((s) => (s.language, s.themeId)), (_, _) {
       ref.invalidate(homeProvider);
       ref.invalidate(discoverProvider);
       ref.invalidate(seasonalSectionProvider);
@@ -131,7 +131,7 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
       locale: Locale(ref.watch(settingsProvider.select((s) => s.language)).name),
       supportedLocales: [for (final l in AppLanguage.values) Locale(l.name)],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      theme: buildTheme(),
+      theme: buildTheme(ref.watch(settingsProvider.select((s) => s.themeId))),
       routerConfig: router,
       scrollBehavior: const _AppScrollBehavior(),
       scaffoldMessengerKey: appMessengerKey,

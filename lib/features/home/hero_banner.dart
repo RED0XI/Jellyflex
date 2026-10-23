@@ -183,7 +183,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
     if (items.isEmpty) {
       return SizedBox(
         height: widget.height,
-        child: const DecoratedBox(
+        child: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
@@ -241,26 +241,34 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
                     ),
             ),
             // Abdunkeln links (für den Text) und unten (Übergang zu den Reihen).
-            const Positioned.fill(
+            Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                     stops: [0, 0.35, 0.75],
-                    colors: [Color(0xF00A0B10), Color(0x990A0B10), Color(0x000A0B10)],
+                    colors: [
+                      AppColors.background.withAlpha(0xF0),
+                      AppColors.background.withAlpha(0x99),
+                      AppColors.background.withAlpha(0x00),
+                    ],
                   ),
                 ),
               ),
             ),
-            const Positioned.fill(
+            Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     stops: [0, 0.35, 1],
-                    colors: [AppColors.background, Color(0x000A0B10), Color(0x550A0B10)],
+                    colors: [
+                      AppColors.background,
+                      AppColors.background.withAlpha(0x00),
+                      AppColors.background.withAlpha(0x55),
+                    ],
                   ),
                 ),
               ),
@@ -384,7 +392,7 @@ class _HeroInfo extends ConsumerWidget {
         TitleLogo(logoUrl: logo, title: item.name, maxHeight: 130, fontSize: 52),
         const SizedBox(height: 18),
         DefaultTextStyle.merge(
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 15, shadows: shadow),
+          style: TextStyle(color: AppColors.textPrimary, fontSize: 15, shadows: shadow),
           child: Wrap(
             spacing: 14,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -407,7 +415,7 @@ class _HeroInfo extends ConsumerWidget {
           const SizedBox(height: 8),
           Text(
             item.genres.take(3).join('  ·  '),
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 14, shadows: shadow),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 14, shadows: shadow),
           ),
         ],
         if (item.overview != null) ...[

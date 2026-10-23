@@ -61,7 +61,7 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
           item.isEpisode ? '${item.seriesName ?? ''} · ${item.episodeLabel ?? ''}' : item.name,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600, fontSize: 13),
+          style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600, fontSize: 13),
         ),
       ),
       if (canPlay) entry(_ItemAction.play, Icons.play_arrow_rounded, data.hasResumePosition ? tr.resume : tr.play),

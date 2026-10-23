@@ -49,7 +49,7 @@ class _MediaInfoDialog extends StatelessWidget {
                       children: [
                         Text(tr.mediaInfo, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                         const SizedBox(height: 2),
-                        Text(versionLabel(source), style: const TextStyle(color: AppColors.textSecondary)),
+                        Text(versionLabel(source), style: TextStyle(color: AppColors.textSecondary)),
                       ],
                     ),
                   ),
@@ -182,7 +182,7 @@ class _Section extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: 150,
-                    child: Text(label, style: const TextStyle(color: AppColors.textSecondary)),
+                    child: Text(label, style: TextStyle(color: AppColors.textSecondary)),
                   ),
                   Expanded(child: SelectableText(value)),
                 ],
@@ -202,7 +202,7 @@ class _Section extends StatelessWidget {
                 children: [
                   Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
                   if (details.isNotEmpty)
-                    Text(details, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+                    Text(details, style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
                 ],
               ),
             ),

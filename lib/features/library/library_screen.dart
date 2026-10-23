@@ -237,7 +237,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         ),
                         Text(
                           _total == null ? ' ' : tr.titlesCount(_total!),
-                          style: const TextStyle(color: AppColors.textSecondary),
+                          style: TextStyle(color: AppColors.textSecondary),
                         ),
                         const SizedBox(height: 18),
                         Wrap(
@@ -321,7 +321,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       padding: const EdgeInsets.only(top: 60),
                       child: Column(
                         children: [
-                          const Icon(Icons.filter_alt_outlined, size: 48, color: AppColors.textMuted),
+                          Icon(Icons.filter_alt_outlined, size: 48, color: AppColors.textMuted),
                           const SizedBox(height: 12),
                           Text(tr.noTitlesMatch, style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
                           const SizedBox(height: 16),
@@ -440,7 +440,7 @@ class _PillMenu<T> extends StatelessWidget {
                 SizedBox(
                   width: 28,
                   child: options[i].$1 == selected
-                      ? const Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
+                      ? Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
                       : null,
                 ),
                 Text(options[i].$2),

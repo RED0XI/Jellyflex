@@ -15,6 +15,7 @@ import '../../widgets/top_scrim.dart';
 import '../home/home_providers.dart';
 import '../../l10n/strings.dart';
 import '../../core/format.dart';
+import '../../widgets/theme_picker.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -276,6 +277,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           title: tr.personalize,
                           icon: Icons.auto_awesome_outlined,
                           children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(tr.theme, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
+                                  const SizedBox(height: 3),
+                                  Text(tr.themeHint, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                                  const SizedBox(height: 14),
+                                  const ThemePicker(),
+                                ],
+                              ),
+                            ),
                             Container(
                               height: 96,
                               margin: const EdgeInsets.all(16),
@@ -357,7 +371,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     height: 56,
                                     clipBehavior: Clip.antiAlias,
                                     alignment: Alignment.center,
-                                    decoration: const BoxDecoration(
+                                    decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       gradient: AppColors.accentGradient,
                                     ),
@@ -381,7 +395,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                         ),
                                         Text(
                                           '${session?.serverName ?? ''} · ${session?.serverUrl ?? ''}',
-                                          style: const TextStyle(color: AppColors.textSecondary),
+                                          style: TextStyle(color: AppColors.textSecondary),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ],
@@ -404,7 +418,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             appDisplayName(s) == defaultAppName
                                 ? 'Jellyflex ${JellyfinApi.clientVersion}'
                                 : tr.basedOn(appDisplayName(s), JellyfinApi.clientVersion),
-                            style: const TextStyle(color: AppColors.textMuted),
+                            style: TextStyle(color: AppColors.textMuted),
                           ),
                         ),
                       ],
@@ -486,7 +500,7 @@ class _Row extends StatelessWidget {
                 Text(title, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
                 if (subtitle != null) ...[
                   const SizedBox(height: 3),
-                  Text(subtitle!, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                  Text(subtitle!, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
                 ],
               ],
             ),
@@ -539,9 +553,7 @@ class _Choice<T> extends StatelessWidget {
               children: [
                 SizedBox(
                   width: 28,
-                  child: options[i].$1 == value
-                      ? const Icon(Icons.check_rounded, size: 18, color: AppColors.accent)
-                      : null,
+                  child: options[i].$1 == value ? Icon(Icons.check_rounded, size: 18, color: AppColors.accent) : null,
                 ),
                 Text(options[i].$2),
               ],

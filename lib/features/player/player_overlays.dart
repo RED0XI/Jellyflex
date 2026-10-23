@@ -425,7 +425,7 @@ class SeekTimeBubble extends StatelessWidget {
               title!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
             ),
           Text(
             formatTimecode(position),
@@ -600,7 +600,7 @@ class _SelectRowState extends State<_SelectRow> {
           children: [
             SizedBox(
               width: 26,
-              child: widget.selected ? const Icon(Icons.check_rounded, size: 19, color: AppColors.accent) : null,
+              child: widget.selected ? Icon(Icons.check_rounded, size: 19, color: AppColors.accent) : null,
             ),
             Text(
               widget.label,
@@ -611,7 +611,7 @@ class _SelectRowState extends State<_SelectRow> {
             ),
             if (widget.hint != null) ...[
               const SizedBox(width: 8),
-              Text(widget.hint!, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              Text(widget.hint!, style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
             ],
           ],
         ),
@@ -634,7 +634,7 @@ class _DelayRow extends StatelessWidget {
       children: [
         SizedBox(
           width: 90,
-          child: Text(label, style: const TextStyle(color: AppColors.textSecondary)),
+          child: Text(label, style: TextStyle(color: AppColors.textSecondary)),
         ),
         _RoundButton(icon: Icons.remove_rounded, onTap: () => onChanged(value - 0.1)),
         SizedBox(

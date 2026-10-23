@@ -21,7 +21,7 @@ class JfImage extends StatelessWidget {
     this.blurHash,
     this.fit = BoxFit.cover,
     this.alignment = Alignment.center,
-    this.placeholderColor = AppColors.surfaceHigh,
+    this.placeholderColor,
     this.fallback,
   });
 
@@ -29,14 +29,16 @@ class JfImage extends StatelessWidget {
   final String? blurHash;
   final BoxFit fit;
   final Alignment alignment;
-  final Color placeholderColor;
+
+  /// Standard: Flächenfarbe des Themes.
+  final Color? placeholderColor;
   final Widget? fallback;
 
   @override
   Widget build(BuildContext context) {
     final placeholder = blurHash != null
         ? BlurHash(hash: blurHash!, imageFit: BoxFit.cover)
-        : ColoredBox(color: placeholderColor);
+        : ColoredBox(color: placeholderColor ?? AppColors.surfaceHigh);
 
     if (url == null) {
       return Stack(fit: StackFit.expand, children: [placeholder, ?fallback]);

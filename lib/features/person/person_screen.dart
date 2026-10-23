@@ -97,25 +97,33 @@ class _PersonScreenState extends ConsumerState<PersonScreen> {
           left: 0,
           right: 0,
           height: size.height * 0.7,
-          child: const DecoratedBox(
+          child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,
                 end: Alignment.topCenter,
                 stops: [0, 0.55, 1],
-                colors: [AppColors.background, Color(0xB30A0B10), Color(0x800A0B10)],
+                colors: [
+                  AppColors.background,
+                  AppColors.background.withAlpha(0xB3),
+                  AppColors.background.withAlpha(0x80),
+                ],
               ),
             ),
           ),
         ),
-        const Positioned.fill(
+        Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
                 stops: [0, 0.6, 1],
-                colors: [Color(0xE60A0B10), Color(0x800A0B10), Color(0x200A0B10)],
+                colors: [
+                  AppColors.background.withAlpha(0xE6),
+                  AppColors.background.withAlpha(0x80),
+                  AppColors.background.withAlpha(0x20),
+                ],
               ),
             ),
           ),
@@ -270,7 +278,7 @@ class _HeaderState extends ConsumerState<_Header> {
               url: api.imageUrlOrNull(photo, fillWidth: 480, fillHeight: 720),
               blurHash: photo?.blurHash,
               alignment: Alignment.topCenter,
-              fallback: const Icon(Icons.person_rounded, size: 96, color: AppColors.textMuted),
+              fallback: Icon(Icons.person_rounded, size: 96, color: AppColors.textMuted),
             ),
           ),
         ),
@@ -297,7 +305,7 @@ class _HeaderState extends ConsumerState<_Header> {
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       tr.onYourServerCounts(counts.join(' · ')),
-                      style: const TextStyle(color: AppColors.textSecondary),
+                      style: TextStyle(color: AppColors.textSecondary),
                     ),
                   ),
                 if (bio != null && bio.isNotEmpty) ...[

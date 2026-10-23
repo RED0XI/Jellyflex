@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/strings.dart';
 import 'format.dart';
+import '../theme.dart';
+import 'themes.dart';
 
 /// Wählbare Sprachen für Ton und Untertitel (ISO 639-2, wie Jellyfin/mpv sie liefern).
 const settingsLanguages = ['ger', 'eng', 'jpn', 'fre', 'spa', 'ita', 'tur', 'kor', 'rus', 'por', 'chi'];
@@ -54,7 +56,11 @@ class AppSettings {
     this.ambilight = AmbilightMode.window,
     this.quizHighscore = 0,
     this.language = AppLanguage.en,
+    this.themeId = 'midnight',
   });
+
+  /// Farbschema (siehe lib/core/themes.dart).
+  final String themeId;
 
   /// Sprache der Oberfläche (Standard: Englisch).
   final AppLanguage language;
@@ -121,6 +127,7 @@ class AppSettings {
     AmbilightMode? ambilight,
     int? quizHighscore,
     AppLanguage? language,
+    String? themeId,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -138,6 +145,7 @@ class AppSettings {
     ambilight: ambilight ?? this.ambilight,
     quizHighscore: quizHighscore ?? this.quizHighscore,
     language: language ?? this.language,
+    themeId: themeId ?? this.themeId,
   );
 
   Map<String, dynamic> toJson() => {
@@ -157,6 +165,7 @@ class AppSettings {
     'ambilight': ambilight.name,
     'quizHighscore': quizHighscore,
     'language': language.name,
+    'themeId': themeId,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -176,6 +185,7 @@ class AppSettings {
     ambilight: AmbilightMode.values.asNameMap()[json['ambilight']] ?? AmbilightMode.window,
     quizHighscore: (json['quizHighscore'] as num?)?.toInt() ?? 0,
     language: AppLanguage.values.asNameMap()[json['language']] ?? AppLanguage.en,
+    themeId: json['themeId'] as String? ?? 'midnight',
   );
 }
 
@@ -196,6 +206,7 @@ class SettingsController extends Notifier<AppSettings> {
       if (_file.existsSync()) {
         final loaded = AppSettings.fromJson(jsonDecode(_file.readAsStringSync()) as Map<String, dynamic>);
         appLanguage = loaded.language;
+        appPalette = paletteById(loaded.themeId);
         return loaded;
       }
     } catch (_) {
@@ -207,6 +218,7 @@ class SettingsController extends Notifier<AppSettings> {
   void update(AppSettings Function(AppSettings s) change) {
     final next = change(state);
     appLanguage = next.language;
+    appPalette = paletteById(next.themeId);
     state = next;
     try {
       _file.parent.createSync(recursive: true);

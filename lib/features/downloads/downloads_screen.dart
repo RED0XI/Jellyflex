@@ -62,7 +62,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                               entries.isEmpty
                                   ? tr.savedForOffline
                                   : tr.downloadsSummary(done.length, formatBytes(manager.usedBytes)),
-                              style: const TextStyle(color: AppColors.textSecondary),
+                              style: TextStyle(color: AppColors.textSecondary),
                             ),
                           ],
                         ),
@@ -154,7 +154,7 @@ class _LocalPoster extends StatelessWidget {
         color: AppColors.surfaceHigh,
         child: file.existsSync()
             ? Image.file(file, fit: BoxFit.cover, width: double.infinity, height: double.infinity)
-            : const Center(child: Icon(Icons.movie_outlined, color: AppColors.textMuted)),
+            : Center(child: Icon(Icons.movie_outlined, color: AppColors.textMuted)),
       ),
     );
   }
@@ -215,8 +215,7 @@ class _ActiveRow extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(_title(entry), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                if (_subtitle(entry) != null)
-                  Text(_subtitle(entry)!, style: const TextStyle(color: AppColors.textSecondary)),
+                if (_subtitle(entry) != null) Text(_subtitle(entry)!, style: TextStyle(color: AppColors.textSecondary)),
                 const SizedBox(height: 10),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(3),
@@ -228,7 +227,7 @@ class _ActiveRow extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(status, style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted)),
+                Text(status, style: TextStyle(fontSize: 12.5, color: AppColors.textMuted)),
               ],
             ),
           ),
@@ -374,7 +373,7 @@ class _DoneCard extends ConsumerWidget {
             _subtitle(entry) ?? formatBytes(entry.total),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
           ),
         ],
       ),

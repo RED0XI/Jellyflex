@@ -323,7 +323,7 @@ class _TopNav extends ConsumerWidget {
                   enabled: false,
                   child: Text(
                     '${session?.userName ?? ''} · ${session?.serverName ?? ''}',
-                    style: const TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(color: AppColors.textSecondary),
                   ),
                 ),
                 const PopupMenuDivider(),
@@ -355,7 +355,7 @@ class _TopNav extends ConsumerWidget {
                 height: 38,
                 alignment: Alignment.center,
                 clipBehavior: Clip.antiAlias,
-                decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppColors.accentGradient),
+                decoration: BoxDecoration(shape: BoxShape.circle, gradient: AppColors.accentGradient),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [

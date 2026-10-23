@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import 'focusable.dart';
 
-/// Großer, heller Haupt-Button (z. B. "Abspielen").
+/// Großer Haupt-Button (z. B. "Abspielen") in der Knopffarbe des Themes.
 class PrimaryButton extends StatefulWidget {
   const PrimaryButton({super.key, required this.label, required this.onPressed, this.icon, this.loading = false});
 
@@ -31,29 +31,31 @@ class _PrimaryButtonState extends State<PrimaryButton> {
           height: 52,
           padding: const EdgeInsets.symmetric(horizontal: 28),
           decoration: BoxDecoration(
-            color: enabled ? (hovered ? Colors.white : const Color(0xFFEDEEF3)) : AppColors.surfaceHigh,
+            color: enabled
+                ? (hovered ? Color.lerp(AppColors.button, Colors.white, 0.15) : AppColors.button)
+                : AppColors.surfaceHigh,
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               if (hovered && enabled)
-                BoxShadow(color: Colors.white.withValues(alpha: 0.18), blurRadius: 24, spreadRadius: 1),
+                BoxShadow(color: AppColors.button.withValues(alpha: 0.35), blurRadius: 24, spreadRadius: 1),
             ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.loading)
-                const SizedBox(
+                SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.background),
+                  child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.onButton),
                 )
               else if (widget.icon != null)
-                Icon(widget.icon, color: AppColors.background, size: 26),
+                Icon(widget.icon, color: AppColors.onButton, size: 26),
               if (widget.icon != null || widget.loading) const SizedBox(width: 10),
               Text(
                 widget.label,
                 style: TextStyle(
-                  color: enabled ? AppColors.background : AppColors.textMuted,
+                  color: enabled ? AppColors.onButton : AppColors.textMuted,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
@@ -115,7 +117,7 @@ class CircleIconButton extends StatefulWidget {
     required this.onPressed,
     required this.tooltip,
     this.active = false,
-    this.activeColor = AppColors.accent,
+    this.activeColor,
     this.size = 52,
   });
 
@@ -123,7 +125,9 @@ class CircleIconButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final String tooltip;
   final bool active;
-  final Color activeColor;
+
+  /// Farbe im aktiven Zustand (Standard: Akzentfarbe des Themes).
+  final Color? activeColor;
   final double size;
 
   @override
@@ -155,7 +159,7 @@ class _CircleIconButtonState extends State<CircleIconButton> {
             child: Icon(
               widget.icon,
               key: ValueKey('${widget.icon.codePoint}-${widget.active}'),
-              color: widget.active ? widget.activeColor : AppColors.textPrimary,
+              color: widget.active ? (widget.activeColor ?? AppColors.accent) : AppColors.textPrimary,
               size: widget.size * 0.46,
             ),
           ),
