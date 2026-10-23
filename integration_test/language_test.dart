@@ -20,8 +20,6 @@ import 'package:jellyflex/widgets/media_row.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
-import 'test_settings.dart';
-
 const _server = 'http://localhost:8097';
 
 class _DemoSession extends SessionController {
