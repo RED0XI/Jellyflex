@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:flutter/services.dart';
 
+import '../../core/auto_refresh.dart';
 import '../../core/downloads.dart';
+import '../../core/jellyfin_api.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../theme.dart';
@@ -146,6 +148,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     super.initState();
     HardwareKeyboard.instance.addHandler(_onKey);
     _scroll.addListener(_maybeLoadMore);
+    contentChanged.addListener(_reloadLoaded);
     _loadMore();
     ref
         .read(apiProvider)
@@ -167,6 +170,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onKey);
+    contentChanged.removeListener(_reloadLoaded);
     _scroll.dispose();
     super.dispose();
   }
@@ -175,6 +179,47 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     if (!_scroll.hasClients) return;
     final p = _scroll.position;
     if (p.pixels > p.maxScrollExtent - 1200) _loadMore();
+  }
+
+  Future<LibraryPage> _fetch(LibraryFilter f, {required int startIndex, required int limit}) => ref
+      .read(apiProvider)
+      .getLibraryPage(
+        parentId: widget.libraryId,
+        includeItemTypes: _includeTypes,
+        sortBy: f.sort.sortBy,
+        sortOrder: f.sort.sortOrder,
+        startIndex: startIndex,
+        limit: limit,
+        filters: [if (f.unplayed) 'IsUnplayed', if (f.favorites) 'IsFavorite'],
+        genre: f.genre,
+        years: [
+          if (f.decade != null)
+            for (var y = f.decade!; y < f.decade! + 10; y++) y,
+        ],
+        nameStartsWith: f.letter == null || f.letter == '#' ? null : f.letter,
+        nameLessThan: f.letter == '#' ? 'A' : null,
+      );
+
+  /// Neue/geänderte Titel auf dem Server: die schon geladenen Einträge still
+  /// ersetzen – ohne Ladekreis und ohne die Scrollposition zu verlieren.
+  Future<void> _reloadLoaded() async {
+    if (_loading || _items.isEmpty) return;
+    final id = _requestId;
+    final count = _items.length;
+    try {
+      final page = await _fetch(_filter, startIndex: 0, limit: count.clamp(_pageSize, 2000));
+      // Inzwischen gefiltert oder weitergescrollt? Dann verwerfen.
+      if (!mounted || id != _requestId || _loading || _items.length != count) return;
+      setState(() {
+        _items
+          ..clear()
+          ..addAll(page.items);
+        _total = page.totalCount;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _maybeLoadMore());
+    } catch (_) {
+      // Nicht erreichbar – die alte Liste bleibt stehen.
+    }
   }
 
   Future<void> _loadMore() async {
@@ -186,24 +231,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       _error = null;
     });
     try {
-      final page = await ref
-          .read(apiProvider)
-          .getLibraryPage(
-            parentId: widget.libraryId,
-            includeItemTypes: _includeTypes,
-            sortBy: f.sort.sortBy,
-            sortOrder: f.sort.sortOrder,
-            startIndex: _items.length,
-            limit: _pageSize,
-            filters: [if (f.unplayed) 'IsUnplayed', if (f.favorites) 'IsFavorite'],
-            genre: f.genre,
-            years: [
-              if (f.decade != null)
-                for (var y = f.decade!; y < f.decade! + 10; y++) y,
-            ],
-            nameStartsWith: f.letter == null || f.letter == '#' ? null : f.letter,
-            nameLessThan: f.letter == '#' ? 'A' : null,
-          );
+      final page = await _fetch(f, startIndex: _items.length, limit: _pageSize);
       if (!mounted || id != _requestId) return;
       setState(() {
         _items.addAll(page.items);

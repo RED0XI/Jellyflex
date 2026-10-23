@@ -14,6 +14,7 @@
 //   GET  /debug/userdata/{id}         Benutzerdaten eines Titels ansehen (PUT: genau so setzen)
 //   GET  /debug/laststream            zuletzt angefragter Video-Stream (Fassung)
 //   GET  /debug/images?delay=150&reset=1   Bilder verzögern (langsames Netz) / Zähler
+//   POST /debug/addmovie?name=X       neuen Film hinzufügen + "LibraryChanged" senden
 
 import 'dart:async';
 import 'dart:convert';
@@ -874,6 +875,38 @@ Future<void> main() async {
             for (final pl in _playlists.values) {...pl, 'Items': _playlistEntries[pl['Id']]!.map((e) => e.id).toList()},
           ]),
         );
+        await res.close();
+        continue;
+      }
+      // Neuen Film hinzufügen (wie nach einem Bibliotheks-Scan) und "LibraryChanged" melden.
+      if (req.uri.path == '/debug/addmovie' && req.method == 'DELETE') {
+        final id = req.uri.queryParameters['id'];
+        movies.removeWhere((m) => m['Id'] == id);
+        byId.remove(id);
+        await res.close();
+        continue;
+      }
+      if (req.uri.path == '/debug/addmovie' && req.method == 'POST') {
+        final id = 'movie${movies.length}';
+        final m = <String, dynamic>{
+          ...movies[1],
+          'Id': id,
+          'Name': req.uri.queryParameters['name'] ?? 'Neuer Film',
+          'UserData': _userData(),
+          'MediaSources': [_source(id, 'mkv', width: 1920, height: 1080)],
+        };
+        movies.add(m);
+        byId[id] = m;
+        final message = jsonEncode({
+          'MessageType': 'LibraryChanged',
+          'Data': {
+            'ItemsAdded': [id],
+          },
+        });
+        for (final s in _sockets) {
+          s.add(message);
+        }
+        res.write(jsonEncode({'id': id}));
         await res.close();
         continue;
       }

@@ -3,8 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../core/app_shell.dart';
+import '../core/auto_refresh.dart';
+import '../core/lists.dart';
 import '../core/live_connection.dart';
 import '../core/session.dart';
 import '../core/server_status.dart';
@@ -13,6 +16,7 @@ import '../theme.dart';
 import '../widgets/window_frame.dart';
 import 'details/details_screen.dart';
 import 'home/home_providers.dart';
+import 'person/person_screen.dart';
 
 /// Für Meldungen von außerhalb einer Seite (z. B. "Nachricht senden" vom Handy).
 final appMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -29,13 +33,26 @@ class LiveHandler extends ConsumerStatefulWidget {
   ConsumerState<LiveHandler> createState() => _LiveHandlerState();
 }
 
-class _LiveHandlerState extends ConsumerState<LiveHandler> {
+class _LiveHandlerState extends ConsumerState<LiveHandler> with WindowListener {
+  /// Ohne Live-Verbindung (z. B. Proxy ohne WebSocket) so oft selbst nachsehen.
+  static const _pollInterval = Duration(minutes: 5);
+  static const _staleAfter = Duration(minutes: 2);
+
   StreamSubscription<LiveMessage>? _subscription;
   Timer? _refreshDebounce;
+  Timer? _poll;
+  LiveConnection? _connection;
+  DateTime _lastRefresh = DateTime.now();
 
   @override
   void initState() {
     super.initState();
+    windowManager.addListener(this);
+    _poll = Timer.periodic(_pollInterval, (_) {
+      // Die Live-Verbindung meldet Änderungen selbst – nur ohne sie nachsehen.
+      if (_connection?.connected.value ?? false) return;
+      if (ref.read(serverOnlineProvider)) _refreshIfStale();
+    });
     // Sprungliste der Taskleiste: Klick setzt einen Titel fort.
     AppShell.listen(_resume);
     ref.listenManual(sessionProvider, (_, session) {
@@ -51,6 +68,9 @@ class _LiveHandlerState extends ConsumerState<LiveHandler> {
     ref.listenManual<LiveConnection?>(liveConnectionProvider, (_, connection) {
       _subscription?.cancel();
       _subscription = connection?.messages.listen(_onMessage);
+      _connection?.connected.removeListener(_onConnectedChanged);
+      _connection = connection;
+      connection?.connected.addListener(_onConnectedChanged);
     }, fireImmediately: true);
     // Wieder erreichbar: Daten neu laden.
     ref.listenManual<bool>(serverOnlineProvider, (was, online) {
@@ -71,9 +91,21 @@ class _LiveHandlerState extends ConsumerState<LiveHandler> {
 
   @override
   void dispose() {
+    windowManager.removeListener(this);
+    _connection?.connected.removeListener(_onConnectedChanged);
     _subscription?.cancel();
     _refreshDebounce?.cancel();
+    _poll?.cancel();
     super.dispose();
+  }
+
+  /// Live-Verbindung steht wieder: Meldungen aus der Zwischenzeit fehlen → neu laden.
+  /// (Ganz offline → online übernimmt der Hinweis "Wieder verbunden" unten.)
+  bool _wasConnected = false;
+  void _onConnectedChanged() {
+    final now = _connection?.connected.value ?? false;
+    if (now && !_wasConnected && ref.read(serverOnlineProvider)) _refreshIfStale();
+    _wasConnected = now;
   }
 
   void _onMessage(LiveMessage message) {
@@ -168,12 +200,34 @@ class _LiveHandlerState extends ConsumerState<LiveHandler> {
   }
 
   void _refresh() {
+    _lastRefresh = DateTime.now();
     ref.invalidate(homeProvider);
     ref.invalidate(discoverProvider);
+    ref.invalidate(libraryViewsProvider);
     ref.invalidate(itemProvider);
     ref.invalidate(seriesNextUpProvider);
+    ref.invalidate(seasonsProvider);
     ref.invalidate(episodesProvider);
+    ref.invalidate(collectionItemsProvider);
+    ref.invalidate(personItemsProvider);
+    ref.invalidate(personEpisodesProvider);
+    ref.invalidate(watchlistProvider);
+    ref.invalidate(playlistsProvider);
+    ref.invalidate(playlistItemsProvider);
+    contentChanged.value++;
   }
+
+  /// Nur neu laden, wenn das letzte Mal schon etwas her ist (z. B. beim
+  /// Zurückkehren ins Fenster – nicht bei jedem kurzen Wechsel).
+  void _refreshIfStale() {
+    if (ref.read(sessionProvider).value == null) return;
+    if (DateTime.now().difference(_lastRefresh) < _staleAfter) return;
+    _refresh();
+  }
+
+  // Fenster bekommt den Fokus zurück → nachsehen, was neu ist.
+  @override
+  void onWindowFocus() => _refreshIfStale();
 
   @override
   Widget build(BuildContext context) => widget.child;
