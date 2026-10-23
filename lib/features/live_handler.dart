@@ -7,6 +7,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../core/app_shell.dart';
 import '../core/auto_refresh.dart';
+import '../core/downloads.dart';
 import '../core/lists.dart';
 import '../core/live_connection.dart';
 import '../core/session.dart';
@@ -115,6 +116,8 @@ class _LiveHandlerState extends ConsumerState<LiveHandler> with WindowListener {
         // Mehrere Meldungen kurz hintereinander → nur einmal neu laden.
         _refreshDebounce?.cancel();
         _refreshDebounce = Timer(const Duration(milliseconds: 1500), _refresh);
+        // Woanders gesehen (z. B. auf dem Fernseher)? Smart Downloads nachziehen.
+        if (message.type == 'UserDataChanged') ref.read(downloadsProvider.notifier).runSmartSoon();
       case 'Play':
         final ids = (data['ItemIds'] as List?)?.whereType<String>().toList() ?? const [];
         if (ids.isEmpty || !_safeId.hasMatch(ids.first)) return;

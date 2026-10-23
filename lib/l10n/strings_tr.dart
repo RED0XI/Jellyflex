@@ -1118,4 +1118,126 @@ final class _Tr extends S {
   String get shortcutMenu => 'Menü (sağ tık gibi)';
   @override
   String get keySpace => 'Boşluk';
+  @override
+  String get ok => 'Tamam';
+  @override
+  String get standard => 'Varsayılan';
+  @override
+  String notEnoughSpace(String needed, String free) => 'Yaklaşık $needed gerekiyor, ancak yalnızca $free boş.';
+  @override
+  String get notEnoughSpaceTitle => 'Yeterli alan yok';
+  @override
+  String get diskAlmostFull => 'Sürücü neredeyse dolu – indirme durduruldu';
+  @override
+  String get downloadAnyway => 'Yine de indir';
+  @override
+  String get downloadWaitsForWifi => 'Ölçülü bir bağlantıdasın – Wi-Fi veya LAN’a geçince indirme başlar.';
+  @override
+  String get chooseFolder => 'Klasör seç';
+  @override
+  String get folderNotAllowed =>
+      'İndirmeler sistem klasörlerine (Windows, Program Files, AppData) kaydedilemez. Lütfen başka bir klasör seç.';
+  @override
+  String folderNotWritable(String error) => 'Jellyflex bu klasöre yazamıyor ($error).';
+  @override
+  String get folderProblem => 'Klasör kullanılamıyor';
+  @override
+  String get downloadFolderQuestion => 'İndirmeler nereye kaydedilsin?';
+  @override
+  String get downloadFolderQuestionText =>
+      'Jellyflex indirmeleri bu klasöre kaydeder. Ayarlardan istediğin zaman değiştirebilirsin.';
+  @override
+  String freeSpace(String size) => '$size boş';
+  @override
+  String get changeFolder => 'Klasörü değiştir…';
+  @override
+  String get useThisFolder => 'Bu klasörü kullan';
+  @override
+  String get downloadOptionsTitle => 'İndir';
+  @override
+  String downloadEpisodesTitle(int count) => '$count bölümü indir';
+  @override
+  String get downloadOriginalHint =>
+      'Tüm ses parçaları ve altyazılarla orijinal dosya – en iyi kalite, en büyük dosya.';
+  @override
+  String get downloadConvertedHint =>
+      'Sunucu daha küçük bir sürüm oluşturur: tek ses parçası, altyazılar ayrı dosyalar. Orijinalden uzun sürebilir.';
+  @override
+  String downloadSizeAbout(String size) => 'Yaklaşık $size';
+  @override
+  String get downloadDontAskAgain => 'Bir daha sorma';
+  @override
+  String get downloadDontAskAgainHint => 'Bundan sonra bu kalite kullanılır – ayarlardan değiştirilebilir.';
+  @override
+  String get downloadFolder => 'İndirme klasörü';
+  @override
+  String downloadFolderHint(String path) => '$path · Mevcut indirmeler oldukları yerde kalır.';
+  @override
+  String get unmeteredOnly => 'Yalnızca Wi-Fi veya LAN’da';
+  @override
+  String get unmeteredOnlyHint =>
+      'Mobil veri, telefon erişim noktası veya Windows’un ölçülü olarak işaretlediği ağlar üzerinden indirme yapılmaz.';
+  @override
+  String get speedLimit => 'Hız sınırı';
+  @override
+  String get speedLimitHint => 'İndirmeler internetinin geri kalanını yavaşlatmasın diye.';
+  @override
+  String get unlimited => 'Sınırsız';
+  @override
+  String get downloadQuality => 'İndirme kalitesi';
+  @override
+  String get downloadQualityHint => 'Küçük sürümler yer kazandırır – sunucu onları dönüştürür.';
+  @override
+  String get askBeforeDownload => 'Her indirmeden önce sor';
+  @override
+  String get askBeforeDownloadHint => 'Her seferinde kalite, ses ve altyazı seç.';
+  @override
+  String get smartDownloads => 'Akıllı indirmeler';
+  @override
+  String get smartDownloadsHint => 'İzlenen bölümleri siler ve sonrakileri kendiliğinden indirir.';
+  @override
+  String get smartEpisodes => 'Hazır tutulacak bölümler';
+  @override
+  String get smartEpisodesHint => 'Dizi başına indirilmiş kalacak izlenmemiş bölüm sayısı.';
+  @override
+  String get smartMaxSpace => 'Akıllı indirmeler için alan';
+  @override
+  String get smartMaxSpaceHint => 'Akıllı indirmeler bundan fazlasını asla kullanmaz.';
+  @override
+  String get noLimit => 'Sınır yok';
+  @override
+  String get downloadStorage => 'Depolama';
+  @override
+  String downloadStorageHint(String used, String free) => 'İndirmeler $used kullanıyor · sürücüde $free boş';
+  @override
+  String get deleteWatchedDownloads => 'İzlenenleri sil';
+  @override
+  String deleteWatchedQuestion(int count) => 'İzlenen indirmeler silinsin mi ($count)?';
+  @override
+  String get deleteWatchedText => 'Bu bilgisayardan silinecekler. Sunucudaki her şey yerinde kalır.';
+  @override
+  String watchedDownloadsDeleted(int count) => 'İzlenen indirmeler silindi ($count)';
+  @override
+  String get noWatchedDownloads => 'İzlenmiş indirme yok';
+  @override
+  String get waitingForWifi => 'Wi-Fi veya LAN bekleniyor';
+  @override
+  String get waitingForWifiHint =>
+      'Ölçülü bir bağlantıdasın (mobil veri veya erişim noktası). İndirmeler kendiliğinden devam eder.';
+  @override
+  String get allowMetered => 'Yine de izin ver';
+  @override
+  String get smartBadge => 'Akıllı';
+  @override
+  String get cancelDownload => 'İndirmeyi iptal et';
+  @override
+  String get cancelDownloadQuestion => 'İndirme iptal edilsin mi?';
+  @override
+  String cancelDownloadText(String name) => '“$name” için şimdiye kadar indirilenler silinecek.';
+  @override
+  String get cancelDownloads => 'İndirmeleri iptal et';
+  @override
+  String downloadsCancelled(int count) => 'İndirmeler iptal edildi ($count)';
+  @override
+  String get keepDownloading => 'İndirmeye devam et';
 }

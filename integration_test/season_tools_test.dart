@@ -51,7 +51,7 @@ void main() {
           overrides: [
             sessionProvider.overrideWith(DemoSession.new),
             settingsProvider.overrideWith(() => testSettings()),
-            downloadsProvider.overrideWith(() => DownloadManager(root)),
+            downloadsProvider.overrideWith(() => DownloadManager(root, () async => false)),
           ],
           child: RepaintBoundary(key: shotKey, child: const JellyflexApp()),
         ),
@@ -79,6 +79,12 @@ void main() {
 
       // Staffel herunterladen: Fortschritt erscheint.
       await tester.tap(find.text('Staffel herunterladen'));
+      await pumpFor(tester, const Duration(milliseconds: 800));
+      // Erster Download: Ordner bestätigen, dann Optionen für alle 8 Folgen.
+      await tester.tap(find.text('Diesen Ordner nehmen'));
+      await pumpFor(tester, const Duration(seconds: 1));
+      expect(find.text('8 Folgen herunterladen'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Herunterladen'));
       await pumpFor(tester, const Duration(seconds: 2));
       expect(find.textContaining(RegExp(r'^\d von 8 heruntergeladen$')), findsOneWidget);
       expect(find.byType(LinearProgressIndicator), findsOneWidget);

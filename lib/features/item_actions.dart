@@ -8,6 +8,7 @@ import '../core/models.dart';
 import '../core/session.dart';
 import '../theme.dart';
 import 'details/details_screen.dart';
+import 'downloads/download_flow.dart';
 import 'downloads/downloads_screen.dart';
 import 'lists/list_actions.dart';
 import '../l10n/strings.dart';
@@ -133,8 +134,9 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
     case _ItemAction.unfavorite:
       await run(() => api.setFavorite(item.id, false), tr.removedFromFavorites);
     case _ItemAction.download:
-      await container.read(downloadsProvider.notifier).enqueue(item);
-      messenger?.showSnackBar(_snack(tr.downloadStarted(item.name)));
+      if (!context.mounted) return;
+      final added = await startDownloads(context, container.read, [item]);
+      if (added > 0) messenger?.showSnackBar(_snack(tr.downloadStarted(item.name)));
     case _ItemAction.removeDownload:
       if (!context.mounted || !await confirmRemoveDownload(context, item.name)) return;
       await container.read(downloadsProvider.notifier).remove(item.id);

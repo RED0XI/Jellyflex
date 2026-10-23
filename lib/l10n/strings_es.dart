@@ -1122,4 +1122,127 @@ final class _Es extends S {
   String get shortcutMenu => 'Menú (como el clic derecho)';
   @override
   String get keySpace => 'Espacio';
+  @override
+  String get ok => 'Aceptar';
+  @override
+  String get standard => 'Predeterminado';
+  @override
+  String notEnoughSpace(String needed, String free) => 'Necesita unos $needed, pero solo hay $free libres.';
+  @override
+  String get notEnoughSpaceTitle => 'Espacio insuficiente';
+  @override
+  String get diskAlmostFull => 'Disco casi lleno – descarga detenida';
+  @override
+  String get downloadAnyway => 'Descargar de todos modos';
+  @override
+  String get downloadWaitsForWifi =>
+      'Estás en una conexión de uso medido: la descarga empezará en cuanto estés en Wi-Fi o LAN.';
+  @override
+  String get chooseFolder => 'Elegir carpeta';
+  @override
+  String get folderNotAllowed =>
+      'Las descargas no se pueden guardar en carpetas del sistema (Windows, Archivos de programa, AppData). Elige otra carpeta.';
+  @override
+  String folderNotWritable(String error) => 'Jellyflex no puede escribir en esta carpeta ($error).';
+  @override
+  String get folderProblem => 'No se puede usar la carpeta';
+  @override
+  String get downloadFolderQuestion => '¿Dónde guardar las descargas?';
+  @override
+  String get downloadFolderQuestionText =>
+      'Jellyflex guarda las descargas en esta carpeta. Puedes cambiarla en cualquier momento en Ajustes.';
+  @override
+  String freeSpace(String size) => '$size libres';
+  @override
+  String get changeFolder => 'Cambiar carpeta…';
+  @override
+  String get useThisFolder => 'Usar esta carpeta';
+  @override
+  String get downloadOptionsTitle => 'Descargar';
+  @override
+  String downloadEpisodesTitle(int count) => 'Descargar $count episodios';
+  @override
+  String get downloadOriginalHint =>
+      'Archivo original con todas las pistas de audio y subtítulos: mejor calidad, archivo más grande.';
+  @override
+  String get downloadConvertedHint =>
+      'El servidor crea una versión más pequeña: una pista de audio y subtítulos en archivos aparte. Puede tardar más que el original.';
+  @override
+  String downloadSizeAbout(String size) => 'Unos $size';
+  @override
+  String get downloadDontAskAgain => 'No volver a preguntar';
+  @override
+  String get downloadDontAskAgainHint => 'Usará esta calidad a partir de ahora; se puede cambiar en Ajustes.';
+  @override
+  String get downloadFolder => 'Carpeta de descargas';
+  @override
+  String downloadFolderHint(String path) => '$path · Las descargas existentes se quedan donde están.';
+  @override
+  String get unmeteredOnly => 'Solo con Wi-Fi o LAN';
+  @override
+  String get unmeteredOnlyHint =>
+      'Sin descargas con datos móviles, punto de acceso del móvil o redes que Windows marca como de uso medido.';
+  @override
+  String get speedLimit => 'Límite de velocidad';
+  @override
+  String get speedLimitHint => 'Para que las descargas no ralenticen el resto de tu conexión.';
+  @override
+  String get unlimited => 'Ilimitada';
+  @override
+  String get downloadQuality => 'Calidad de descarga';
+  @override
+  String get downloadQualityHint => 'Las versiones más pequeñas ahorran espacio; el servidor las convierte.';
+  @override
+  String get askBeforeDownload => 'Preguntar antes de cada descarga';
+  @override
+  String get askBeforeDownloadHint => 'Elegir calidad, audio y subtítulos cada vez.';
+  @override
+  String get smartDownloads => 'Descargas inteligentes';
+  @override
+  String get smartDownloadsHint => 'Borra los episodios vistos y descarga los siguientes automáticamente.';
+  @override
+  String get smartEpisodes => 'Episodios listos';
+  @override
+  String get smartEpisodesHint => 'Episodios sin ver por serie que se mantienen descargados.';
+  @override
+  String get smartMaxSpace => 'Espacio para descargas inteligentes';
+  @override
+  String get smartMaxSpaceHint => 'Las descargas inteligentes nunca usan más.';
+  @override
+  String get noLimit => 'Sin límite';
+  @override
+  String get downloadStorage => 'Almacenamiento';
+  @override
+  String downloadStorageHint(String used, String free) => 'Las descargas ocupan $used · $free libres en el disco';
+  @override
+  String get deleteWatchedDownloads => 'Borrar vistos';
+  @override
+  String deleteWatchedQuestion(int count) => '¿Borrar las descargas vistas ($count)?';
+  @override
+  String get deleteWatchedText => 'Se borrarán de este PC. Todo sigue en el servidor.';
+  @override
+  String watchedDownloadsDeleted(int count) => 'Descargas vistas borradas ($count)';
+  @override
+  String get noWatchedDownloads => 'No hay descargas vistas';
+  @override
+  String get waitingForWifi => 'Esperando Wi-Fi o LAN';
+  @override
+  String get waitingForWifiHint =>
+      'Estás en una conexión de uso medido (datos móviles o punto de acceso). Las descargas seguirán solas.';
+  @override
+  String get allowMetered => 'Permitir igualmente';
+  @override
+  String get smartBadge => 'Auto';
+  @override
+  String get cancelDownload => 'Cancelar descarga';
+  @override
+  String get cancelDownloadQuestion => '¿Cancelar la descarga?';
+  @override
+  String cancelDownloadText(String name) => 'Se borrará lo que ya se haya descargado de «$name».';
+  @override
+  String get cancelDownloads => 'Cancelar descargas';
+  @override
+  String downloadsCancelled(int count) => 'Descargas canceladas ($count)';
+  @override
+  String get keepDownloading => 'Seguir descargando';
 }

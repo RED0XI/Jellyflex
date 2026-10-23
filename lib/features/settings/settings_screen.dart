@@ -22,7 +22,9 @@ import 'about_section.dart';
 import 'home_rows_dialog.dart';
 import '../../core/profile_pin.dart';
 import '../../widgets/pin_dialog.dart';
-import '../../core/downloads.dart' show formatBytes;
+import '../../core/download_folder.dart';
+import '../../core/downloads.dart';
+import '../downloads/download_flow.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -397,6 +399,97 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
 
                         _Section(
+                          title: tr.downloads,
+                          icon: Icons.download_for_offline_outlined,
+                          children: [
+                            _Row(
+                              title: tr.downloadFolder,
+                              subtitle: tr.downloadFolderHint(ref.read(downloadsProvider.notifier).root.path),
+                              trailing: TextButton.icon(
+                                onPressed: () => changeDownloadFolder(context, ref.read),
+                                icon: const Icon(Icons.drive_folder_upload_rounded, size: 18),
+                                label: Text(tr.changeFolder),
+                              ),
+                            ),
+                            _Row(
+                              title: tr.unmeteredOnly,
+                              subtitle: tr.unmeteredOnlyHint,
+                              trailing: _Toggle(
+                                value: s.downloadsUnmeteredOnly,
+                                onChanged: (v) {
+                                  ctrl.update((s) => s.copyWith(downloadsUnmeteredOnly: v));
+                                  ref.read(downloadsProvider.notifier).recheckNetwork();
+                                },
+                              ),
+                            ),
+                            _Row(
+                              title: tr.speedLimit,
+                              subtitle: tr.speedLimitHint,
+                              trailing: _Choice<int>(
+                                value: s.downloadSpeedLimit,
+                                label: _speedLabel(s.downloadSpeedLimit),
+                                options: [for (final v in _speedLimits) (v, _speedLabel(v))],
+                                onChanged: (v) => ctrl.update((s) => s.copyWith(downloadSpeedLimit: v)),
+                              ),
+                            ),
+                            _Row(
+                              title: tr.downloadQuality,
+                              subtitle: tr.downloadQualityHint,
+                              trailing: _Choice<int?>(
+                                value: s.downloadQuality,
+                                label: qualityLabel(s.downloadQuality),
+                                options: qualityOptions,
+                                onChanged: (v) => ctrl.update((s) => s.copyWith(downloadQuality: () => v)),
+                              ),
+                            ),
+                            _Row(
+                              title: tr.askBeforeDownload,
+                              subtitle: tr.askBeforeDownloadHint,
+                              trailing: _Toggle(
+                                value: s.downloadAskOptions,
+                                onChanged: (v) => ctrl.update((s) => s.copyWith(downloadAskOptions: v)),
+                              ),
+                            ),
+                            _Row(
+                              title: tr.smartDownloads,
+                              subtitle: tr.smartDownloadsHint,
+                              trailing: _Toggle(
+                                value: s.smartDownloads,
+                                onChanged: (v) => ctrl.update((s) => s.copyWith(smartDownloads: v)),
+                              ),
+                            ),
+                            if (s.smartDownloads) ...[
+                              _Row(
+                                title: tr.smartEpisodes,
+                                subtitle: tr.smartEpisodesHint,
+                                trailing: _Choice<int>(
+                                  value: s.smartEpisodes,
+                                  label: '${s.smartEpisodes}',
+                                  options: [
+                                    for (final n in const [1, 2, 3, 5]) (n, '$n'),
+                                  ],
+                                  onChanged: (v) => ctrl.update((s) => s.copyWith(smartEpisodes: v)),
+                                ),
+                              ),
+                              _Row(
+                                title: tr.smartMaxSpace,
+                                subtitle: tr.smartMaxSpaceHint,
+                                trailing: _Choice<int>(
+                                  value: s.smartMaxGb,
+                                  label: s.smartMaxGb == 0 ? tr.noLimit : '${s.smartMaxGb} GB',
+                                  options: [
+                                    (0, tr.noLimit),
+                                    for (final gb in const [5, 10, 20, 50, 100]) (gb, '$gb GB'),
+                                  ],
+                                  onChanged: (v) => ctrl.update((s) => s.copyWith(smartMaxGb: v)),
+                                ),
+                              ),
+                            ],
+                            const _DownloadStorageRow(),
+                          ],
+                        ),
+
+                        _Section(
                           title: tr.storage,
                           icon: Icons.storage_rounded,
                           children: [
@@ -594,6 +687,60 @@ class _Toggle extends StatelessWidget {
       onChanged: onChanged,
       activeThumbColor: Colors.white,
       activeTrackColor: AppColors.accent,
+    );
+  }
+}
+
+/// Geschwindigkeitsgrenzen für Downloads (Bytes/s); 0 = unbegrenzt.
+const _speedLimits = [0, 6250000, 2500000, 1250000, 625000, 250000];
+
+String _speedLabel(int bytesPerSecond) => bytesPerSecond == 0
+    ? tr.unlimited
+    : '${tr.decimal(bytesPerSecond * 8 / 1000000, bytesPerSecond * 8 % 1000000 == 0 ? 0 : 1)} Mbit/s';
+
+/// Belegter Platz der Downloads, freier Platz auf dem Laufwerk, gesehene löschen.
+class _DownloadStorageRow extends ConsumerWidget {
+  const _DownloadStorageRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(myDownloadsProvider);
+    final manager = ref.read(downloadsProvider.notifier);
+    final free = DownloadFolder.freeBytes(manager.root.path);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    void snack(String text) =>
+        messenger?.showSnackBar(SnackBar(content: Text(text), behavior: SnackBarBehavior.floating, width: 420));
+
+    Future<void> deleteWatched() async {
+      final count = manager.watchedDownloads().where((e) => !e.needsSync).length;
+      if (count == 0) {
+        snack(tr.noWatchedDownloads);
+        return;
+      }
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: Text(tr.deleteWatchedQuestion(count)),
+          content: Text(tr.deleteWatchedText),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(tr.delete)),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      snack(tr.watchedDownloadsDeleted(await manager.removeWatched()));
+    }
+
+    return _Row(
+      title: tr.downloadStorage,
+      subtitle: tr.downloadStorageHint(formatBytes(manager.usedBytes), free == null ? '?' : formatBytes(free)),
+      trailing: TextButton.icon(
+        onPressed: deleteWatched,
+        icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+        label: Text(tr.deleteWatchedDownloads),
+      ),
     );
   }
 }

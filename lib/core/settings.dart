@@ -68,10 +68,46 @@ class AppSettings {
     this.themeId = 'midnight',
     this.soundEffects = true,
     this.playerVolume = 100,
+    this.downloadFolder,
+    this.downloadFolderAsked = false,
+    this.downloadsUnmeteredOnly = true,
+    this.downloadSpeedLimit = 0,
+    this.downloadQuality,
+    this.downloadAskOptions = true,
+    this.smartDownloads = false,
+    this.smartEpisodes = 2,
+    this.smartMaxGb = 0,
   });
 
   /// Zuletzt eingestellte Lautstärke im Player (0–100).
   final double playerVolume;
+
+  /// Eigener Download-Ordner; `null` = Videos\Jellyflex.
+  final String? downloadFolder;
+
+  /// Beim ersten Download wurde nach dem Ordner gefragt.
+  final bool downloadFolderAsked;
+
+  /// Nur über nicht getaktete Verbindungen (WLAN/LAN) laden – nicht über mobile Daten oder Hotspot.
+  final bool downloadsUnmeteredOnly;
+
+  /// Höchstens so viele Bytes pro Sekunde laden; 0 = unbegrenzt.
+  final int downloadSpeedLimit;
+
+  /// Höchste Bitrate für Downloads; `null` = Originaldatei.
+  final int? downloadQuality;
+
+  /// Vor jedem Download Qualität und Sprachen abfragen.
+  final bool downloadAskOptions;
+
+  /// Smart Downloads: gesehene Folgen löschen, die nächsten laden.
+  final bool smartDownloads;
+
+  /// So viele ungesehene Folgen je Serie bereithalten.
+  final int smartEpisodes;
+
+  /// Höchstens so viel Platz (GB) für Smart Downloads; 0 = unbegrenzt.
+  final int smartMaxGb;
 
   /// Klänge bei "Überrasch mich" und im Quiz.
   final bool soundEffects;
@@ -167,6 +203,15 @@ class AppSettings {
     String? themeId,
     bool? soundEffects,
     double? playerVolume,
+    String? Function()? downloadFolder,
+    bool? downloadFolderAsked,
+    bool? downloadsUnmeteredOnly,
+    int? downloadSpeedLimit,
+    int? Function()? downloadQuality,
+    bool? downloadAskOptions,
+    bool? smartDownloads,
+    int? smartEpisodes,
+    int? smartMaxGb,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -192,6 +237,15 @@ class AppSettings {
     themeId: themeId ?? this.themeId,
     soundEffects: soundEffects ?? this.soundEffects,
     playerVolume: playerVolume ?? this.playerVolume,
+    downloadFolder: downloadFolder != null ? downloadFolder() : this.downloadFolder,
+    downloadFolderAsked: downloadFolderAsked ?? this.downloadFolderAsked,
+    downloadsUnmeteredOnly: downloadsUnmeteredOnly ?? this.downloadsUnmeteredOnly,
+    downloadSpeedLimit: downloadSpeedLimit ?? this.downloadSpeedLimit,
+    downloadQuality: downloadQuality != null ? downloadQuality() : this.downloadQuality,
+    downloadAskOptions: downloadAskOptions ?? this.downloadAskOptions,
+    smartDownloads: smartDownloads ?? this.smartDownloads,
+    smartEpisodes: smartEpisodes ?? this.smartEpisodes,
+    smartMaxGb: smartMaxGb ?? this.smartMaxGb,
   );
 
   Map<String, dynamic> toJson() => {
@@ -219,6 +273,15 @@ class AppSettings {
     'themeId': themeId,
     'soundEffects': soundEffects,
     'playerVolume': playerVolume,
+    'downloadFolder': downloadFolder,
+    'downloadFolderAsked': downloadFolderAsked,
+    'downloadsUnmeteredOnly': downloadsUnmeteredOnly,
+    'downloadSpeedLimit': downloadSpeedLimit,
+    'downloadQuality': downloadQuality,
+    'downloadAskOptions': downloadAskOptions,
+    'smartDownloads': smartDownloads,
+    'smartEpisodes': smartEpisodes,
+    'smartMaxGb': smartMaxGb,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -246,6 +309,15 @@ class AppSettings {
     themeId: json['themeId'] as String? ?? 'midnight',
     soundEffects: json['soundEffects'] as bool? ?? true,
     playerVolume: ((json['playerVolume'] as num?)?.toDouble() ?? 100).clamp(0, 100).toDouble(),
+    downloadFolder: json['downloadFolder'] as String?,
+    downloadFolderAsked: json['downloadFolderAsked'] as bool? ?? false,
+    downloadsUnmeteredOnly: json['downloadsUnmeteredOnly'] as bool? ?? true,
+    downloadSpeedLimit: ((json['downloadSpeedLimit'] as num?)?.toInt() ?? 0).clamp(0, 1 << 40),
+    downloadQuality: (json['downloadQuality'] as num?)?.toInt(),
+    downloadAskOptions: json['downloadAskOptions'] as bool? ?? true,
+    smartDownloads: json['smartDownloads'] as bool? ?? false,
+    smartEpisodes: ((json['smartEpisodes'] as num?)?.toInt() ?? 2).clamp(1, 10),
+    smartMaxGb: ((json['smartMaxGb'] as num?)?.toInt() ?? 0).clamp(0, 100000),
   );
 }
 

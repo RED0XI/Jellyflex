@@ -86,6 +86,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   /// Heruntergeladene Datei (statt Stream vom Server), falls vorhanden.
   String? _localFile;
+
+  /// Download als kleinere Fassung: nur eine Tonspur ([_convertedAudioIndex]),
+  /// Untertitel liegen als Dateien daneben ([_convertedSubtitles]).
+  bool _localConverted = false;
+  int? _convertedAudioIndex;
+  List<MediaStream> _convertedSubtitles = const [];
   BaseItem? _nextEpisode;
 
   /// Höchste Bitrate; `null` = Original (Direct Play), sonst rechnet der Server um.
@@ -371,10 +377,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void dispose() {
     _hideTimer?.cancel();
-    if (_volumeSaveTimer?.isActive ?? false) {
-      _volumeSaveTimer!.cancel();
-      _saveVolume();
-    }
+    // Gemerktes erst nach dem Abbau speichern – während des Abbaus des
+    // Widget-Baums dürfen Provider nicht geändert werden.
+    final saveVolume = _volumeSaveTimer?.isActive ?? false;
+    _volumeSaveTimer?.cancel();
+    final volume = _player.state.volume;
+    final saveLocal = _closing ? null : _localPlaybackSaver(synced: false);
+    scheduleMicrotask(() {
+      if (saveVolume) _saveVolumeValue(volume);
+      saveLocal?.call();
+    });
     _progressTimer?.cancel();
     for (final s in _subscriptions) {
       s.cancel();
@@ -382,7 +394,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (!_closing && _reportedStart) {
       _api.reportPlaybackStopped(_progressBody()).ignore();
     }
-    if (!_closing) _saveLocalPlayback(synced: false);
     windowFullscreen.removeListener(_onFullscreenChanged);
     windowMiniPlayer.removeListener(_onFullscreenChanged);
     // Player weg (nicht nur nächste Folge) → normales Fenster zurück.
@@ -434,6 +445,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       if (sources.isEmpty) throw Exception(tr.noPlayableFile);
       final wanted = widget.mediaSourceId ?? (_localFile != null ? download?.mediaSourceId : null);
       final source = sources.where((s) => s.id == wanted).firstOrNull ?? sources.first;
+      if (_localFile != null && download!.converted) {
+        _localConverted = true;
+        _convertedAudioIndex = download.audioIndex;
+        _convertedSubtitles = source.mediaStreams
+            .where((s) => s.type == 'Subtitle' && download.subtitleFile(s.index) != null)
+            .toList();
+      }
       if (!mounted) return;
       final settings = ref.read(settingsProvider);
       var maxBitrate = settings.maxBitrate;
@@ -630,16 +648,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   /// Heruntergeladene Titel: Stelle auch lokal merken – für offline und zum
   /// späteren Nachmelden, falls der Server gerade nicht erreichbar ist.
-  void _saveLocalPlayback({required bool synced}) {
+  void _saveLocalPlayback({required bool synced}) => _localPlaybackSaver(synced: synced)?.call();
+
+  /// Stand jetzt festhalten, später speichern (siehe dispose).
+  VoidCallback? _localPlaybackSaver({required bool synced}) {
     final item = _item;
-    if (_localFile == null || item == null) return;
+    if (_localFile == null || item == null) return null;
     final duration = _player.state.duration;
-    _downloads.savePlayback(
-      widget.itemId,
-      positionTicks: durationToTicks(_player.state.position),
-      runtimeTicks: duration > Duration.zero ? durationToTicks(duration) : item.runTimeTicks,
-      synced: synced,
-    );
+    final position = durationToTicks(_player.state.position);
+    final runtime = duration > Duration.zero ? durationToTicks(duration) : item.runTimeTicks;
+    final itemId = widget.itemId;
+    return () => _downloads.savePlayback(itemId, positionTicks: position, runtimeTicks: runtime, synced: synced);
   }
 
   void _onPlayingChanged(bool playing) {
@@ -692,9 +711,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (audio.isEmpty) return;
     _tracksApplied = true;
 
-    final audioId = _mpvIdFor(source, 'Audio', _audioIndex);
-    final audioTrack = audio.where((t) => t.id == audioId).firstOrNull;
-    if (audioTrack != null) _player.setAudioTrack(audioTrack);
+    // Kleinere Fassung: nur die eine mitgeladene Tonspur.
+    if (_localConverted) {
+      _audioIndex = _convertedAudioIndex ?? _audioIndex;
+    } else {
+      final audioId = _mpvIdFor(source, 'Audio', _audioIndex);
+      final audioTrack = audio.where((t) => t.id == audioId).firstOrNull;
+      if (audioTrack != null) _player.setAudioTrack(audioTrack);
+    }
 
     final subIndex = _subtitleIndex;
     final external = _externalSubtitles.where((s) => s.index == subIndex).firstOrNull;
@@ -702,6 +726,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _player.setSubtitleTrack(SubtitleTrack.no());
     } else if (external != null) {
       _player.setSubtitleTrack(_externalTrack(external));
+    } else if (_localConverted) {
+      _player.setSubtitleTrack(SubtitleTrack.no()); // gewünschte Sprache nicht mitgeladen
     } else {
       final subId = _mpvIdFor(source, 'Subtitle', subIndex);
       final subTrack = tracks.subtitle.where((t) => t.id == subId).firstOrNull;
@@ -712,8 +738,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   static bool _isRealTrack(dynamic t) => t.id != 'auto' && t.id != 'no';
 
   /// Untertiteldateien neben dem Video (z. B. "Film.de.srt"), die Jellyfin kennt.
-  List<MediaStream> get _externalSubtitles =>
-      _source?.mediaStreams.where((s) => s.type == 'Subtitle' && s.isExternal).toList() ?? const [];
+  List<MediaStream> get _externalSubtitles => _localConverted
+      ? _convertedSubtitles
+      : _source?.mediaStreams.where((s) => s.type == 'Subtitle' && s.isExternal).toList() ?? const [];
 
   /// Externe Untertitel: bei Downloads die mitgeladene Datei, sonst vom Server.
   String _subtitleUri(MediaStream stream) {
@@ -743,6 +770,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final source = _source;
     final n = int.tryParse(mpvId);
     if (source == null || n == null) return null;
+    if (_localConverted) {
+      // Kleinere Fassung: Spur 1 ist die mitgeladene Tonspur, eingebettete Untertitel gibt es nicht.
+      if (type != 'Audio' || n != 1) return null;
+      return source.mediaStreams.where((s) => s.type == 'Audio' && s.index == _convertedAudioIndex).firstOrNull;
+    }
     final streams = source.embeddedStreams(type);
     return n >= 1 && n <= streams.length ? streams[n - 1] : null;
   }
@@ -854,8 +886,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   /// Lautstärke für den nächsten Start merken – Stummschalten zählt nicht.
-  void _saveVolume() {
-    final v = _player.state.volume.roundToDouble();
+  void _saveVolume() => _saveVolumeValue(_player.state.volume);
+
+  void _saveVolumeValue(double volume) {
+    final v = volume.roundToDouble();
     if (v <= 0 || v == _settings.current.playerVolume) return;
     _settings.update((s) => s.copyWith(playerVolume: v));
   }

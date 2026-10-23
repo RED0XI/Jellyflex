@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/downloads.dart';
+import '../downloads/download_flow.dart';
 import '../downloads/downloads_screen.dart';
 import '../../core/format.dart';
 import '../../core/images.dart';
@@ -551,7 +552,7 @@ class _DownloadButton extends ConsumerWidget {
       return CircleIconButton(
         icon: Icons.download_rounded,
         tooltip: tr.downloadOffline,
-        onPressed: () => manager.enqueue(item, mediaSourceId: mediaSourceId),
+        onPressed: () => startDownloads(context, ref.read, [item], mediaSourceId: mediaSourceId),
       );
     }
     if (entry.isDone) {
@@ -565,26 +566,41 @@ class _DownloadButton extends ConsumerWidget {
         },
       );
     }
-    // Läuft gerade oder wartet: Fortschrittsring, Klick pausiert bzw. setzt fort.
+    // Läuft gerade oder wartet: Fortschrittsring, Klick pausiert bzw. setzt fort;
+    // daneben Abbrechen (löscht das bisher Geladene).
     final running = entry.status == DownloadStatus.downloading || entry.status == DownloadStatus.queued;
-    return Stack(
-      alignment: Alignment.center,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(
-          width: 52,
-          height: 52,
-          child: CircularProgressIndicator(
-            value: entry.total > 0 ? entry.progress : null,
-            strokeWidth: 3,
-            color: AppColors.accent,
-            backgroundColor: Colors.white12,
-          ),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(
+              width: 52,
+              height: 52,
+              child: CircularProgressIndicator(
+                value: entry.total > 0 ? entry.progress : null,
+                strokeWidth: 3,
+                color: entry.status == DownloadStatus.failed ? const Color(0xFFFF6B6B) : AppColors.accent,
+                backgroundColor: Colors.white12,
+              ),
+            ),
+            CircleIconButton(
+              icon: running ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              tooltip: running ? tr.pauseDownload : tr.resumeDownload,
+              size: 44,
+              onPressed: () => running ? manager.pause(item.id) : manager.resume(item.id),
+            ),
+          ],
         ),
+        const SizedBox(width: 6),
         CircleIconButton(
-          icon: running ? Icons.pause_rounded : Icons.play_arrow_rounded,
-          tooltip: running ? tr.pauseDownload : tr.resumeDownload,
+          icon: Icons.close_rounded,
+          tooltip: tr.cancelDownload,
           size: 44,
-          onPressed: () => running ? manager.pause(item.id) : manager.resume(item.id),
+          onPressed: () async {
+            if (await confirmCancelDownload(context, item.name)) manager.remove(item.id);
+          },
         ),
       ],
     );
@@ -785,8 +801,13 @@ class _SeasonTools extends ConsumerWidget {
             onPressed: episodes.isEmpty
                 ? null
                 : () async {
-                    final added = await ref.read(downloadsProvider.notifier).enqueueAll(episodes);
-                    snack(added == 0 ? tr.seasonAlreadyDownloaded : tr.episodesDownloading(added));
+                    final manager = ref.read(downloadsProvider.notifier);
+                    if (episodes.every((e) => manager.entryFor(e.id) != null)) {
+                      snack(tr.seasonAlreadyDownloaded);
+                      return;
+                    }
+                    final added = await startDownloads(context, ref.read, episodes);
+                    if (added > 0) snack(tr.episodesDownloading(added));
                   },
             icon: Icon(
               done == episodes.length && episodes.isNotEmpty ? Icons.download_done_rounded : Icons.download_rounded,
@@ -794,7 +815,7 @@ class _SeasonTools extends ConsumerWidget {
             ),
             label: Text(downloads.isEmpty ? tr.downloadSeason : tr.downloadedOf(done, episodes.length)),
           ),
-          if (downloading)
+          if (downloading) ...[
             SizedBox(
               width: 140,
               child: ClipRRect(
@@ -806,6 +827,20 @@ class _SeasonTools extends ConsumerWidget {
                 ),
               ),
             ),
+            TextButton.icon(
+              onPressed: () async {
+                final unfinished = downloads.where((d) => !d.isDone).toList();
+                if (!await confirmCancelDownload(context, season.name)) return;
+                final manager = ref.read(downloadsProvider.notifier);
+                for (final d in unfinished) {
+                  await manager.remove(d.itemId);
+                }
+                snack(tr.downloadsCancelled(unfinished.length));
+              },
+              icon: const Icon(Icons.close_rounded, size: 18),
+              label: Text(tr.cancelDownloads),
+            ),
+          ],
         ],
       ),
     );

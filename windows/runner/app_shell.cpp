@@ -5,6 +5,8 @@
 #include <propkey.h>
 #include <propvarutil.h>
 #include <shobjidl.h>
+#include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Networking.Connectivity.h>
 #include <wrl/client.h>
 
 #include <algorithm>
@@ -112,6 +114,24 @@ bool SetJumpList(const std::wstring& category, const std::vector<std::pair<std::
   return SUCCEEDED(list->CommitList());
 }
 
+// Art der Internetverbindung laut Windows: "none" (keine), "metered" (getaktet –
+// mobile Daten, Handy-Hotspot, als getaktet markiertes WLAN) oder "unrestricted".
+std::string ConnectionCost() {
+  try {
+    namespace nc = winrt::Windows::Networking::Connectivity;
+    auto profile = nc::NetworkInformation::GetInternetConnectionProfile();
+    if (!profile) return "none";
+    auto cost = profile.GetConnectionCost();
+    if (cost.Roaming() || cost.NetworkCostType() == nc::NetworkCostType::Fixed ||
+        cost.NetworkCostType() == nc::NetworkCostType::Variable) {
+      return "metered";
+    }
+    return "unrestricted";
+  } catch (...) {
+    return "unknown";
+  }
+}
+
 }  // namespace
 
 AppShell::AppShell(flutter::BinaryMessenger* messenger) {
@@ -130,6 +150,10 @@ void AppShell::Forward(const std::wstring& command_line) {
 
 void AppShell::HandleMethodCall(const flutter::MethodCall<flutter::EncodableValue>& call,
                                 std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+  if (call.method_name() == "connectionCost") {
+    result->Success(flutter::EncodableValue(ConnectionCost()));
+    return;
+  }
   if (call.method_name() != "setJumpList") {
     result->NotImplemented();
     return;

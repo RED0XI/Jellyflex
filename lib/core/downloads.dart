@@ -6,13 +6,30 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'app_shell.dart';
+import 'download_folder.dart';
 import 'images.dart';
 import 'jellyfin_api.dart';
 import 'models.dart';
 import 'session.dart';
+import 'settings.dart';
 import '../l10n/strings.dart';
 
 enum DownloadStatus { queued, downloading, paused, done, failed }
+
+/// Wie ein Titel heruntergeladen wird: Qualität und (bei kleinerer Fassung) Sprachen.
+class DownloadOptions {
+  const DownloadOptions({this.maxBitrate, this.audioLanguage, this.subtitleLanguages});
+
+  /// Höchste Bitrate (bit/s); `null` = Originaldatei mit allen Ton- und Untertitelspuren.
+  final int? maxBitrate;
+
+  /// Tonspur der kleineren Fassung; `null` = wie beim Abspielen bevorzugt.
+  final String? audioLanguage;
+
+  /// Untertitel, die als Datei mitgeladen werden; `null` = alle.
+  final List<String>? subtitleLanguages;
+}
 
 /// Ein heruntergeladener (oder herunterladender) Titel.
 class DownloadEntry {
@@ -24,7 +41,9 @@ class DownloadEntry {
     required this.type,
     required this.folder,
     this.seriesName,
+    this.seriesId,
     this.episodeLabel,
+    this.sortIndex,
     this.mediaSourceId,
     this.status = DownloadStatus.queued,
     this.received = 0,
@@ -35,6 +54,12 @@ class DownloadEntry {
     this.played = false,
     this.watchedAt,
     this.needsSync = false,
+    this.maxBitrate,
+    this.audioLanguage,
+    this.subtitleLanguages,
+    this.converted = false,
+    this.audioIndex,
+    this.auto = false,
   });
 
   final String itemId;
@@ -43,7 +68,11 @@ class DownloadEntry {
   final String name;
   final String type;
   final String? seriesName;
+  final String? seriesId;
   final String? episodeLabel;
+
+  /// Reihenfolge innerhalb der Serie (Staffel × 10000 + Folge) – für Smart Downloads.
+  final int? sortIndex;
 
   /// Heruntergeladene Fassung (bei mehreren Versionen), sonst `null` = erste.
   final String? mediaSourceId;
@@ -52,6 +81,8 @@ class DownloadEntry {
   final String folder;
   final DownloadStatus status;
   final int received;
+
+  /// Gesamtgröße; bei umgerechneten Fassungen bis zum Ende nur geschätzt.
   final int total;
 
   /// Fertige Videodatei (erst nach Abschluss gesetzt).
@@ -66,6 +97,20 @@ class DownloadEntry {
   /// Lokaler Fortschritt wurde noch nicht an den Server gemeldet.
   final bool needsSync;
 
+  /// Gewünschte Qualität und Sprachen (siehe [DownloadOptions]).
+  final int? maxBitrate;
+  final String? audioLanguage;
+  final List<String>? subtitleLanguages;
+
+  /// Der Server hat eine kleinere Fassung erzeugt (nur eine Tonspur, Untertitel als Dateien).
+  final bool converted;
+
+  /// Jellyfin-Index der Tonspur in der umgerechneten Fassung.
+  final int? audioIndex;
+
+  /// Von Smart Downloads geladen (zählt zu deren Speichergrenze).
+  final bool auto;
+
   /// Eindeutig je Konto: derselbe Titel kann von zwei Konten geladen sein.
   String get key => '$serverUrl|$userId|$itemId';
 
@@ -73,11 +118,14 @@ class DownloadEntry {
   bool get isDone => status == DownloadStatus.done && mediaFile != null;
   bool get isActive => status == DownloadStatus.queued || status == DownloadStatus.downloading;
 
+  /// Belegter (bzw. am Ende belegter) Platz.
+  int get sizeOnDisk => isDone ? total : received;
+
   String get posterPath => '$folder${Platform.pathSeparator}poster.jpg';
   String get backdropPath => '$folder${Platform.pathSeparator}backdrop.jpg';
   String get itemJsonPath => '$folder${Platform.pathSeparator}item.json';
 
-  /// Mitgeladene externe Untertiteldatei für den Jellyfin-Streamindex.
+  /// Mitgeladene Untertiteldatei für den Jellyfin-Streamindex.
   String? subtitleFile(int streamIndex) {
     try {
       final prefix = 'subtitle_$streamIndex.';
@@ -103,6 +151,10 @@ class DownloadEntry {
     bool? played,
     DateTime? watchedAt,
     bool? needsSync,
+    bool? converted,
+    int? Function()? audioIndex,
+    String? seriesId,
+    int? sortIndex,
   }) => DownloadEntry(
     itemId: itemId,
     serverUrl: serverUrl,
@@ -111,7 +163,9 @@ class DownloadEntry {
     type: type,
     folder: folder,
     seriesName: seriesName,
+    seriesId: seriesId ?? this.seriesId,
     episodeLabel: episodeLabel,
+    sortIndex: sortIndex ?? this.sortIndex,
     mediaSourceId: mediaSourceId ?? this.mediaSourceId,
     status: status ?? this.status,
     received: received ?? this.received,
@@ -122,6 +176,12 @@ class DownloadEntry {
     played: played ?? this.played,
     watchedAt: watchedAt ?? this.watchedAt,
     needsSync: needsSync ?? this.needsSync,
+    maxBitrate: maxBitrate,
+    audioLanguage: audioLanguage,
+    subtitleLanguages: subtitleLanguages,
+    converted: converted ?? this.converted,
+    audioIndex: audioIndex != null ? audioIndex() : this.audioIndex,
+    auto: auto,
   );
 
   Map<String, dynamic> toJson() => {
@@ -131,7 +191,9 @@ class DownloadEntry {
     'name': name,
     'type': type,
     'seriesName': seriesName,
+    'seriesId': seriesId,
     'episodeLabel': episodeLabel,
+    'sortIndex': sortIndex,
     'mediaSourceId': mediaSourceId,
     'folder': folder,
     'status': status.name,
@@ -143,6 +205,12 @@ class DownloadEntry {
     'played': played,
     'watchedAt': watchedAt?.toUtc().toIso8601String(),
     'needsSync': needsSync,
+    'maxBitrate': maxBitrate,
+    'audioLanguage': audioLanguage,
+    'subtitleLanguages': subtitleLanguages,
+    'converted': converted,
+    'audioIndex': audioIndex,
+    'auto': auto,
   };
 
   factory DownloadEntry.fromJson(Map<String, dynamic> j) => DownloadEntry(
@@ -152,7 +220,9 @@ class DownloadEntry {
     name: (j['name'] as String?) ?? '',
     type: (j['type'] as String?) ?? '',
     seriesName: j['seriesName'] as String?,
+    seriesId: j['seriesId'] as String?,
     episodeLabel: j['episodeLabel'] as String?,
+    sortIndex: (j['sortIndex'] as num?)?.toInt(),
     mediaSourceId: j['mediaSourceId'] as String?,
     folder: j['folder'] as String,
     status: DownloadStatus.values.asNameMap()[j['status']] ?? DownloadStatus.paused,
@@ -164,6 +234,12 @@ class DownloadEntry {
     played: j['played'] == true,
     watchedAt: DateTime.tryParse((j['watchedAt'] as String?) ?? ''),
     needsSync: j['needsSync'] == true,
+    maxBitrate: (j['maxBitrate'] as num?)?.toInt(),
+    audioLanguage: j['audioLanguage'] as String?,
+    subtitleLanguages: (j['subtitleLanguages'] as List?)?.whereType<String>().toList(),
+    converted: j['converted'] == true,
+    audioIndex: (j['audioIndex'] as num?)?.toInt(),
+    auto: j['auto'] == true,
   );
 
   /// Gespeicherte Infos des Titels (für die Anzeige ohne Server) – mit dem
@@ -187,33 +263,90 @@ class DownloadEntry {
   }
 }
 
+/// Bremst einen Datenstrom auf höchstens `limit` Bytes pro Sekunde.
+class _RateLimiter {
+  final _clock = Stopwatch()..start();
+  int _bytes = 0;
+  int _limit = 0;
+
+  Future<void> take(int bytes, int limit) async {
+    if (limit <= 0) {
+      _limit = 0;
+      return;
+    }
+    if (limit != _limit) {
+      _limit = limit;
+      _bytes = 0;
+      _clock.reset();
+    }
+    _bytes += bytes;
+    final ahead = Duration(microseconds: _bytes * 1000000 ~/ limit) - _clock.elapsed;
+    if (ahead > Duration.zero) await Future<void>.delayed(ahead);
+    // Regelmäßig neu anfangen – sonst holt der Download nach einer Pause im Netz zu viel auf einmal nach.
+    if (_clock.elapsed > const Duration(seconds: 5)) {
+      _bytes = 0;
+      _clock.reset();
+    }
+  }
+}
+
 /// Lädt Titel im Hintergrund herunter (einer nach dem anderen), mit Pausieren,
 /// Fortsetzen nach Abbruch (HTTP-Range) und Offline-Abspielen. Offline
 /// Geschautes wird gemerkt und später an den Server gemeldet.
+///
+/// Außerdem: eigener Download-Ordner, nur über WLAN/LAN (nicht getaktet),
+/// Geschwindigkeitsgrenze, Prüfung des freien Speicherplatzes, kleinere
+/// Fassungen mit gewählter Sprache und Smart Downloads.
 class DownloadManager extends Notifier<List<DownloadEntry>> {
-  DownloadManager([this._rootOverride]);
+  DownloadManager([this._rootOverride, this._isMetered]);
 
   final Directory? _rootOverride;
+
+  /// Nur für Tests: statt Windows zu fragen, ob die Verbindung getaktet ist.
+  final Future<bool> Function()? _isMetered;
+
   CancelToken? _cancel;
   String? _runningKey;
   Future<void>? _running;
   Timer? _saveTimer;
   Timer? _syncTimer;
+  Timer? _networkTimer;
+  Timer? _smartTimer;
+  Timer? _smartSoon;
   bool _syncing = false;
+  bool _pumping = false;
+  bool _smartRunning = false;
   DateTime _lastProgressUpdate = DateTime.fromMillisecondsSinceEpoch(0);
 
-  /// Standardordner: Videos\Jellyflex im Benutzerprofil.
-  Directory get root =>
-      _rootOverride ??
-      Directory('${Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path}\\Videos\\Jellyflex');
+  /// Alle Ordner, in denen je Downloads angelegt wurden (der Ordner ist änderbar –
+  /// ältere Downloads bleiben, wo sie sind, und gelten weiter als sicher).
+  final _roots = <String>{};
 
-  File get _indexFile => File('${root.path}\\downloads.json');
+  /// Warten die Downloads gerade auf eine nicht getaktete Verbindung (WLAN/LAN)?
+  final waitingForUnmetered = ValueNotifier<bool>(false);
+
+  /// Platz, der auf dem Laufwerk mindestens frei bleibt.
+  static const _reserveBytes = 1024 * 1024 * 1024;
+
+  AppSettings get _settings => ref.read(settingsProvider);
+
+  /// Aktueller Download-Ordner (Standard: Videos\Jellyflex).
+  Directory get root => _rootOverride ?? Directory(_settings.downloadFolder ?? DownloadFolder.defaultPath);
+
+  /// Liste der Downloads – im App-Datenordner (in Tests im Testordner).
+  File get _indexFile => File('${(_rootOverride ?? appDataDir).path}\\downloads.json');
+
+  /// Frühere Versionen speicherten die Liste im Download-Ordner.
+  File get _legacyIndexFile => File('${DownloadFolder.defaultPath}\\downloads.json');
 
   @override
   List<DownloadEntry> build() {
     ref.onDispose(() {
       _cancel?.cancel('App beendet');
       _syncTimer?.cancel();
+      _networkTimer?.cancel();
+      _smartTimer?.cancel();
+      _smartSoon?.cancel();
       // Noch nicht gespeicherte Änderungen nicht verlieren.
       if (_saveTimer?.isActive ?? false) {
         _saveTimer!.cancel();
@@ -224,12 +357,37 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     ref.listen(sessionProvider, (_, _) {
       _accountChanged();
       syncPending();
+      runSmartSoon();
+    });
+    // Neuer Ordner: merken (alte Downloads bleiben gültig) und Liste speichern.
+    ref.listen(settingsProvider.select((s) => s.downloadFolder), (_, _) {
+      _roots.add(root.path);
+      _set(state);
+    });
+    ref.listen(settingsProvider.select((s) => s.smartDownloads), (_, on) {
+      if (on) runSmartSoon();
     });
     _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) => syncPending());
+    _networkTimer = Timer.periodic(const Duration(seconds: 30), (_) => _checkNetwork());
+    _smartTimer = Timer.periodic(const Duration(minutes: 30), (_) => runSmart());
+    _roots.add(root.path);
 
     try {
-      if (_indexFile.existsSync()) {
-        final list = (jsonDecode(_indexFile.readAsStringSync()) as List)
+      var file = _indexFile;
+      if (!file.existsSync() && _rootOverride == null && _legacyIndexFile.existsSync()) file = _legacyIndexFile;
+      if (file.existsSync()) {
+        final decoded = jsonDecode(file.readAsStringSync());
+        final List<dynamic> raw;
+        if (decoded is List) {
+          // Altes Format: nur die Liste, alle Downloads im Ordner der Liste.
+          raw = decoded;
+          _roots.add(file.parent.path);
+        } else {
+          final map = (decoded as Map).cast<String, dynamic>();
+          raw = (map['entries'] as List?) ?? const [];
+          _roots.addAll(((map['roots'] as List?) ?? const []).whereType<String>());
+        }
+        final list = raw
             .map((e) => DownloadEntry.fromJson((e as Map).cast<String, dynamic>()))
             // Die Liste liegt als Datei im Benutzerordner – Einträge, die auf fremde
             // Orte zeigen (verändert oder beschädigt), werden ignoriert.
@@ -240,8 +398,11 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
         // Wartende Downloads fortsetzen, sobald die App läuft.
         Future.microtask(() {
           if (!ref.mounted) return;
+          // Liste ggf. am neuen Ort speichern.
+          if (file.path != _indexFile.path) _set(state);
           _pump();
           syncPending();
+          runSmartSoon();
         });
         return list;
       }
@@ -274,12 +435,30 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     return '${half(hash >>> 32)}${half(hash)}';
   }
 
-  /// Gespeicherter Eintrag plausibel? Kennung harmlos, Ordner und Videodatei im Download-Ordner.
+  /// Name des Ordners eines Downloads (Titel + Konto).
+  static String folderNameFor(String itemId, String serverUrl, String userId) => _folderName(itemId, serverUrl, userId);
+
+  static String _folderName(String itemId, String serverUrl, String userId) =>
+      '$itemId-${_ownerTag(serverUrl, userId)}';
+
+  static String _norm(String p) => Directory(p).absolute.path.toLowerCase().replaceAll('/', '\\');
+
+  /// Gespeicherter Eintrag plausibel? Kennung harmlos, Ordner heißt wie erwartet und
+  /// liegt direkt in einem bekannten Download-Ordner, Videodatei in diesem Ordner.
   bool _isSafeEntry(DownloadEntry e) {
-    if (!_safeId.hasMatch(e.itemId) || !_insideRoot(e.folder)) return false;
+    if (!_safeId.hasMatch(e.itemId) || !_isKnownFolder(e)) return false;
     final media = e.mediaFile;
     if (media == null) return true;
     return _isInside(e.folder, media);
+  }
+
+  /// Nur solche Ordner werden je gelöscht.
+  bool _isKnownFolder(DownloadEntry e) {
+    final folder = _norm(e.folder);
+    final name = _folderName(e.itemId, e.serverUrl, e.userId).toLowerCase();
+    if (!folder.endsWith('\\$name')) return false;
+    final parent = folder.substring(0, folder.length - name.length - 1);
+    return _roots.any((r) => _norm(r) == parent);
   }
 
   /// Kontowechsel: Download des vorigen Kontos anhalten (er wartet, bis das
@@ -295,24 +474,27 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     _pump();
   }
 
-  /// Liegt [path] wirklich im Download-Ordner (und ist nicht der Ordner selbst)?
-  bool _insideRoot(String path) => _isInside(root.path, path);
-
   /// Liegt [path] innerhalb von [base] (Groß-/Kleinschreibung und / bzw. \ egal)?
   static bool _isInside(String base, String path) {
-    String norm(String p) => Directory(p).absolute.path.toLowerCase().replaceAll('/', '\\');
-    final prefix = '${norm(base)}\\';
-    final target = norm(path);
+    final prefix = '${_norm(base)}\\';
+    final target = _norm(path);
     return target.startsWith(prefix) && !target.substring(prefix.length).contains('..');
   }
 
+  /// Standard-Optionen aus den Einstellungen.
+  DownloadOptions get defaultOptions =>
+      DownloadOptions(maxBitrate: _settings.downloadQuality, audioLanguage: _settings.audioLanguage);
+
   /// Titel (Film oder Folge) zum Herunterladen vormerken – optional eine bestimmte Fassung.
-  Future<void> enqueue(BaseItem item, {String? mediaSourceId}) async {
+  /// [auto]: von Smart Downloads.
+  Future<void> enqueue(BaseItem item, {String? mediaSourceId, DownloadOptions? options, bool auto = false}) async {
     if (item.isSeries || item.isSeason || item.isCollection) return;
     if (entryFor(item.id) != null) return;
     final session = ref.read(sessionProvider).value;
     if (session == null || !_safeId.hasMatch(item.id)) return;
-    final folder = '${root.path}\\${item.id}-${_ownerTag(session.serverUrl, session.userId)}';
+    final o = options ?? defaultOptions;
+    _roots.add(root.path);
+    final folder = '${root.path}\\${_folderName(item.id, session.serverUrl, session.userId)}';
     _set([
       ...state,
       DownloadEntry(
@@ -322,20 +504,28 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
         name: item.name,
         type: item.type,
         seriesName: item.seriesName,
+        seriesId: item.seriesId,
         episodeLabel: item.episodeLabel,
+        sortIndex: item.isEpisode ? _order(item) : null,
         mediaSourceId: mediaSourceId,
         folder: folder,
+        maxBitrate: o.maxBitrate,
+        audioLanguage: o.audioLanguage,
+        subtitleLanguages: o.subtitleLanguages,
+        auto: auto,
       ),
     ]);
     _pump();
   }
 
+  static int _order(BaseItem i) => (i.parentIndexNumber ?? 0) * 10000 + (i.indexNumber ?? 0);
+
   /// Alle Folgen einer Staffel vormerken. Liefert die Anzahl neuer Downloads.
-  Future<int> enqueueAll(List<BaseItem> items) async {
+  Future<int> enqueueAll(List<BaseItem> items, {DownloadOptions? options}) async {
     var added = 0;
     for (final item in items) {
       if (entryFor(item.id) != null) continue;
-      await enqueue(item);
+      await enqueue(item, options: options);
       if (entryFor(item.id) != null) added++;
     }
     return added;
@@ -360,6 +550,10 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   Future<void> remove(String itemId) async {
     final entry = entryFor(itemId);
     if (entry == null) return;
+    await _removeEntry(entry);
+  }
+
+  Future<void> _removeEntry(DownloadEntry entry) async {
     _set(state.where((e) => e.key != entry.key).toList());
     if (_runningKey == entry.key) {
       _cancel?.cancel('gelöscht');
@@ -369,8 +563,8 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       } catch (_) {}
     }
     final dir = Directory(entry.folder);
-    // Niemals außerhalb des Download-Ordners löschen.
-    if (!_insideRoot(dir.path)) {
+    // Niemals außerhalb eines Download-Ordners löschen.
+    if (!_isKnownFolder(entry)) {
       _pump();
       return;
     }
@@ -386,7 +580,27 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   }
 
   /// Belegter Speicherplatz aller Downloads (Bytes).
-  int get usedBytes => state.where(isMine).fold(0, (sum, e) => sum + (e.isDone ? e.total : e.received));
+  int get usedBytes => state.where(isMine).fold(0, (sum, e) => sum + e.sizeOnDisk);
+
+  /// Von Smart Downloads belegter Platz (Bytes).
+  int get smartUsedBytes => state.where((e) => isMine(e) && e.auto).fold(0, (sum, e) => sum + e.sizeOnDisk);
+
+  /// Fertige Downloads, die schon (lokal oder laut Server) gesehen sind.
+  List<DownloadEntry> watchedDownloads() => [
+    for (final e in state)
+      if (isMine(e) && e.isDone && (e.played || (e.watchedAt == null && (e.loadItem()?.userData.played ?? false)))) e,
+  ];
+
+  /// Alle gesehenen Downloads löschen (Fortschritt, der noch nicht beim Server ist, bleibt).
+  Future<int> removeWatched() async {
+    var removed = 0;
+    for (final e in watchedDownloads()) {
+      if (e.needsSync) continue;
+      await _removeEntry(e);
+      removed++;
+    }
+    return removed;
+  }
 
   // --- Offline geschaut -------------------------------------------------------
 
@@ -403,6 +617,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       entry.key,
       (e) => e.copyWith(positionTicks: position, played: played, watchedAt: DateTime.now(), needsSync: !synced),
     );
+    if (played && entry.type == 'Episode') runSmartSoon();
   }
 
   /// Offline geschauten Fortschritt an den Server melden (sofern erreichbar und
@@ -445,23 +660,139 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   BaseItem? nextDownloadedEpisode(BaseItem episode) {
     final seriesId = episode.seriesId;
     if (seriesId == null) return null;
-    int order(BaseItem i) => (i.parentIndexNumber ?? 0) * 10000 + (i.indexNumber ?? 0);
-    final current = order(episode);
-    final candidates = [
-      for (final e in state)
-        if (isMine(e) && e.isDone && e.type == 'Episode' && e.itemId != episode.id) ?e.loadItem(),
-    ].where((i) => i.seriesId == seriesId && order(i) > current).toList()..sort((a, b) => order(a).compareTo(order(b)));
+    final current = _order(episode);
+    final candidates =
+        [
+            for (final e in state)
+              if (isMine(e) && e.isDone && e.type == 'Episode' && e.itemId != episode.id) ?e.loadItem(),
+          ].where((i) => i.seriesId == seriesId && _order(i) > current).toList()
+          ..sort((a, b) => _order(a).compareTo(_order(b)));
     return candidates.firstOrNull;
   }
 
+  // --- Smart Downloads ------------------------------------------------------
+
+  /// Smart Downloads gleich (gebündelt) prüfen – z. B. nach dem Ende einer Folge.
+  void runSmartSoon() {
+    _smartSoon?.cancel();
+    _smartSoon = Timer(const Duration(seconds: 3), runSmart);
+  }
+
+  /// Für jede Serie mit heruntergeladenen Folgen: die nächsten ungesehenen Folgen
+  /// bereithalten (Anzahl und Speichergrenze aus den Einstellungen) und gesehene
+  /// Folgen löschen. Neue Downloads warten wie alle anderen auf WLAN/LAN.
+  Future<void> runSmart() async {
+    final settings = _settings;
+    if (!settings.smartDownloads || _smartRunning || !ref.mounted) return;
+    final session = ref.read(sessionProvider).value;
+    if (session == null) return;
+    final seriesIds = {
+      for (final e in state)
+        if (isMine(e) && e.type == 'Episode' && e.seriesId != null) e.seriesId!,
+    };
+    if (seriesIds.isEmpty) return;
+    _smartRunning = true;
+    final api = ref.read(apiProvider);
+    final limit = settings.smartMaxGb * 1024 * 1024 * 1024;
+    try {
+      for (final seriesId in seriesIds) {
+        final List<BaseItem> episodes;
+        try {
+          episodes = (await api.getSeriesEpisodes(seriesId)).where((e) => (e.parentIndexNumber ?? 1) > 0).toList()
+            ..sort((a, b) => _order(a).compareTo(_order(b)));
+        } catch (e) {
+          debugPrint('Smart Downloads: Server nicht erreichbar ($e)');
+          return;
+        }
+        if (!ref.mounted || ref.read(sessionProvider).value?.accountKey != session.accountKey) return;
+        // Gesehen – laut Server oder offline (noch nicht gemeldet).
+        bool watched(BaseItem ep) => ep.userData.played || (entryFor(ep.id)?.played ?? false);
+
+        // Nach der zuletzt gesehenen Folge weiter.
+        final lastWatched = episodes.lastIndexWhere(watched);
+        final upcoming = episodes.skip(lastWatched + 1).where((e) => !watched(e)).take(settings.smartEpisodes);
+        for (final ep in upcoming) {
+          if (entryFor(ep.id) != null) continue;
+          final size = _estimateSize(ep, settings.downloadQuality);
+          if (limit > 0 && smartUsedBytes + size > limit) break;
+          await enqueue(ep, auto: true);
+        }
+        // Gesehene Folgen löschen – aber nie Fortschritt, der noch nicht beim Server ist.
+        for (final ep in episodes.where(watched)) {
+          final entry = entryFor(ep.id);
+          if (entry == null || entry.needsSync || !entry.isDone) continue;
+          await _removeEntry(entry);
+        }
+      }
+    } finally {
+      _smartRunning = false;
+    }
+  }
+
+  /// Geschätzte Größe eines Downloads (Bytes).
+  static int _estimateSize(BaseItem item, int? maxBitrate) {
+    final source = item.mediaSources.firstOrNull;
+    final runtime = item.runTimeTicks ?? source?.runTimeTicks ?? 0;
+    final seconds = runtime / 10000000;
+    if (maxBitrate != null && seconds > 0 && ((source?.bitrate ?? 0) == 0 || source!.bitrate! > maxBitrate)) {
+      return (seconds * maxBitrate / 8).round();
+    }
+    if ((source?.size ?? 0) > 0) return source!.size!;
+    return seconds > 0 && (source?.bitrate ?? 0) > 0 ? (seconds * source!.bitrate! / 8).round() : 0;
+  }
+
+  /// Geschätzte Größe für die Anzeige vor dem Download.
+  int estimateSize(BaseItem item, DownloadOptions options) => _estimateSize(item, options.maxBitrate);
+
+  // --- Netzwerk -------------------------------------------------------------
+
+  Future<bool> _networkBlocked() async {
+    if (!_settings.downloadsUnmeteredOnly) return false;
+    return (_isMetered ?? AppShell.isMeteredConnection)();
+  }
+
+  /// Getaktete Verbindung? Dann laufenden Download anhalten (er wartet) – sonst weiter.
+  Future<void> _checkNetwork() async {
+    if (!ref.mounted) return;
+    final hasWork = state.any((e) => isMine(e) && e.isActive);
+    if (!hasWork) {
+      waitingForUnmetered.value = false;
+      return;
+    }
+    final blocked = await _networkBlocked();
+    if (!ref.mounted) return;
+    waitingForUnmetered.value = blocked;
+    if (blocked && _runningKey != null) {
+      final key = _runningKey!;
+      _update(key, (e) => e.copyWith(status: DownloadStatus.queued));
+      _cancel?.cancel('getaktete Verbindung');
+    } else if (!blocked) {
+      _pump();
+    }
+  }
+
+  /// Sofort nachsehen (z. B. nach Änderung der Einstellung).
+  void recheckNetwork() => _checkNetwork();
+
   // --- Interna --------------------------------------------------------------
 
-  void _pump() {
-    if (_runningKey != null) return;
+  Future<void> _pump() async {
+    // App beendet (bzw. Anmeldung gewechselt): nichts mehr starten.
+    if (!ref.mounted || _runningKey != null || _pumping) return;
     // Nur Downloads des angemeldeten Kontos laufen lassen.
-    final next = state.where((e) => e.status == DownloadStatus.queued && isMine(e)).firstOrNull;
-    if (next == null) return;
-    _running = _run(next);
+    if (!state.any((e) => e.status == DownloadStatus.queued && isMine(e))) return;
+    _pumping = true;
+    try {
+      final blocked = await _networkBlocked();
+      if (!ref.mounted) return;
+      waitingForUnmetered.value = blocked;
+      if (blocked || _runningKey != null) return;
+      final next = state.where((e) => e.status == DownloadStatus.queued && isMine(e)).firstOrNull;
+      if (next == null) return;
+      _running = _run(next);
+    } finally {
+      _pumping = false;
+    }
   }
 
   Future<void> _run(DownloadEntry entry) async {
@@ -484,20 +815,47 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       final source = sources.where((s) => s.id == entry.mediaSourceId).firstOrNull ?? sources.firstOrNull;
       if (source == null) throw Exception(tr.noFileFound);
       await File(entry.itemJsonPath).writeAsString(jsonEncode(item.raw));
+
+      // Kleinere Fassung nur, wenn die Datei wirklich größer ist als gewünscht.
+      final maxBitrate = entry.maxBitrate;
+      final converted = maxBitrate != null && ((source.bitrate ?? 0) == 0 || source.bitrate! > maxBitrate);
+      final audioIndex = converted ? _audioIndexFor(source, entry.audioLanguage) : null;
+      _update(
+        entry.key,
+        (e) => e.copyWith(
+          converted: converted,
+          audioIndex: () => audioIndex,
+          seriesId: item.seriesId,
+          sortIndex: item.isEpisode ? _order(item) : null,
+        ),
+      );
+
       await _downloadImages(api, item, entry, cancel);
-      await _downloadSubtitles(api, item, source, entry, cancel);
+      await _downloadSubtitles(api, item, source, entry, cancel, converted: converted);
       if (cancel.isCancelled) return;
 
       // Dateiendung vom Server nur übernehmen, wenn sie harmlos ist.
-      final container = (source.container ?? '').split(',').first.toLowerCase();
+      final container = converted ? 'mkv' : (source.container ?? '').split(',').first.toLowerCase();
       final ext = _safeExt.hasMatch(container) ? container : 'mkv';
       final target = File('${entry.folder}\\media.$ext');
       final part = File('${target.path}.part');
+      // Umgerechnete Fassungen lassen sich nicht fortsetzen – dann von vorn.
+      if (converted && await part.exists()) await part.delete();
       final already = await part.exists() ? await part.length() : 0;
 
+      // Genug Platz? (mit Reserve, damit Windows nicht vollläuft)
+      final expected = converted ? _estimateSize(item, maxBitrate) : (source.size ?? 0);
+      final free = DownloadFolder.freeBytes(entry.folder);
+      if (free != null && expected > 0 && expected - already > free - _reserveBytes) {
+        throw Exception(tr.notEnoughSpace(formatBytes(expected - already), formatBytes(free)));
+      }
+
+      final url = converted
+          ? api.downloadTranscodeUrl(item.id, mediaSourceId: source.id, maxBitrate: maxBitrate, audioIndex: audioIndex)
+          : api.streamUrl(item.id, mediaSourceId: source.id);
       final dio = Dio(BaseOptions(headers: {'Authorization': api.authorizationHeader}));
       final response = await dio.get<ResponseBody>(
-        api.streamUrl(item.id, mediaSourceId: source.id),
+        url,
         options: Options(
           responseType: ResponseType.stream,
           headers: {if (already > 0) 'Range': 'bytes=$already-'},
@@ -517,9 +875,13 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
         final contentLength = int.tryParse(response.headers.value(Headers.contentLengthHeader) ?? '') ?? 0;
         received = resumed ? already : 0;
         total = contentLength > 0 ? (resumed ? already : 0) + contentLength : 0;
+        // Ohne Größenangabe (umgerechnet): geschätzte Größe für den Fortschritt.
+        final shownTotal = total > 0 ? total : expected;
         final sink = part.openWrite(mode: resumed ? FileMode.append : FileMode.write);
+        final limiter = _RateLimiter();
         try {
           var unflushed = 0;
+          var sinceSpaceCheck = 0;
           await for (final chunk in response.data!.stream) {
             if (cancel.isCancelled) break;
             sink.add(chunk);
@@ -531,7 +893,15 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
               await sink.flush();
               unflushed = 0;
             }
-            _reportProgress(entry.key, received, total);
+            // Laufwerk wird knapp (z. B. weil anderes gleichzeitig Platz braucht) → abbrechen.
+            sinceSpaceCheck += chunk.length;
+            if (sinceSpaceCheck >= 256 * 1024 * 1024) {
+              sinceSpaceCheck = 0;
+              final left = DownloadFolder.freeBytes(entry.folder);
+              if (left != null && left < _reserveBytes ~/ 4) throw Exception(tr.diskAlmostFull);
+            }
+            _reportProgress(entry.key, received, shownTotal > received ? shownTotal : received);
+            await limiter.take(chunk.length, _settings.downloadSpeedLimit);
           }
         } finally {
           await sink.close();
@@ -561,6 +931,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
         final message = switch (e) {
           DioException(:final response?) => tr.serverError(response.statusCode),
           DioException() => tr.noConnectionToServer,
+          FileSystemException(:final osError?) => osError.message,
           _ => '$e'.replaceFirst('Exception: ', ''),
         };
         _update(entry.key, (x) => x.copyWith(status: DownloadStatus.failed, error: () => message));
@@ -571,6 +942,18 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       _pump();
     }
   }
+
+  /// Tonspur für die kleinere Fassung: gewünschte Sprache, sonst die Standardspur.
+  static int? _audioIndexFor(MediaSource source, String? language) {
+    if (language != null) {
+      final match = source.embeddedStreams('Audio').where((s) => sameLanguage(s.language, language)).firstOrNull;
+      if (match != null) return match.index;
+    }
+    return source.defaultAudioStreamIndex ?? source.embeddedStreams('Audio').firstOrNull?.index;
+  }
+
+  /// Text-Untertitel lassen sich als Datei laden (Bild-Untertitel wie PGS nicht).
+  static const _textSubtitleCodecs = {'srt', 'subrip', 'ass', 'ssa', 'vtt', 'webvtt', 'mov_text', 'text'};
 
   /// Nebendateien: kurze Zeitlimits und abbrechbar (Pause/Löschen wartet sonst ewig).
   static final _sideOptions = BaseOptions(
@@ -590,17 +973,35 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     }
   }
 
+  /// Originaldatei: externe Untertitel (eingebettete stecken in der Datei).
+  /// Kleinere Fassung: alle gewählten Text-Untertitel – auch eingebettete – als Datei.
   Future<void> _downloadSubtitles(
     JellyfinApi api,
     BaseItem item,
     MediaSource source,
     DownloadEntry entry,
-    CancelToken cancel,
-  ) async {
+    CancelToken cancel, {
+    required bool converted,
+  }) async {
     final dio = Dio(_sideOptions.copyWith(headers: {'Authorization': api.authorizationHeader}));
-    for (final s in source.mediaStreams.where((s) => s.type == 'Subtitle' && s.isExternal)) {
-      final url = api.subtitleUrl(item.id, source.id, s);
-      final ext = url.split('.').last.toLowerCase();
+    final wanted = entry.subtitleLanguages;
+    for (final s in source.mediaStreams.where((s) => s.type == 'Subtitle')) {
+      final String url;
+      if (converted) {
+        if (!_textSubtitleCodecs.contains(s.codec?.toLowerCase())) continue;
+        if (wanted != null && !wanted.any((l) => sameLanguage(l, s.language))) continue;
+        final codec = s.codec?.toLowerCase();
+        url = api.subtitleUrl(
+          item.id,
+          source.id,
+          s,
+          format: codec == 'ass' || codec == 'ssa' ? 'ass' : (codec == 'vtt' || codec == 'webvtt' ? 'vtt' : 'srt'),
+        );
+      } else {
+        if (!s.isExternal) continue;
+        url = api.subtitleUrl(item.id, source.id, s);
+      }
+      final ext = Uri.parse(url).path.split('.').last.toLowerCase();
       if (!_safeExt.hasMatch(ext)) continue;
       try {
         await dio.download(url, '${entry.folder}\\subtitle_${s.index}.$ext', cancelToken: cancel);
@@ -616,10 +1017,13 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   }
 
   void _update(String key, DownloadEntry Function(DownloadEntry e) change) {
+    if (!ref.mounted) return;
     _set([for (final e in state) e.key == key ? change(e) : e]);
   }
 
   void _set(List<DownloadEntry> entries) {
+    // Ein abgebrochener Download meldet sich evtl. erst nach dem Beenden der App.
+    if (!ref.mounted) return;
     state = entries;
     // Index gebündelt speichern (nicht bei jedem Fortschritts-Update).
     _saveTimer?.cancel();
@@ -628,8 +1032,18 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
 
   void _save() {
     try {
-      root.createSync(recursive: true);
-      _indexFile.writeAsStringSync(jsonEncode([for (final e in state) e.toJson()]));
+      final file = _indexFile;
+      file.parent.createSync(recursive: true);
+      final tmp = File('${file.path}.tmp');
+      tmp.writeAsStringSync(
+        jsonEncode({
+          'version': 2,
+          'roots': [..._roots],
+          'entries': [for (final e in state) e.toJson()],
+        }),
+        flush: true,
+      );
+      tmp.renameSync(file.path);
     } catch (_) {}
   }
 }

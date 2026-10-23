@@ -3,9 +3,11 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jellyflex/core/download_folder.dart';
 import 'package:jellyflex/core/downloads.dart';
 import 'package:jellyflex/core/models.dart';
 import 'package:jellyflex/core/session.dart';
+import 'package:jellyflex/core/settings.dart';
 
 const _parent = AuthSession(
   serverUrl: 'http://127.0.0.1:9',
@@ -36,14 +38,20 @@ void main() {
   late Directory root;
   late ProviderContainer container;
 
+  /// Eigene Einstellungen im Testordner – nie die echten.
+  ProviderContainer makeContainer() => ProviderContainer(
+    overrides: [
+      sessionProvider.overrideWith(_TestSession.new),
+      settingsProvider.overrideWith(() => SettingsController(File('${root.path}\\settings.json'))),
+      downloadsProvider.overrideWith(() => DownloadManager(root, () async => false)),
+    ],
+  );
+
+  String folderName(String id) => DownloadManager.folderNameFor(id, _parent.serverUrl, _parent.userId);
+
   setUp(() async {
     root = Directory.systemTemp.createTempSync('jellyflex_dl_sec_');
-    container = ProviderContainer(
-      overrides: [
-        sessionProvider.overrideWith(_TestSession.new),
-        downloadsProvider.overrideWith(() => DownloadManager(root)),
-      ],
-    );
+    container = makeContainer();
     await container.read(sessionProvider.future);
   });
 
@@ -100,12 +108,7 @@ void main() {
         },
       ]),
     );
-    final fresh = ProviderContainer(
-      overrides: [
-        sessionProvider.overrideWith(_TestSession.new),
-        downloadsProvider.overrideWith(() => DownloadManager(root)),
-      ],
-    );
+    final fresh = makeContainer();
     await fresh.read(sessionProvider.future);
     // Der manipulierte Eintrag wird gar nicht erst übernommen …
     expect(fresh.read(downloadsProvider), isEmpty);
@@ -117,30 +120,91 @@ void main() {
   });
 
   test('Gespeicherte Videodatei außerhalb des Download-Ordners wird ignoriert', () async {
-    final folder = '${root.path}\\abc-1';
     File('${root.path}\\downloads.json').writeAsStringSync(
       jsonEncode([
-        for (final (id, media) in [('good', '$folder\\media.mkv'), ('bad', r'C:\Windows\notepad.exe')])
+        for (final (id, media) in [
+          ('good', '${root.path}\\${folderName('good')}\\media.mkv'),
+          ('bad', r'C:\Windows\notepad.exe'),
+        ])
           {
             'itemId': id,
             'serverUrl': _parent.serverUrl,
             'userId': _parent.userId,
             'name': id,
             'type': 'Movie',
-            'folder': folder,
+            'folder': '${root.path}\\${folderName(id)}',
             'mediaFile': media,
             'status': 'done',
           },
       ]),
     );
-    final fresh = ProviderContainer(
-      overrides: [
-        sessionProvider.overrideWith(_TestSession.new),
-        downloadsProvider.overrideWith(() => DownloadManager(root)),
-      ],
-    );
+    final fresh = makeContainer();
     await fresh.read(sessionProvider.future);
     expect(fresh.read(downloadsProvider).map((e) => e.itemId), ['good']);
     fresh.dispose();
+  });
+
+  test('Ordner mit falschem Namen oder in fremdem Ordner wird ignoriert', () async {
+    final other = Directory.systemTemp.createTempSync('jellyflex_other_root_');
+    File('${root.path}\\downloads.json').writeAsStringSync(
+      jsonEncode({
+        'version': 2,
+        'roots': [root.path, other.path],
+        'entries': [
+          for (final (id, folder) in [
+            ('inroot', '${root.path}\\${folderName('inroot')}'),
+            ('second', '${other.path}\\${folderName('second')}'),
+            ('wrongname', '${root.path}\\Dokumente'),
+            ('foreign', '${Directory.systemTemp.path}\\${folderName('foreign')}'),
+          ])
+            {
+              'itemId': id,
+              'serverUrl': _parent.serverUrl,
+              'userId': _parent.userId,
+              'name': id,
+              'type': 'Movie',
+              'folder': folder,
+              'status': 'paused',
+            },
+        ],
+      }),
+    );
+    final fresh = makeContainer();
+    await fresh.read(sessionProvider.future);
+    expect(fresh.read(downloadsProvider).map((e) => e.itemId), ['inroot', 'second']);
+    fresh.dispose();
+    other.deleteSync(recursive: true);
+  });
+
+  test('Altes Listenformat wird weiter gelesen', () async {
+    File('${root.path}\\downloads.json').writeAsStringSync(
+      jsonEncode([
+        {
+          'itemId': 'old1',
+          'serverUrl': _parent.serverUrl,
+          'userId': _parent.userId,
+          'name': 'Alt',
+          'type': 'Movie',
+          'folder': '${root.path}\\${folderName('old1')}',
+          'status': 'paused',
+        },
+      ]),
+    );
+    final fresh = makeContainer();
+    await fresh.read(sessionProvider.future);
+    expect(fresh.read(downloadsProvider).map((e) => e.itemId), ['old1']);
+    fresh.dispose();
+  });
+
+  test('Download-Ordner: Unterordner "Jellyflex", Systemordner gesperrt', () {
+    expect(DownloadFolder.fromPicked(r'D:\Filme'), r'D:\Filme\Jellyflex');
+    expect(DownloadFolder.fromPicked(r'D:\'), r'D:\Jellyflex');
+    expect(DownloadFolder.fromPicked(r'D:\Medien\jellyflex\'), r'D:\Medien\jellyflex');
+    final windows = Platform.environment['SystemRoot'] ?? r'C:\Windows';
+    expect(DownloadFolder.isForbidden('$windows\\Jellyflex'), isTrue);
+    expect(DownloadFolder.isForbidden('${Platform.environment['APPDATA']}\\Jellyflex'), isTrue);
+    expect(DownloadFolder.isForbidden(r'D:\Filme\..\Windows'), isTrue);
+    expect(DownloadFolder.isForbidden(r'D:\Filme\Jellyflex'), isFalse);
+    expect(DownloadFolder.freeBytes(Directory.systemTemp.path), greaterThan(0));
   });
 }

@@ -51,7 +51,7 @@ final _videoFile = File(
 );
 
 /// Liefert das Testvideo aus – mit Range-Unterstützung, damit Spulen klappt.
-Future<void> _serveVideo(HttpRequest req) async {
+Future<void> _serveVideo(HttpRequest req, {bool progressive = false}) async {
   final res = req.response;
   if (!_videoFile.existsSync()) {
     res.statusCode = 404;
@@ -63,7 +63,7 @@ Future<void> _serveVideo(HttpRequest req) async {
   res.headers.contentType = ContentType('video', 'x-matroska');
   var start = 0;
   var end = length - 1;
-  final range = req.headers.value('range');
+  final range = progressive ? null : req.headers.value('range');
   final match = range == null ? null : RegExp(r'bytes=(\d*)-(\d*)').firstMatch(range);
   if (match != null) {
     start = int.tryParse(match.group(1)!) ?? 0;
@@ -71,7 +71,7 @@ Future<void> _serveVideo(HttpRequest req) async {
     res.statusCode = HttpStatus.partialContent;
     res.headers.set('Content-Range', 'bytes $start-$end/$length');
   }
-  res.contentLength = end - start + 1;
+  if (!progressive) res.contentLength = end - start + 1;
   try {
     if (_throttleBps <= 0) {
       await res.addStream(_videoFile.openRead(start, end + 1));
@@ -137,10 +137,16 @@ const _externalSub = {
   'DisplayTitle': 'Deutsch - SRT - Extern',
 };
 
-Map<String, dynamic> _source(String id, String container, {required int width, required int height}) => {
+Map<String, dynamic> _source(
+  String id,
+  String container, {
+  required int width,
+  required int height,
+  int size = 4200000000,
+}) => {
   'Id': id,
   'Container': container,
-  'Size': 4200000000,
+  'Size': size,
   'Bitrate': 6000000,
   'MediaStreams': [
     {'Type': 'Video', 'Index': 0, 'Codec': 'hevc', 'Width': width, 'Height': height, 'VideoRange': 'SDR'},
@@ -440,6 +446,7 @@ void _seed() {
           'SeasonId': seasonId,
           'SeasonName': 'Staffel $n',
           'RunTimeTicks': runtime,
+          'MediaSources': [_source(epId, 'mkv', width: 1920, height: 1080, size: 1200000000)],
           'Overview': 'In dieser Folge spitzt sich die Lage zu – und eine alte Entscheidung holt alle wieder ein.',
           'ImageTags': {'Primary': 'p'},
           'SeriesPrimaryImageTag': 'p',
@@ -929,12 +936,11 @@ Future<void> main() async {
         await res.close();
         continue;
       }
-      if (seg.length == 3 && seg[0] == 'Videos' && seg[2] == 'stream') {
+      if (seg.length == 3 && seg[0] == 'Videos' && (seg[2] == 'stream' || seg[2] == 'stream.mkv')) {
         // Nicht abwarten: Streams laufen parallel zu anderen Anfragen.
-        if (req.uri.queryParameters['static'] == 'true') {
-          _lastStream = {'itemId': seg[1], ...req.uri.queryParameters};
-        }
-        unawaited(_serveVideo(req));
+        _lastStream = {'itemId': seg[1], 'path': seg[2], ...req.uri.queryParameters};
+        // Umgerechnet (static=false): wie Jellyfin am Stück, ohne Größe und ohne Range.
+        unawaited(_serveVideo(req, progressive: req.uri.queryParameters['static'] == 'false'));
         continue;
       }
       if (seg.length >= 4 && seg[0] == 'Items' && seg[2] == 'Images') {

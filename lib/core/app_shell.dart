@@ -45,6 +45,20 @@ abstract final class AppShell {
     }
   }
 
+  /// Ist die Internetverbindung laut Windows getaktet (mobile Daten, Handy-Hotspot,
+  /// als getaktet markiertes WLAN)? Unbekannt oder ohne Internet (z. B. nur Heimnetz)
+  /// gilt als nicht getaktet.
+  static Future<bool> isMeteredConnection() async {
+    try {
+      return await _channel.invokeMethod<String>('connectionCost') == 'metered';
+    } on MissingPluginException {
+      return false;
+    } catch (e) {
+      debugPrint('Verbindungsart unbekannt: $e');
+      return false;
+    }
+  }
+
   static String _clip(String text) => text.length > 80 ? '${text.substring(0, 79)}…' : text;
 
   /// "Weiterschauen" vom Server holen und in die Sprungliste schreiben.

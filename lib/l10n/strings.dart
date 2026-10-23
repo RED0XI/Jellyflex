@@ -850,4 +850,112 @@ class S {
   String get backOnline => _t('Connected to the server again', 'Wieder mit dem Server verbunden');
   String serverError(int? code) => _t('Server error $code', 'Server-Fehler $code');
   String get encryptionFailed => _t('Encryption failed', 'Verschlüsselung fehlgeschlagen');
+
+  // --- Downloads: Ordner, Qualität, WLAN, Smart Downloads --------------------
+
+  String get ok => _t('OK', 'OK');
+  String get standard => _t('Default', 'Standard');
+  String notEnoughSpace(String needed, String free) =>
+      _t('Needs about $needed, but only $free is free.', 'Braucht etwa $needed, frei sind aber nur $free.');
+  String get notEnoughSpaceTitle => _t('Not enough space', 'Nicht genug Speicherplatz');
+  String get diskAlmostFull => _t('Drive almost full – download stopped', 'Laufwerk fast voll – Download angehalten');
+  String get downloadAnyway => _t('Download anyway', 'Trotzdem laden');
+  String get downloadWaitsForWifi => _t(
+    'You’re on a metered connection – the download starts as soon as you’re on Wi-Fi or LAN.',
+    'Du bist über eine getaktete Verbindung online – der Download startet, sobald du im WLAN oder LAN bist.',
+  );
+  String get chooseFolder => _t('Choose folder', 'Ordner wählen');
+  String get folderNotAllowed => _t(
+    'Downloads can’t be saved in system folders (Windows, Program Files, AppData). Please choose another folder.',
+    'In Systemordnern (Windows, Programme, AppData) können keine Downloads liegen. Bitte wähle einen anderen Ordner.',
+  );
+  String folderNotWritable(String error) =>
+      _t('Jellyflex can’t write to this folder ($error).', 'Jellyflex kann in diesem Ordner nicht speichern ($error).');
+  String get folderProblem => _t('Folder can’t be used', 'Ordner nicht nutzbar');
+  String get downloadFolderQuestion => _t('Where should downloads go?', 'Wohin sollen die Downloads?');
+  String get downloadFolderQuestionText => _t(
+    'Jellyflex saves downloads in this folder. You can change it any time in Settings.',
+    'Jellyflex speichert Downloads in diesem Ordner. Du kannst ihn jederzeit in den Einstellungen ändern.',
+  );
+  String freeSpace(String size) => _t('$size free', '$size frei');
+  String get changeFolder => _t('Change folder…', 'Ordner ändern …');
+  String get useThisFolder => _t('Use this folder', 'Diesen Ordner nehmen');
+  String get downloadOptionsTitle => _t('Download', 'Herunterladen');
+  String downloadEpisodesTitle(int count) => _t('Download $count episodes', '$count Folgen herunterladen');
+  String get downloadOriginalHint => _t(
+    'Original file with all audio tracks and subtitles – best quality, largest file.',
+    'Originaldatei mit allen Tonspuren und Untertiteln – beste Qualität, größte Datei.',
+  );
+  String get downloadConvertedHint => _t(
+    'The server makes a smaller version: one audio track, subtitles as separate files. Can take longer than the original.',
+    'Der Server erstellt eine kleinere Fassung: eine Tonspur, Untertitel als eigene Dateien. Kann länger dauern als das Original.',
+  );
+  String downloadSizeAbout(String size) => _t('About $size', 'Etwa $size');
+  String get downloadDontAskAgain => _t('Don’t ask again', 'Nicht mehr fragen');
+  String get downloadDontAskAgainHint => _t(
+    'Uses this quality from now on – changeable in Settings.',
+    'Nimmt ab jetzt diese Qualität – änderbar in den Einstellungen.',
+  );
+  String get downloadFolder => _t('Download folder', 'Download-Ordner');
+  String downloadFolderHint(String path) =>
+      _t('$path · Existing downloads stay where they are.', '$path · Vorhandene Downloads bleiben, wo sie sind.');
+  String get unmeteredOnly => _t('Only on Wi-Fi or LAN', 'Nur über WLAN oder LAN');
+  String get unmeteredOnlyHint => _t(
+    'No downloads over mobile data, phone hotspots or networks Windows marks as metered.',
+    'Keine Downloads über mobile Daten, Handy-Hotspot oder Netze, die Windows als getaktet kennzeichnet.',
+  );
+  String get speedLimit => _t('Speed limit', 'Geschwindigkeit begrenzen');
+  String get speedLimitHint => _t(
+    'So downloads don’t slow down the rest of your internet.',
+    'Damit Downloads den Rest deines Internets nicht ausbremsen.',
+  );
+  String get unlimited => _t('Unlimited', 'Unbegrenzt');
+  String get downloadQuality => _t('Download quality', 'Download-Qualität');
+  String get downloadQualityHint => _t(
+    'Smaller versions save space – the server converts them.',
+    'Kleinere Fassungen sparen Platz – der Server rechnet sie um.',
+  );
+  String get askBeforeDownload => _t('Ask before each download', 'Vor jedem Download fragen');
+  String get askBeforeDownloadHint =>
+      _t('Choose quality, audio and subtitles every time.', 'Jedes Mal Qualität, Ton und Untertitel wählen.');
+  String get smartDownloads => _t('Smart downloads', 'Smart Downloads');
+  String get smartDownloadsHint => _t(
+    'Deletes watched episodes and downloads the next ones by itself.',
+    'Löscht gesehene Folgen und lädt die nächsten von selbst.',
+  );
+  String get smartEpisodes => _t('Episodes to keep ready', 'Folgen bereithalten');
+  String get smartEpisodesHint => _t(
+    'Unwatched episodes per series that stay downloaded.',
+    'So viele ungesehene Folgen je Serie bleiben heruntergeladen.',
+  );
+  String get smartMaxSpace => _t('Space for smart downloads', 'Platz für Smart Downloads');
+  String get smartMaxSpaceHint => _t('Smart downloads never use more than this.', 'Mehr belegen Smart Downloads nie.');
+  String get noLimit => _t('No limit', 'Keine Grenze');
+  String get downloadStorage => _t('Storage', 'Speicherplatz');
+  String downloadStorageHint(String used, String free) =>
+      _t('Downloads use $used · $free free on the drive', 'Downloads belegen $used · $free frei auf dem Laufwerk');
+  String get deleteWatchedDownloads => _t('Delete watched', 'Gesehene löschen');
+  String deleteWatchedQuestion(int count) =>
+      _t('Delete watched downloads ($count)?', 'Gesehene Downloads löschen ($count)?');
+  String get deleteWatchedText => _t(
+    'They’ll be deleted from this PC. Everything stays on the server.',
+    'Sie werden von diesem PC gelöscht. Auf dem Server bleibt alles erhalten.',
+  );
+  String watchedDownloadsDeleted(int count) =>
+      _t('Watched downloads deleted ($count)', 'Gesehene Downloads gelöscht ($count)');
+  String get noWatchedDownloads => _t('No watched downloads', 'Keine gesehenen Downloads');
+  String get waitingForWifi => _t('Waiting for Wi-Fi or LAN', 'Wartet auf WLAN oder LAN');
+  String get waitingForWifiHint => _t(
+    'You’re on a metered connection (mobile data or hotspot). Downloads continue by themselves.',
+    'Du bist über eine getaktete Verbindung online (mobile Daten oder Hotspot). Die Downloads gehen von selbst weiter.',
+  );
+  String get allowMetered => _t('Allow anyway', 'Trotzdem erlauben');
+  String get smartBadge => _t('Smart', 'Smart');
+  String get cancelDownload => _t('Cancel download', 'Download abbrechen');
+  String get cancelDownloadQuestion => _t('Cancel download?', 'Download abbrechen?');
+  String cancelDownloadText(String name) =>
+      _t('What’s already downloaded of “$name” will be deleted.', 'Was von „$name“ schon geladen ist, wird gelöscht.');
+  String get cancelDownloads => _t('Cancel downloads', 'Downloads abbrechen');
+  String downloadsCancelled(int count) => _t('Downloads cancelled ($count)', 'Downloads abgebrochen ($count)');
+  String get keepDownloading => _t('Keep downloading', 'Weiter laden');
 }

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:uuid/uuid.dart';
 
 import 'images.dart';
 import 'models.dart';
@@ -537,6 +538,10 @@ class JellyfinApi {
   Future<List<BaseItem>> getEpisodes(String seriesId, String seasonId) =>
       _getItems('/Shows/$seriesId/Episodes', {..._common, 'seasonId': seasonId});
 
+  /// Alle Folgen einer Serie (alle Staffeln, in Reihenfolge) – für Smart Downloads.
+  Future<List<BaseItem>> getSeriesEpisodes(String seriesId) =>
+      _getItems('/Shows/$seriesId/Episodes', {..._common, 'fields': '$_fields,MediaSources'});
+
   Future<List<BaseItem>> getSimilar(String id, {int limit = 16}) =>
       _getItems('/Items/$id/Similar', {'userId': userId, 'fields': _fields, 'limit': limit});
 
@@ -619,6 +624,41 @@ class JellyfinApi {
     return '$baseUrl/Videos/$itemId/stream?$query';
   }
 
+  /// Kleinere Fassung zum Herunterladen: der Server rechnet die Datei in H.264/AAC
+  /// (MKV) mit höchstens [maxBitrate] um und liefert sie am Stück. Nur die gewählte
+  /// Tonspur; Untertitel werden getrennt als Dateien geladen.
+  String downloadTranscodeUrl(
+    String itemId, {
+    required String mediaSourceId,
+    required int maxBitrate,
+    int? audioIndex,
+  }) {
+    const audioBitrate = 192000;
+    final maxHeight = switch (maxBitrate) {
+      <= 2000000 => 480,
+      <= 7000000 => 720,
+      <= 25000000 => 1080,
+      _ => null,
+    };
+    final query = Uri(
+      queryParameters: {
+        'static': 'false',
+        'mediaSourceId': mediaSourceId,
+        'deviceId': deviceId,
+        'playSessionId': const Uuid().v4().replaceAll('-', ''),
+        'container': 'mkv',
+        'videoCodec': 'h264',
+        'audioCodec': 'aac',
+        'videoBitRate': '${(maxBitrate - audioBitrate).clamp(300000, maxBitrate)}',
+        'audioBitRate': '$audioBitrate',
+        'maxAudioChannels': '2',
+        'maxHeight': ?maxHeight?.toString(),
+        'audioStreamIndex': ?audioIndex?.toString(),
+      },
+    ).query;
+    return '$baseUrl/Videos/$itemId/stream.mkv?$query';
+  }
+
   /// Vom Server gelieferte Adresse (z. B. `TranscodingUrl`) vollständig machen –
   /// aber nur, wenn sie wirklich zum eigenen Server führt. Sonst könnte eine
   /// manipulierte Antwort wie "@fremd.example/…" das Anmelde-Token an einen
@@ -637,8 +677,9 @@ class JellyfinApi {
   }
 
   /// Externe Untertiteldatei (z. B. "Film.de.srt" neben dem Film) als Stream.
-  String subtitleUrl(String itemId, String mediaSourceId, MediaStream stream) {
-    final format = switch (stream.codec?.toLowerCase()) {
+  /// [format] erzwingt ein Format (der Server wandelt Text-Untertitel um, z. B. "srt").
+  String subtitleUrl(String itemId, String mediaSourceId, MediaStream stream, {String? format}) {
+    format ??= switch (stream.codec?.toLowerCase()) {
       'subrip' || 'srt' || null => 'srt',
       final codec => codec,
     };

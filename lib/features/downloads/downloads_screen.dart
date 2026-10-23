@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/downloads.dart';
+import '../../core/settings.dart';
 import '../../theme.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/focusable.dart';
@@ -94,6 +95,13 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                       ),
                     ),
                   ),
+                if (active.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: manager.waitingForUnmetered,
+                      builder: (context, waiting, _) => waiting ? const _WaitingForWifi() : const SizedBox.shrink(),
+                    ),
+                  ),
                 if (active.isNotEmpty) ...[
                   _SectionTitle(tr.downloading),
                   SliverList.list(children: [for (final e in active) _ActiveRow(entry: e)]),
@@ -119,6 +127,47 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
             ),
           ),
           TopScrim(scroll: _scroll),
+        ],
+      ),
+    );
+  }
+}
+
+/// Hinweis: Downloads warten, weil die Verbindung getaktet ist (mobile Daten, Hotspot).
+class _WaitingForWifi extends ConsumerWidget {
+  const _WaitingForWifi();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.wifi_rounded, color: AppColors.accent),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tr.waitingForWifi, style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text(tr.waitingForWifiHint, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: () {
+              ref.read(settingsProvider.notifier).update((s) => s.copyWith(downloadsUnmeteredOnly: false));
+              ref.read(downloadsProvider.notifier).recheckNetwork();
+            },
+            child: Text(tr.allowMetered),
+          ),
         ],
       ),
     );
@@ -177,6 +226,23 @@ Future<bool> confirmRemoveDownload(BuildContext context, String name) async {
   return ok ?? false;
 }
 
+/// Fragt nach, bevor ein laufender Download abgebrochen wird.
+Future<bool> confirmCancelDownload(BuildContext context, String name) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: Text(tr.cancelDownloadQuestion),
+      content: Text(tr.cancelDownloadText(name)),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr.keepDownloading)),
+        FilledButton(autofocus: true, onPressed: () => Navigator.pop(context, true), child: Text(tr.cancelDownload)),
+      ],
+    ),
+  );
+  return ok ?? false;
+}
+
 /// Spielt einen fertigen Download ab – an der zuletzt geschauten Stelle.
 void playDownload(BuildContext context, DownloadEntry entry) {
   final ticks = entry.loadItem()?.userData.playbackPositionTicks ?? entry.positionTicks;
@@ -195,7 +261,7 @@ class _ActiveRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final manager = ref.read(downloadsProvider.notifier);
     final status = switch (entry.status) {
-      DownloadStatus.queued => tr.waiting,
+      DownloadStatus.queued => manager.waitingForUnmetered.value ? tr.waitingForWifi : tr.waiting,
       DownloadStatus.downloading =>
         entry.total > 0 ? tr.receivedOf(formatBytes(entry.received), formatBytes(entry.total)) : tr.starting,
       DownloadStatus.paused => tr.paused(entry.error),
@@ -334,6 +400,16 @@ class _DoneCard extends ConsumerWidget {
                       child: const Icon(Icons.play_circle_fill_rounded, size: 56),
                     ),
                   ),
+                  if (entry.auto)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(5)),
+                        child: Text(tr.smartBadge, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
                   Positioned(
                     top: 8,
                     right: 8,
@@ -370,7 +446,8 @@ class _DoneCard extends ConsumerWidget {
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
           Text(
-            _subtitle(entry) ?? formatBytes(entry.total),
+            _subtitle(entry) ??
+                [formatBytes(entry.total), if (entry.converted) qualityLabel(entry.maxBitrate)].join(' · '),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),

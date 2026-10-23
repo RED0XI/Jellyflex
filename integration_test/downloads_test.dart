@@ -78,7 +78,7 @@ void main() {
           overrides: [
             sessionProvider.overrideWith(DemoSession.new),
             settingsProvider.overrideWith(testSettings),
-            downloadsProvider.overrideWith(() => DownloadManager(root)),
+            downloadsProvider.overrideWith(() => DownloadManager(root, () async => false)),
           ],
           child: RepaintBoundary(key: shotKey, child: const JellyflexApp()),
         ),
@@ -92,7 +92,9 @@ void main() {
       final other = await tester.runAsync(() => container.read(apiProvider).getItem('movie2'));
 
       // --- Herunterladen + Pausieren ---
-      await manager.enqueue(movie!);
+      // 1080p-Fassung: die 4K-Fassung ist laut Demo-Server 61 GB groß – mehr, als
+      // auf manchem Testrechner frei ist (die Platzprüfung würde sie ablehnen).
+      await manager.enqueue(movie!, mediaSourceId: 'movie0-hd');
       expect(
         await _waitFor(tester, () => entry('movie0').received > 3000000),
         isTrue,
@@ -160,7 +162,7 @@ void main() {
 
       // Index wurde gespeichert (Neustart der App findet die Downloads wieder).
       await pumpFor(tester, const Duration(seconds: 1));
-      final index = jsonDecode(File('${root.path}\\downloads.json').readAsStringSync()) as List;
+      final index = (jsonDecode(File('${root.path}\\downloads.json').readAsStringSync()) as Map)['entries'] as List;
       expect(index.length, 1);
 
       // --- Bildschirmfoto: ein laufender und ein fertiger (angeschauter) Download ---
