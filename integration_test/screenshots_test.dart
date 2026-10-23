@@ -4,10 +4,8 @@
 // Start:  flutter test integration_test/screenshots_test.dart -d windows
 
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -24,6 +22,7 @@ import 'package:jellyflex/theme.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'test_settings.dart';
+import 'test_helpers.dart';
 
 class _FakeSession extends SessionController {
   @override
@@ -88,24 +87,6 @@ class _ShotApi extends JellyfinApi {
   }
 }
 
-final _shotKey = GlobalKey();
-
-Future<void> _saveShot(WidgetTester tester, String name) async {
-  final boundary = _shotKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-  final image = await tester.runAsync(() => boundary.toImage(pixelRatio: 1));
-  final bytes = await tester.runAsync(() => image!.toByteData(format: ui.ImageByteFormat.png));
-  final file = File('build/screenshots/$name.png')..createSync(recursive: true);
-  file.writeAsBytesSync(bytes!.buffer.asUint8List());
-  debugPrint('Screenshot: ${file.absolute.path}');
-}
-
-Future<void> _pumpFor(WidgetTester tester, Duration total) async {
-  final end = DateTime.now().add(total);
-  while (DateTime.now().isBefore(end)) {
-    await tester.pump(const Duration(milliseconds: 100));
-  }
-}
-
 Widget _app(Widget page) => ProviderScope(
   overrides: [
     sessionProvider.overrideWith(_FakeSession.new),
@@ -114,7 +95,7 @@ Widget _app(Widget page) => ProviderScope(
     apiProvider.overrideWithValue(_ShotApi()),
   ],
   child: RepaintBoundary(
-    key: _shotKey,
+    key: shotKey,
     child: MaterialApp(debugShowCheckedModeBanner: false, theme: buildTheme(), home: page),
   ),
 );
@@ -126,21 +107,21 @@ void main() {
   testWidgets('Einstellungen', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1440, 1300));
     await tester.pumpWidget(_app(const SettingsScreen()));
-    await _pumpFor(tester, const Duration(seconds: 3)); // Schriften laden
-    await _saveShot(tester, 'settings');
+    await pumpFor(tester, const Duration(seconds: 3)); // Schriften laden
+    await saveShot(tester, 'settings');
   });
 
   testWidgets('Bibliothek mit Filtern', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1440, 900));
     await tester.pumpWidget(_app(const LibraryScreen(libraryId: 'lib', name: 'Filme', collectionType: 'movies')));
-    await _pumpFor(tester, const Duration(seconds: 2));
+    await pumpFor(tester, const Duration(seconds: 2));
     await tester.tap(find.text('Ungesehen'));
-    await _pumpFor(tester, const Duration(milliseconds: 600));
+    await pumpFor(tester, const Duration(milliseconds: 600));
     await tester.tap(find.text('Jahrzehnt'));
-    await _pumpFor(tester, const Duration(milliseconds: 600));
+    await pumpFor(tester, const Duration(milliseconds: 600));
     await tester.tap(find.text('90er').last);
-    await _pumpFor(tester, const Duration(seconds: 1));
-    await _saveShot(tester, 'library');
+    await pumpFor(tester, const Duration(seconds: 1));
+    await saveShot(tester, 'library');
   });
 
   // Braucht den Demo-Server: dart run tool/mock_server.dart
@@ -154,15 +135,15 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1440, 2900));
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [sessionProvider.overrideWith(_DemoSession.new), settingsProvider.overrideWith(testSettings)],
+        overrides: [sessionProvider.overrideWith(DemoSession.new), settingsProvider.overrideWith(testSettings)],
         child: RepaintBoundary(
-          key: _shotKey,
+          key: shotKey,
           child: MaterialApp(debugShowCheckedModeBanner: false, theme: buildTheme(), home: const HomeScreen()),
         ),
       ),
     );
-    await _pumpFor(tester, const Duration(seconds: 6));
-    await _saveShot(tester, 'home_full');
+    await pumpFor(tester, const Duration(seconds: 6));
+    await saveShot(tester, 'home_full');
   });
 
   // Braucht den Demo-Server mit Testvideo (Trailer = %TEMP%\jellyflex_test.mkv).
@@ -176,9 +157,9 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1440, 900));
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [sessionProvider.overrideWith(_DemoSession.new), settingsProvider.overrideWith(testSettings)],
+        overrides: [sessionProvider.overrideWith(DemoSession.new), settingsProvider.overrideWith(testSettings)],
         child: RepaintBoundary(
-          key: _shotKey,
+          key: shotKey,
           child: MaterialApp(debugShowCheckedModeBanner: false, theme: buildTheme(), home: const HomeScreen()),
         ),
       ),
@@ -194,11 +175,11 @@ void main() {
     while (DateTime.now().isBefore(end) && muteOpacity() < 1) {
       await tester.pump(const Duration(milliseconds: 200));
     }
-    await _pumpFor(
+    await pumpFor(
       tester,
       const Duration(milliseconds: 1500),
     ); // Einblenden abwarten    debugPrint('Ton-Knopf sichtbar: ${muteOpacity()}');
-    await _saveShot(tester, 'home_trailer');
+    await saveShot(tester, 'home_trailer');
     expect(muteOpacity(), 1.0, reason: 'Trailer sollte laufen und eingeblendet sein');
   });
 
@@ -230,25 +211,13 @@ void main() {
           ),
         ],
         child: RepaintBoundary(
-          key: _shotKey,
+          key: shotKey,
           child: MaterialApp(debugShowCheckedModeBanner: false, theme: buildTheme(), home: const LoginScreen()),
         ),
       ),
     );
-    await _pumpFor(tester, const Duration(seconds: 2));
+    await pumpFor(tester, const Duration(seconds: 2));
     expect(find.text('Wer schaut?'), findsOneWidget);
-    await _saveShot(tester, 'profiles');
+    await saveShot(tester, 'profiles');
   });
-}
-
-class _DemoSession extends SessionController {
-  @override
-  Future<AuthSession?> build() async => const AuthSession(
-    serverUrl: 'http://localhost:8097',
-    serverName: 'Demo-Server',
-    userId: 'user1',
-    userName: 'Demo',
-    token: 'mock-token',
-    deviceId: 'd',
-  );
 }

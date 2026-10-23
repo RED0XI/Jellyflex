@@ -22,20 +22,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'test_settings.dart';
-
-const _server = 'http://localhost:8097';
-
-class _DemoSession extends SessionController {
-  @override
-  Future<AuthSession?> build() async => const AuthSession(
-    serverUrl: _server,
-    serverName: 'Demo-Server',
-    userId: 'user1',
-    userName: 'Demo',
-    token: 'mock-token',
-    deviceId: 'ambilight-test',
-  );
-}
+import 'test_helpers.dart';
 
 final _shotKey = GlobalKey();
 
@@ -64,20 +51,13 @@ double _barBrightness((ByteData, int) shot, int y) {
   return sum / n;
 }
 
-Future<void> _pumpFor(WidgetTester tester, Duration total) async {
-  final end = DateTime.now().add(total);
-  while (DateTime.now().isBefore(end)) {
-    await tester.pump(const Duration(milliseconds: 100));
-  }
-}
-
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
 
   testWidgets('Ambilight im Player', (tester) async {
     try {
-      await HttpClient().getUrl(Uri.parse('$_server/System/Info/Public')).then((r) => r.close());
+      await HttpClient().getUrl(Uri.parse('$demoServer/System/Info/Public')).then((r) => r.close());
     } catch (_) {
       markTestSkipped('Demo-Server läuft nicht');
       return;
@@ -92,13 +72,13 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            sessionProvider.overrideWith(_DemoSession.new),
+            sessionProvider.overrideWith(DemoSession.new),
             settingsProvider.overrideWith(() => testSettings(temp)),
           ],
           child: RepaintBoundary(key: _shotKey, child: const JellyflexApp()),
         ),
       );
-      await _pumpFor(tester, const Duration(seconds: 3));
+      await pumpFor(tester, const Duration(seconds: 3));
       final container = ProviderScope.containerOf(tester.element(find.byType(JellyflexApp)));
       expect(container.read(settingsProvider).ambilight, AmbilightMode.window, reason: 'Standard: im Fenster an');
 
@@ -109,11 +89,11 @@ void main() {
       }
       await tester.runAsync(() => player!.seek(const Duration(seconds: 20)));
       // Bedienelemente ausblenden lassen (sonst liegt oben der dunkle Verlauf).
-      await _pumpFor(tester, const Duration(seconds: 5));
+      await pumpFor(tester, const Duration(seconds: 5));
 
       final on = await _shot(tester, 'ambilight_on');
       container.read(settingsProvider.notifier).update((s) => s.copyWith(ambilight: AmbilightMode.off));
-      await _pumpFor(tester, const Duration(seconds: 1));
+      await pumpFor(tester, const Duration(seconds: 1));
       final off = await _shot(tester, 'ambilight_off');
 
       // Etwa in der Mitte des oberen Balkens messen.

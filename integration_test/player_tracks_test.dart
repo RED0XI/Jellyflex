@@ -21,6 +21,8 @@ import 'package:jellyflex/widgets/window_frame.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'test_helpers.dart';
+
 /// Speichert ein Panel als PNG unter build/screenshots/ (zum Anschauen).
 Future<void> _savePanelShot(WidgetTester tester, Finder panel, String name) async {
   final boundary = tester.renderObject<RenderRepaintBoundary>(
@@ -31,13 +33,6 @@ Future<void> _savePanelShot(WidgetTester tester, Finder panel, String name) asyn
   File('build/screenshots/$name.png')
     ..createSync(recursive: true)
     ..writeAsBytesSync(bytes!.buffer.asUint8List());
-}
-
-Future<void> _pumpFor(WidgetTester tester, Duration total) async {
-  final end = DateTime.now().add(total);
-  while (DateTime.now().isBefore(end)) {
-    await tester.pump(const Duration(milliseconds: 100));
-  }
 }
 
 void main() {
@@ -59,58 +54,58 @@ void main() {
       if (p != null && p.state.tracks.audio.length >= 4 && p.state.duration > Duration.zero) break;
     }
     final p = player!;
-    await _pumpFor(tester, const Duration(seconds: 1));
+    await pumpFor(tester, const Duration(seconds: 1));
     debugPrint('Start: audio=${p.state.track.audio.id} sub=${p.state.track.subtitle.id}');
 
     // Maus bewegen → Bedienelemente einblenden.
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
     await mouse.addPointer(location: const Offset(400, 300));
     await mouse.moveTo(const Offset(420, 320));
-    await _pumpFor(tester, const Duration(milliseconds: 400));
+    await pumpFor(tester, const Duration(milliseconds: 400));
 
     // --- Spurwahl über das Panel ---
     await tester.tap(find.byIcon(Icons.subtitles_rounded));
-    await _pumpFor(tester, const Duration(milliseconds: 500));
+    await pumpFor(tester, const Duration(milliseconds: 500));
     expect(find.text('Audio'), findsOneWidget);
     expect(find.text('Untertitel'), findsOneWidget);
 
     await tester.tap(find.text('Englisch - AAC - Stereo'));
-    await _pumpFor(tester, const Duration(milliseconds: 800));
+    await pumpFor(tester, const Duration(milliseconds: 800));
     expect(p.state.track.audio.id, '2');
 
     await tester.tap(find.text('Englisch - SRT'));
-    await _pumpFor(tester, const Duration(milliseconds: 800));
+    await pumpFor(tester, const Duration(milliseconds: 800));
     expect(p.state.track.subtitle.id, '2');
 
     // Panel bleibt nach 4 s offen (Bedienleiste blendet sich nicht aus).
-    await _pumpFor(tester, const Duration(seconds: 4));
+    await pumpFor(tester, const Duration(seconds: 4));
     expect(find.text('Englisch - SRT'), findsOneWidget);
 
     await tester.tap(find.text('Aus'));
-    await _pumpFor(tester, const Duration(milliseconds: 800));
+    await pumpFor(tester, const Duration(milliseconds: 800));
     expect(p.state.track.subtitle.id, 'no');
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape); // Panel schließen
-    await _pumpFor(tester, const Duration(milliseconds: 500));
+    await pumpFor(tester, const Duration(milliseconds: 500));
     expect(find.text('Englisch - SRT'), findsNothing);
 
     // --- Intro überspringen (Test-Intro: 3 s bis 25 s) ---
     await p.seek(const Duration(seconds: 5));
-    await _pumpFor(tester, const Duration(seconds: 2));
+    await pumpFor(tester, const Duration(seconds: 2));
     expect(find.text('Intro überspringen'), findsOneWidget);
     await tester.tap(find.text('Intro überspringen'));
-    await _pumpFor(tester, const Duration(seconds: 2));
+    await pumpFor(tester, const Duration(seconds: 2));
     debugPrint('Nach Intro-Skip: ${p.state.position}');
     expect(p.state.position.inSeconds, greaterThanOrEqualTo(24));
     expect(find.text('Intro überspringen'), findsNothing);
 
     // --- F11 Vollbild an/aus ---
     await tester.sendKeyEvent(LogicalKeyboardKey.f11);
-    await _pumpFor(tester, const Duration(seconds: 1));
+    await pumpFor(tester, const Duration(seconds: 1));
     expect(windowFullscreen.value, isTrue);
     expect(await windowManager.isFullScreen(), isTrue);
     await tester.sendKeyEvent(LogicalKeyboardKey.f11);
-    await _pumpFor(tester, const Duration(seconds: 1));
+    await pumpFor(tester, const Duration(seconds: 1));
     expect(windowFullscreen.value, isFalse);
   });
 
@@ -132,14 +127,14 @@ void main() {
       if (p != null && p.state.tracks.audio.length >= 4 && p.state.duration > Duration.zero) break;
     }
     final p = player!;
-    await _pumpFor(tester, const Duration(seconds: 2));
+    await pumpFor(tester, const Duration(seconds: 2));
     debugPrint('Mit Einstellungen: audio=${p.state.track.audio.id} sub=${p.state.track.subtitle.id}');
     expect(p.state.track.audio.id, '2', reason: 'Englische Tonspur bevorzugt');
     expect(p.state.track.subtitle.id, '2', reason: 'Englische Untertitel bevorzugt');
 
     // Im Intro (3 s – 25 s) wird automatisch ans Ende gesprungen.
     await p.seek(const Duration(seconds: 5));
-    await _pumpFor(tester, const Duration(seconds: 3));
+    await pumpFor(tester, const Duration(seconds: 3));
     debugPrint('Nach Auto-Skip: ${p.state.position}');
     expect(p.state.position.inSeconds, greaterThanOrEqualTo(24));
   });
@@ -158,30 +153,30 @@ void main() {
       if (p != null && p.state.tracks.audio.length >= 4 && p.state.duration > Duration.zero) break;
     }
     final p = player!;
-    await _pumpFor(tester, const Duration(seconds: 1));
+    await pumpFor(tester, const Duration(seconds: 1));
 
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
     await mouse.addPointer(location: const Offset(400, 300));
     await mouse.moveTo(const Offset(420, 320));
-    await _pumpFor(tester, const Duration(milliseconds: 400));
+    await pumpFor(tester, const Duration(milliseconds: 400));
 
     // --- Kapitel in der Vorschau beim Überfahren der Spulleiste (Mitte = 60 s) ---
     await mouse.moveTo(tester.getCenter(find.byType(Slider).first));
-    await _pumpFor(tester, const Duration(milliseconds: 400));
+    await pumpFor(tester, const Duration(milliseconds: 400));
     expect(find.text('Die Mitte'), findsOneWidget);
     await mouse.moveTo(const Offset(420, 320));
-    await _pumpFor(tester, const Duration(milliseconds: 300));
+    await pumpFor(tester, const Duration(milliseconds: 300));
 
     // --- Geschwindigkeit ---
     await tester.tap(find.byIcon(Icons.tune_rounded));
-    await _pumpFor(tester, const Duration(milliseconds: 500));
+    await pumpFor(tester, const Duration(milliseconds: 500));
     await tester.tap(find.text('1,5×'));
-    await _pumpFor(tester, const Duration(milliseconds: 500));
+    await pumpFor(tester, const Duration(milliseconds: 500));
     expect(p.state.rate, 1.5);
 
     // --- Untertitelversatz +0,1 s ---
     await tester.tap(find.byIcon(Icons.add_rounded).last);
-    await _pumpFor(tester, const Duration(milliseconds: 500));
+    await pumpFor(tester, const Duration(milliseconds: 500));
     final subDelay = await (p.platform as NativePlayer).getProperty('sub-delay');
     debugPrint('sub-delay=$subDelay');
     expect(double.parse(subDelay), closeTo(0.1, 0.001));
@@ -190,9 +185,9 @@ void main() {
 
     // --- Qualität: Umrechnung an derselben Stelle ---
     await p.seek(const Duration(seconds: 40));
-    await _pumpFor(tester, const Duration(seconds: 1));
+    await pumpFor(tester, const Duration(seconds: 1));
     await tester.tap(find.text('6 Mbit/s · 720p'));
-    await _pumpFor(tester, const Duration(seconds: 3));
+    await pumpFor(tester, const Duration(seconds: 3));
     debugPrint('Umrechnung angefragt: $harnessTranscodeRequests, Position: ${p.state.position}');
     expect(harnessTranscodeRequests, [6000000]);
     expect(p.state.position.inSeconds, greaterThanOrEqualTo(38));
@@ -200,9 +195,9 @@ void main() {
 
     // Spurwechsel bei Umrechnung startet den Stream neu.
     await tester.tap(find.byIcon(Icons.subtitles_rounded));
-    await _pumpFor(tester, const Duration(milliseconds: 500));
+    await pumpFor(tester, const Duration(milliseconds: 500));
     await tester.tap(find.text('Englisch - AAC - Stereo'));
-    await _pumpFor(tester, const Duration(seconds: 3));
+    await pumpFor(tester, const Duration(seconds: 3));
     expect(harnessTranscodeRequests.length, 2);
   });
 }

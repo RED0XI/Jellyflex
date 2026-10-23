@@ -23,18 +23,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'test_settings.dart';
-
-class _DemoSession extends SessionController {
-  @override
-  Future<AuthSession?> build() async => const AuthSession(
-    serverUrl: 'http://localhost:8097',
-    serverName: 'Demo-Server',
-    userId: 'user1',
-    userName: 'Demo',
-    token: 'mock-token',
-    deviceId: 'live-test',
-  );
-}
+import 'test_helpers.dart';
 
 Future<int> _send(String type, Object data) async {
   final client = HttpClient();
@@ -44,13 +33,6 @@ Future<int> _send(String type, Object data) async {
   final body = await utf8.decoder.bind(res).join();
   client.close();
   return (jsonDecode(body) as Map)['sent'] as int;
-}
-
-Future<void> _pumpFor(WidgetTester tester, Duration total) async {
-  final end = DateTime.now().add(total);
-  while (DateTime.now().isBefore(end)) {
-    await tester.pump(const Duration(milliseconds: 100));
-  }
 }
 
 void main() {
@@ -70,11 +52,11 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [sessionProvider.overrideWith(_DemoSession.new), settingsProvider.overrideWith(testSettings)],
+        overrides: [sessionProvider.overrideWith(DemoSession.new), settingsProvider.overrideWith(testSettings)],
         child: const JellyflexApp(),
       ),
     );
-    await _pumpFor(tester, const Duration(seconds: 4));
+    await pumpFor(tester, const Duration(seconds: 4));
 
     // --- Mitteilung vom Server ---
     final clients = await tester.runAsync(
@@ -85,7 +67,7 @@ void main() {
     );
     debugPrint('Live-Clients: $clients');
     expect(clients, greaterThanOrEqualTo(1), reason: 'App sollte per WebSocket verbunden sein');
-    await _pumpFor(tester, const Duration(seconds: 1));
+    await pumpFor(tester, const Duration(seconds: 1));
     expect(find.text('Hallo: Test vom Handy'), findsOneWidget);
 
     // --- Abspielen per Fernsteuerung ---
@@ -101,14 +83,14 @@ void main() {
     }
     expect(find.byType(PlayerScreen), findsOneWidget);
     final p = player!;
-    await _pumpFor(tester, const Duration(seconds: 1));
+    await pumpFor(tester, const Duration(seconds: 1));
 
     await tester.runAsync(() => _send('Playstate', {'Command': 'Pause'}));
-    await _pumpFor(tester, const Duration(seconds: 1));
+    await pumpFor(tester, const Duration(seconds: 1));
     expect(p.state.playing, isFalse);
 
     await tester.runAsync(() => _send('Playstate', {'Command': 'Seek', 'SeekPositionTicks': 300000000}));
-    await _pumpFor(tester, const Duration(seconds: 1));
+    await pumpFor(tester, const Duration(seconds: 1));
     expect(p.state.position.inSeconds, inInclusiveRange(29, 31));
 
     await tester.runAsync(
@@ -117,11 +99,11 @@ void main() {
         'Arguments': {'Volume': '30'},
       }),
     );
-    await _pumpFor(tester, const Duration(milliseconds: 800));
+    await pumpFor(tester, const Duration(milliseconds: 800));
     expect(p.state.volume, 30);
 
     await tester.runAsync(() => _send('Playstate', {'Command': 'Stop'}));
-    await _pumpFor(tester, const Duration(seconds: 3));
+    await pumpFor(tester, const Duration(seconds: 3));
     expect(find.byType(PlayerScreen), findsNothing);
   });
 
@@ -135,16 +117,16 @@ void main() {
     await windowManager.ensureInitialized();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [sessionProvider.overrideWith(_DemoSession.new), settingsProvider.overrideWith(testSettings)],
+        overrides: [sessionProvider.overrideWith(DemoSession.new), settingsProvider.overrideWith(testSettings)],
         child: const JellyflexApp(),
       ),
     );
-    await _pumpFor(tester, const Duration(seconds: 4));
+    await pumpFor(tester, const Duration(seconds: 4));
 
     // --- Tastatur: Pfeiltasten bis in die erste Reihe, Enter öffnet Details ---
     for (var i = 0; i < 4; i++) {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-      await _pumpFor(tester, const Duration(milliseconds: 400));
+      await pumpFor(tester, const Duration(milliseconds: 400));
       final f = FocusManager.instance.primaryFocus;
       debugPrint('NACH ↓ $i: $f | ${f?.context?.findAncestorWidgetOfExactType<Focusable>()?.runtimeType}');
     }
@@ -156,12 +138,12 @@ void main() {
     await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.f10);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
-    await _pumpFor(tester, const Duration(milliseconds: 600));
+    await pumpFor(tester, const Duration(milliseconds: 600));
     final menuOpen = find.text('Details').evaluate().isNotEmpty;
     debugPrint('Kontextmenü offen: $menuOpen');
     if (menuOpen) {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await _pumpFor(tester, const Duration(milliseconds: 500));
+      await pumpFor(tester, const Duration(milliseconds: 500));
     }
 
     final beforeEnter = FocusManager.instance.primaryFocus;
@@ -169,24 +151,24 @@ void main() {
       'Fokus vor Enter: $beforeEnter / in Focusable: ${beforeEnter?.context?.findAncestorWidgetOfExactType<Focusable>() != null}',
     );
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-    await _pumpFor(tester, const Duration(seconds: 2));
+    await pumpFor(tester, const Duration(seconds: 2));
     expect(find.byType(DetailsScreen), findsOneWidget, reason: 'Enter auf einer Karte öffnet die Details');
 
     // --- Controller: B = zurück, Steuerkreuz + A = wieder öffnen ---
     GamepadInput.simulate(PadAction.back);
-    await _pumpFor(tester, const Duration(seconds: 1));
+    await pumpFor(tester, const Duration(seconds: 1));
     expect(find.byType(DetailsScreen), findsNothing, reason: 'B geht zurück');
 
     GamepadInput.simulate(PadAction.right);
-    await _pumpFor(tester, const Duration(milliseconds: 500));
+    await pumpFor(tester, const Duration(milliseconds: 500));
     GamepadInput.simulate(PadAction.select);
-    await _pumpFor(tester, const Duration(seconds: 2));
+    await pumpFor(tester, const Duration(seconds: 2));
     expect(find.byType(DetailsScreen), findsOneWidget, reason: 'Steuerkreuz + A öffnet die Details');
 
     GamepadInput.simulate(PadAction.back);
-    await _pumpFor(tester, const Duration(seconds: 1));
+    await pumpFor(tester, const Duration(seconds: 1));
     GamepadInput.simulate(PadAction.search);
-    await _pumpFor(tester, const Duration(seconds: 1));
+    await pumpFor(tester, const Duration(seconds: 1));
     expect(find.byType(SearchScreen), findsOneWidget, reason: 'Y öffnet die Suche');
   });
 }

@@ -7,10 +7,8 @@
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,46 +23,15 @@ import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'test_settings.dart';
-
-const _server = 'http://localhost:8097';
-
-class _DemoSession extends SessionController {
-  @override
-  Future<AuthSession?> build() async => const AuthSession(
-    serverUrl: _server,
-    serverName: 'Demo-Server',
-    userId: 'user1',
-    userName: 'Demo',
-    token: 'mock-token',
-    deviceId: 'downloads-test',
-  );
-}
+import 'test_helpers.dart';
 
 Future<String> _call(String method, String path) async {
   final client = HttpClient();
-  final req = await client.openUrl(method, Uri.parse('$_server$path'));
+  final req = await client.openUrl(method, Uri.parse('$demoServer$path'));
   final res = await req.close();
   final body = await utf8.decoder.bind(res).join();
   client.close();
   return body;
-}
-
-final _shotKey = GlobalKey();
-
-Future<void> _saveShot(WidgetTester tester, String name) async {
-  final boundary = _shotKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-  final image = await tester.runAsync(() => boundary.toImage(pixelRatio: 1));
-  final bytes = await tester.runAsync(() => image!.toByteData(format: ui.ImageByteFormat.png));
-  final file = File('build/screenshots/$name.png')..createSync(recursive: true);
-  file.writeAsBytesSync(bytes!.buffer.asUint8List());
-  debugPrint('Screenshot: ${file.absolute.path}');
-}
-
-Future<void> _pumpFor(WidgetTester tester, Duration total) async {
-  final end = DateTime.now().add(total);
-  while (DateTime.now().isBefore(end)) {
-    await tester.pump(const Duration(milliseconds: 100));
-  }
 }
 
 /// Wartet (höchstens [timeout]), bis [condition] erfüllt ist.
@@ -87,7 +54,7 @@ void main() {
 
   testWidgets('Downloads: laden, pausieren, löschen, offline schauen, nachmelden', (tester) async {
     try {
-      await HttpClient().getUrl(Uri.parse('$_server/System/Info/Public')).then((r) => r.close());
+      await HttpClient().getUrl(Uri.parse('$demoServer/System/Info/Public')).then((r) => r.close());
     } catch (_) {
       markTestSkipped('Demo-Server läuft nicht');
       return;
@@ -109,14 +76,14 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            sessionProvider.overrideWith(_DemoSession.new),
+            sessionProvider.overrideWith(DemoSession.new),
             settingsProvider.overrideWith(testSettings),
             downloadsProvider.overrideWith(() => DownloadManager(root)),
           ],
-          child: RepaintBoundary(key: _shotKey, child: const JellyflexApp()),
+          child: RepaintBoundary(key: shotKey, child: const JellyflexApp()),
         ),
       );
-      await _pumpFor(tester, const Duration(seconds: 3));
+      await pumpFor(tester, const Duration(seconds: 3));
       final container = ProviderScope.containerOf(tester.element(find.byType(JellyflexApp)));
       final manager = container.read(downloadsProvider.notifier);
       DownloadEntry entry(String id) => manager.entryFor(id)!;
@@ -132,10 +99,10 @@ void main() {
         reason: 'Download sollte starten',
       );
       manager.pause('movie0');
-      await _pumpFor(tester, const Duration(milliseconds: 800));
+      await pumpFor(tester, const Duration(milliseconds: 800));
       final part = File('${entry('movie0').folder}\\media.mkv.part');
       final pausedSize = part.lengthSync();
-      await _pumpFor(tester, const Duration(seconds: 1));
+      await pumpFor(tester, const Duration(seconds: 1));
       expect(entry('movie0').status, DownloadStatus.paused);
       expect(part.lengthSync(), pausedSize, reason: 'Nach Pause wächst die Datei nicht weiter');
       expect(pausedSize, lessThan(video.lengthSync()));
@@ -153,13 +120,13 @@ void main() {
       expect(await _waitFor(tester, () => (manager.entryFor('movie2')?.received ?? 0) > 1000000), isTrue);
       final otherFolder = Directory(entry('movie2').folder);
       await tester.runAsync(() => manager.remove('movie2'));
-      await _pumpFor(tester, const Duration(milliseconds: 500));
+      await pumpFor(tester, const Duration(milliseconds: 500));
       expect(manager.entryFor('movie2'), isNull);
       expect(otherFolder.existsSync(), isFalse, reason: 'Ordner samt Teildatei gelöscht');
 
       // --- Downloads-Seite ---
       container.read(routerProvider).push('/downloads');
-      await _pumpFor(tester, const Duration(seconds: 1));
+      await pumpFor(tester, const Duration(seconds: 1));
       expect(find.text('Bereit zum Offline-Schauen'), findsOneWidget);
 
       // --- Offline abspielen ---
@@ -172,7 +139,7 @@ void main() {
       );
       expect(find.textContaining('konnte nicht'), findsNothing);
       await tester.runAsync(() => player!.seek(const Duration(seconds: 60)));
-      await _pumpFor(tester, const Duration(seconds: 2));
+      await pumpFor(tester, const Duration(seconds: 2));
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       expect(await _waitFor(tester, () => find.byType(PlayerScreen).evaluate().isEmpty), isTrue);
       final watched = entry('movie0');
@@ -186,27 +153,27 @@ void main() {
       // --- Wieder online: Fortschritt nachmelden ---
       await tester.runAsync(() => _call('POST', '/debug/offline?on=0'));
       await tester.runAsync(manager.syncPending);
-      await _pumpFor(tester, const Duration(milliseconds: 300));
+      await pumpFor(tester, const Duration(milliseconds: 300));
       expect(entry('movie0').needsSync, isFalse);
       final serverData = jsonDecode((await tester.runAsync(() => _call('GET', '/debug/userdata/movie0')))!) as Map;
       expect(serverData['PlaybackPositionTicks'], watched.positionTicks, reason: 'Server kennt jetzt die Stelle');
 
       // Index wurde gespeichert (Neustart der App findet die Downloads wieder).
-      await _pumpFor(tester, const Duration(seconds: 1));
+      await pumpFor(tester, const Duration(seconds: 1));
       final index = jsonDecode(File('${root.path}\\downloads.json').readAsStringSync()) as List;
       expect(index.length, 1);
 
       // --- Bildschirmfoto: ein laufender und ein fertiger (angeschauter) Download ---
       await manager.enqueue(other);
       await _waitFor(tester, () => (manager.entryFor('movie2')?.received ?? 0) > 2000000);
-      await _pumpFor(tester, const Duration(milliseconds: 600));
-      await _saveShot(tester, 'downloads');
+      await pumpFor(tester, const Duration(milliseconds: 600));
+      await saveShot(tester, 'downloads');
       await tester.runAsync(() => manager.remove('movie2'));
     } finally {
       await tester.runAsync(() => _call('POST', '/debug/offline?on=0'));
       await tester.runAsync(() => _call('POST', '/debug/throttle?bps=0'));
       await tester.pumpWidget(const SizedBox());
-      await _pumpFor(tester, const Duration(milliseconds: 500));
+      await pumpFor(tester, const Duration(milliseconds: 500));
       try {
         root.deleteSync(recursive: true);
       } catch (_) {}
