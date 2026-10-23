@@ -11,9 +11,12 @@ import 'core/system_certs.dart';
 import 'core/redact.dart';
 import 'core/app_log.dart';
 import 'core/download_notify.dart';
+import 'core/app_shell.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Start aus der Sprungliste ("Weiterschauen"): Titel nach dem Anmelden fortsetzen.
+  AppShell.pendingResumeId = AppShell.resumeIdFrom(args.join(' '));
   // Zugangsdaten nie in Protokolle schreiben (auch nicht aus Fehlermeldungen).
   final print = debugPrint;
   debugPrint = (message, {wrapWidth}) {

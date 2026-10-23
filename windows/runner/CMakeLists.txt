@@ -7,6 +7,7 @@ project(runner LANGUAGES CXX)
 #
 # Any new source files that you add to the application should be added here.
 add_executable(${BINARY_NAME} WIN32
+  "app_shell.cpp"
   "flutter_window.cpp"
   "media_session.cpp"
   "main.cpp"
@@ -35,6 +36,8 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
+# Sprungliste der Taskleiste (app_shell.cpp).
+target_link_libraries(${BINARY_NAME} PRIVATE "propsys.lib" "shlwapi.lib")
 # WinRT für die Windows-Medienanzeige (media_session.cpp).
 target_link_libraries(${BINARY_NAME} PRIVATE "windowsapp.lib")
 # WinRT für die Windows-Medienanzeige (media_session.cpp).

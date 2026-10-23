@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "app_shell.h"
 #include "media_session.h"
 #include "win32_window.h"
 
@@ -32,6 +33,7 @@ class FlutterWindow : public Win32Window {
 
   // Windows-Medienanzeige und Medientasten.
   std::unique_ptr<MediaSession> media_session_;
+  std::unique_ptr<AppShell> app_shell_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

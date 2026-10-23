@@ -2,11 +2,38 @@
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
 
+#include <shobjidl.h>
+
+#include <string>
+
+#include "app_shell.h"
 #include "flutter_window.h"
 #include "utils.h"
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
+#ifndef _DEBUG
+  // Nur eine Instanz: Läuft Jellyflex schon, den Aufruf (z. B. aus der
+  // Sprungliste) an das offene Fenster weitergeben und beenden.
+  // (In Debug-Builds aus, damit Tests parallel zu einer installierten App laufen.)
+  HANDLE instance_mutex = ::CreateMutexW(nullptr, FALSE, L"Local\\Jellyflex.SingleInstance");
+  if (instance_mutex && ::GetLastError() == ERROR_ALREADY_EXISTS) {
+    if (HWND existing = ::FindWindowW(AppShell::kWindowClass, nullptr)) {
+      std::wstring args = command_line ? command_line : L"";
+      if (args.size() > 1024) args.resize(1024);
+      COPYDATASTRUCT data{AppShell::kCopyDataId, static_cast<DWORD>((args.size() + 1) * sizeof(wchar_t)),
+                          const_cast<wchar_t*>(args.c_str())};
+      ::SendMessageW(existing, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&data));
+      if (::IsIconic(existing)) ::ShowWindow(existing, SW_RESTORE);
+      ::SetForegroundWindow(existing);
+    }
+    return EXIT_SUCCESS;
+  }
+  // Feste App-Kennung: Sprungliste und Taskleisten-Gruppierung gehören zusammen.
+  // (Nicht in Debug-Builds – Testläufe sollen die Sprungliste der echten App nicht ändern.)
+  ::SetCurrentProcessExplicitAppUserModelID(L"Jellyflex.App");
+#endif
+
   // Attach to console when present (e.g., 'flutter run') or create a
   // new console when running with a debugger.
   if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent()) {

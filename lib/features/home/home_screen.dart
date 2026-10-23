@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/app_shell.dart';
 import '../../core/images.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
@@ -39,6 +40,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final home = ref.watch(homeProvider);
+    // Startseite (neu) geladen: "Weiterschauen" auch in die Sprungliste der Taskleiste.
+    ref.listen(homeProvider, (_, next) {
+      if (next.hasValue && !next.isLoading) AppShell.updateJumpList(ref.read(apiProvider));
+    });
     final season = ref.watch(activeSeasonProvider);
     final seasonal = ref.watch(seasonalSectionProvider).value;
     final screenHeight = MediaQuery.sizeOf(context).height;

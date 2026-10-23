@@ -28,6 +28,7 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   media_session_ = std::make_unique<MediaSession>(
       flutter_controller_->engine()->messenger(), GetHandle());
+  app_shell_ = std::make_unique<AppShell>(flutter_controller_->engine()->messenger());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -44,6 +45,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   media_session_ = nullptr;
+  app_shell_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -62,6 +64,19 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                                                       lparam);
     if (result) {
       return *result;
+    }
+  }
+
+  // Aufruf einer zweiten Instanz (z. B. Klick in der Sprungliste).
+  if (message == WM_COPYDATA && app_shell_) {
+    auto* data = reinterpret_cast<COPYDATASTRUCT*>(lparam);
+    if (data && data->dwData == AppShell::kCopyDataId && data->lpData && data->cbData <= 4096 &&
+        data->cbData % sizeof(wchar_t) == 0) {
+      const auto* text = static_cast<const wchar_t*>(data->lpData);
+      size_t length = data->cbData / sizeof(wchar_t);
+      while (length > 0 && text[length - 1] == L'\0') length--;
+      app_shell_->Forward(std::wstring(text, length));
+      return TRUE;
     }
   }
 

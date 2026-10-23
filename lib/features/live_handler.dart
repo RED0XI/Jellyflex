@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/app_shell.dart';
 import '../core/live_connection.dart';
+import '../core/session.dart';
 import '../core/server_status.dart';
 import '../l10n/strings.dart';
 import '../theme.dart';
@@ -34,6 +36,18 @@ class _LiveHandlerState extends ConsumerState<LiveHandler> {
   @override
   void initState() {
     super.initState();
+    // Sprungliste der Taskleiste: Klick setzt einen Titel fort.
+    AppShell.listen(_resume);
+    ref.listenManual(sessionProvider, (_, session) {
+      final signedIn = session.value != null;
+      // Abgemeldet: Titel nicht mehr in der Taskleiste zeigen.
+      if (!signedIn) AppShell.setJumpList(tr.continueWatching, const []);
+      if (signedIn && AppShell.pendingResumeId != null) {
+        final id = AppShell.pendingResumeId!;
+        AppShell.pendingResumeId = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _resume(id));
+      }
+    }, fireImmediately: true);
     ref.listenManual<LiveConnection?>(liveConnectionProvider, (_, connection) {
       _subscription?.cancel();
       _subscription = connection?.messages.listen(_onMessage);
@@ -116,6 +130,22 @@ class _LiveHandlerState extends ConsumerState<LiveHandler> {
         if (router.canPop()) router.pop();
       case 'ToggleFullscreen':
         toggleWindowFullscreen();
+    }
+  }
+
+  /// Titel aus der Sprungliste fortsetzen (an der gemerkten Stelle).
+  Future<void> _resume(String id) async {
+    if (ref.read(sessionProvider).value == null) {
+      AppShell.pendingResumeId = id;
+      return;
+    }
+    try {
+      final item = await ref.read(apiProvider).getItem(id);
+      if (!mounted) return;
+      final ticks = item.userData.playbackPositionTicks;
+      _open('/play/${item.id}${ticks > 0 ? '?start=$ticks' : ''}');
+    } catch (e) {
+      debugPrint('Fortsetzen aus der Sprungliste nicht möglich: $e');
     }
   }
 

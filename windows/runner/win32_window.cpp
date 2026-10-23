@@ -16,7 +16,8 @@ namespace {
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
 
-constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
+// Eigener Name, damit eine zweite Instanz das Fenster wiederfindet (siehe main.cpp).
+constexpr const wchar_t kWindowClassName[] = L"JELLYFLEX_WINDOW";
 
 /// Registry key for app theme preference.
 ///
