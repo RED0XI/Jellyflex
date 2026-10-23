@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'core/themes.dart';
 
@@ -27,6 +26,10 @@ abstract final class AppColors {
       LinearGradient(colors: [p.accent, p.accentAlt], begin: Alignment.topLeft, end: Alignment.bottomRight);
 }
 
+/// Schriftart der App: die des Betriebssystems (keine Downloads).
+const appFontFamily = 'Segoe UI Variable Text';
+const appFontFallback = ['Segoe UI', 'Arial'];
+
 /// Horizontaler Seitenabstand, den alle Screens teilen.
 const double kPageGutter = 56;
 
@@ -38,6 +41,8 @@ ThemeData buildTheme([String? themeId]) {
   final base = ThemeData(
     brightness: Brightness.dark,
     useMaterial3: true,
+    fontFamily: appFontFamily,
+    fontFamilyFallback: appFontFallback,
     scaffoldBackgroundColor: AppColors.background,
     colorScheme: ColorScheme.dark(
       primary: AppColors.accent,
@@ -47,7 +52,10 @@ ThemeData buildTheme([String? themeId]) {
     ),
   );
 
-  final textTheme = GoogleFonts.interTextTheme(base.textTheme)
+  // Schrift des Systems (Windows 11: Segoe UI Variable) – nichts wird aus dem
+  // Internet geladen, und die App bleibt kleiner.
+  final textTheme = base.textTheme
+      .apply(fontFamily: appFontFamily, fontFamilyFallback: appFontFallback)
       .apply(bodyColor: AppColors.textPrimary, displayColor: AppColors.textPrimary);
 
   return base.copyWith(
