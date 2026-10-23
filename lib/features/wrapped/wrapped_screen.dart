@@ -260,6 +260,13 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
           s.isEmpty ? tr.nothingThisYear : tr.letsLookBack,
           style: const TextStyle(fontSize: 22, color: Colors.white70),
         ),
+        const SizedBox(height: 14),
+        // Klarstellen, was gezählt wird: nur dieses Profil, nur wirklich Geschautes.
+        Text(
+          s.markedOnly > 0 ? '${tr.recapOnlyYou}  ·  ${tr.recapMarkedNote(s.markedOnly)}' : tr.recapOnlyYou,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 14, color: Colors.white54),
+        ),
         if (years.length > 1) ...[
           const SizedBox(height: 28),
           Wrap(

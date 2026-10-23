@@ -83,4 +83,29 @@ void main() {
     expect(stats.isEmpty, isTrue);
     expect(stats.favoriteHour, isNull);
   });
+
+  test('Nur als gesehen markierte Titel zählen nicht (z. B. ganze Staffel auf einmal)', () {
+    final stats = computeWrapped(
+      year: 2026,
+      playedMovies: [
+        _movie('echt', 110, '2026-02-10T20:00:00Z'),
+        // Zwei Filme innerhalb von Sekunden: markiert, nicht geschaut.
+        _movie('m1', 120, '2026-02-11T09:00:00Z'),
+        _movie('m2', 130, '2026-02-11T09:00:20Z'),
+      ],
+      playedEpisodes: [
+        // Eine ganze Staffel (10 Folgen) in derselben Minute markiert …
+        for (var i = 0; i < 10; i++) _episode('bulk$i', 'nordlicht', 45, '2026-05-01T12:00:0${i % 10}Z'),
+        // … und drei wirklich geschaute Folgen hintereinander.
+        _episode('w1', 'signal', 50, '2026-05-02T20:00:00Z'),
+        _episode('w2', 'signal', 50, '2026-05-02T20:52:00Z'),
+        _episode('w3', 'signal', 50, '2026-05-02T21:45:00Z'),
+      ],
+    );
+    expect(stats.movies, 1);
+    expect(stats.episodes, 3);
+    expect(stats.markedOnly, 12);
+    expect(stats.totalMinutes, 110 + 3 * 50);
+    expect(stats.bingeMinutes, 150, reason: 'Marathon-Tag zählt nur Geschautes');
+  });
 }

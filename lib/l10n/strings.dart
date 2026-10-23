@@ -236,6 +236,11 @@ class S {
   String get goodEvening => _t('Good evening', 'Guten Abend');
   String get coverStory => _t('Cover story', 'Titelgeschichte');
   String get layout => _t('Layout', 'Layout');
+  String get recapOnlyYou => _t('Only your profile counts', 'Gezählt wird nur dein Profil');
+  String recapMarkedNote(int n) => _t(
+    '$n ${n == 1 ? 'title was' : 'titles were'} only marked as watched (not counted)',
+    '$n ${n == 1 ? 'Titel wurde' : 'Titel wurden'} nur als gesehen markiert (nicht gezählt)',
+  );
   String get layoutHint => _t(
     'Changes how the whole app is built – navigation, banner, cards, type. Colours stay as chosen below.',
     'Ändert den ganzen Aufbau – Navigation, Banner, Karten, Schrift. Die Farben bleiben wie unten gewählt.',

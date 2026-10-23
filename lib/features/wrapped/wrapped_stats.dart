@@ -14,6 +14,9 @@ class WrappedPerson {
 ///
 /// Jellyfin merkt sich pro Titel nur, wann er *zuletzt* gesehen wurde – jeder
 /// Film bzw. jede Folge zählt also einmal, im Jahr des letzten Ansehens.
+/// Gezählt wird nur das eigene Profil (die Anfragen laufen mit der eigenen
+/// Benutzer-ID). Nur als gesehen *markierte* Titel zählen nicht (siehe
+/// [bulkMarkedIds]).
 class WrappedStats {
   const WrappedStats({
     required this.year,
@@ -29,6 +32,7 @@ class WrappedStats {
     required this.bingeMinutes,
     required this.hourHistogram,
     required this.longestMovie,
+    this.markedOnly = 0,
   });
 
   final int year;
@@ -51,6 +55,9 @@ class WrappedStats {
   final List<int> hourHistogram;
   final BaseItem? longestMovie;
 
+  /// Titel des Jahres, die nur als gesehen markiert wurden (nicht mitgezählt).
+  final int markedOnly;
+
   bool get isEmpty => movies + episodes == 0;
 
   /// Stunde, zu der am meisten geschaut wurde.
@@ -71,6 +78,35 @@ DateTime? _lastPlayed(BaseItem item) {
 
 int _minutes(BaseItem item) => item.runtime?.inMinutes ?? 0;
 
+/// Titel, die nur als gesehen *markiert* wurden – z. B. eine ganze Staffel oder
+/// Sammlung auf einmal – statt wirklich geschaut. Erkennbar daran, dass mehrere
+/// Titel fast denselben Zeitpunkt "zuletzt gesehen" haben: Wer schaut, braucht
+/// zwischen zwei Titeln mindestens die Laufzeit.
+///
+/// Regel: Titel, deren Zeitpunkte jeweils höchstens 3 Minuten auseinander
+/// liegen, bilden eine Gruppe. Ab 3 Titeln (oder 2 innerhalb einer Minute) gilt
+/// die Gruppe als markiert.
+Set<String> bulkMarkedIds(Iterable<BaseItem> items) {
+  final dated = [
+    for (final item in items)
+      if (_lastPlayed(item) case final played?) (item.id, played),
+  ]..sort((a, b) => a.$2.compareTo(b.$2));
+  final marked = <String>{};
+  var group = <(String, DateTime)>[];
+  void flush() {
+    final quickPair = group.length == 2 && group[1].$2.difference(group[0].$2) < const Duration(minutes: 1);
+    if (group.length >= 3 || quickPair) marked.addAll(group.map((e) => e.$1));
+    group = [];
+  }
+
+  for (final entry in dated) {
+    if (group.isNotEmpty && entry.$2.difference(group.last.$2) > const Duration(minutes: 3)) flush();
+    group.add(entry);
+  }
+  flush();
+  return marked;
+}
+
 /// Berechnet den Rückblick für [year] aus gesehenen Filmen und Folgen.
 /// [seriesById]: die Serien zu den Folgen (für Genres, Besetzung und Bilder).
 WrappedStats computeWrapped({
@@ -80,8 +116,12 @@ WrappedStats computeWrapped({
   Map<String, BaseItem> seriesById = const {},
 }) {
   bool inYear(BaseItem i) => _lastPlayed(i)?.year == year;
-  final movies = playedMovies.where((i) => i.isMovie && inYear(i)).toList();
-  final episodes = playedEpisodes.where((i) => i.isEpisode && inYear(i)).toList();
+  final yearMovies = playedMovies.where((i) => i.isMovie && inYear(i)).toList();
+  final yearEpisodes = playedEpisodes.where((i) => i.isEpisode && inYear(i)).toList();
+  // Nur markierte (nicht geschaute) Titel verfälschen Stunden und Marathon-Tag.
+  final marked = bulkMarkedIds([...yearMovies, ...yearEpisodes]);
+  final movies = yearMovies.where((i) => !marked.contains(i.id)).toList();
+  final episodes = yearEpisodes.where((i) => !marked.contains(i.id)).toList();
   final all = [...movies, ...episodes];
 
   final total = all.fold(0, (sum, i) => sum + _minutes(i));
@@ -162,5 +202,6 @@ WrappedStats computeWrapped({
     bingeMinutes: binge?.value ?? 0,
     hourHistogram: hours,
     longestMovie: longest,
+    markedOnly: marked.length,
   );
 }
