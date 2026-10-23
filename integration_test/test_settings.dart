@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:jellyflex/core/downloads.dart';
 import 'package:jellyflex/core/secure_store.dart';
 import 'package:jellyflex/core/series_tracks.dart';
 import 'package:jellyflex/core/settings.dart';
@@ -15,6 +16,7 @@ SettingsController testSettings([Directory? dir, AppLanguage language = AppLangu
   // Auch Anmeldedaten (Konten, PIN) nur in einer Temp-Datei – nie im echten Speicher.
   SecureStore.instance = SecureStore.forFile(File('${folder.path}\\secure.bin'));
   SeriesTracks.instance = SeriesTracks.forFile(File('${folder.path}\\series_tracks.json'));
+  DownloadManager.testDirectory = folder;
   final file = File('${folder.path}\\settings.json');
   if (!file.existsSync()) file.writeAsStringSync(jsonEncode({'language': language.name}));
   return SettingsController(file);

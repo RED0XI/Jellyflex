@@ -331,10 +331,20 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   AppSettings get _settings => ref.read(settingsProvider);
 
   /// Aktueller Download-Ordner (Standard: Videos\Jellyflex).
-  Directory get root => _rootOverride ?? Directory(_settings.downloadFolder ?? DownloadFolder.defaultPath);
+  Directory get root =>
+      _rootOverride ??
+      Directory(
+        _settings.downloadFolder ??
+            (testDirectory != null ? '${testDirectory!.path}\\Jellyflex' : null) ??
+            DownloadFolder.defaultPath,
+      );
+
+  /// Nur für Tests: Ordner für Liste und Downloads (nie die echten Daten des Benutzers).
+  @visibleForTesting
+  static Directory? testDirectory;
 
   /// Liste der Downloads – im App-Datenordner (in Tests im Testordner).
-  File get _indexFile => File('${(_rootOverride ?? appDataDir).path}\\downloads.json');
+  File get _indexFile => File('${(_rootOverride ?? testDirectory ?? appDataDir).path}\\downloads.json');
 
   /// Frühere Versionen speicherten die Liste im Download-Ordner.
   File get _legacyIndexFile => File('${DownloadFolder.defaultPath}\\downloads.json');
@@ -374,7 +384,9 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
 
     try {
       var file = _indexFile;
-      if (!file.existsSync() && _rootOverride == null && _legacyIndexFile.existsSync()) file = _legacyIndexFile;
+      if (!file.existsSync() && _rootOverride == null && testDirectory == null && _legacyIndexFile.existsSync()) {
+        file = _legacyIndexFile;
+      }
       if (file.existsSync()) {
         final decoded = jsonDecode(file.readAsStringSync());
         final List<dynamic> raw;
