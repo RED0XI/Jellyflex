@@ -55,6 +55,7 @@ class AppSettings {
     this.logoPath,
     this.screensaverMinutes = 5,
     this.imageCacheMb = 300,
+    this.updateCheck = false,
     this.seasonalThemes = true,
     this.ambilight = AmbilightMode.window,
     this.quizHighscore = 0,
@@ -86,6 +87,9 @@ class AppSettings {
 
   /// Obergrenze des Bild-Zwischenspeichers auf der Festplatte (MB, 0 = aus).
   final int imageCacheMb;
+
+  /// Beim Start nach einer neuen Version fragen (Standard: aus).
+  final bool updateCheck;
 
   /// Eigener App-Name (Titelleiste, Fenstertitel, Anmeldung …); `null` = "Jellyflex".
   final String? appName;
@@ -134,6 +138,7 @@ class AppSettings {
     String? Function()? logoPath,
     int? screensaverMinutes,
     int? imageCacheMb,
+    bool? updateCheck,
     bool? seasonalThemes,
     AmbilightMode? ambilight,
     int? quizHighscore,
@@ -154,6 +159,7 @@ class AppSettings {
     logoPath: logoPath != null ? logoPath() : this.logoPath,
     screensaverMinutes: screensaverMinutes ?? this.screensaverMinutes,
     imageCacheMb: imageCacheMb ?? this.imageCacheMb,
+    updateCheck: updateCheck ?? this.updateCheck,
     seasonalThemes: seasonalThemes ?? this.seasonalThemes,
     ambilight: ambilight ?? this.ambilight,
     quizHighscore: quizHighscore ?? this.quizHighscore,
@@ -176,6 +182,7 @@ class AppSettings {
     'logoPath': logoPath,
     'screensaverMinutes': screensaverMinutes,
     'imageCacheMb': imageCacheMb,
+    'updateCheck': updateCheck,
     'seasonalThemes': seasonalThemes,
     'ambilight': ambilight.name,
     'quizHighscore': quizHighscore,
@@ -198,6 +205,7 @@ class AppSettings {
     logoPath: json['logoPath'] as String?,
     screensaverMinutes: (json['screensaverMinutes'] as num?)?.toInt() ?? 5,
     imageCacheMb: ((json['imageCacheMb'] as num?)?.toInt() ?? 300).clamp(0, 5000),
+    updateCheck: json['updateCheck'] as bool? ?? false,
     seasonalThemes: json['seasonalThemes'] as bool? ?? true,
     ambilight: AmbilightMode.values.asNameMap()[json['ambilight']] ?? AmbilightMode.window,
     quizHighscore: (json['quizHighscore'] as num?)?.toInt() ?? 0,

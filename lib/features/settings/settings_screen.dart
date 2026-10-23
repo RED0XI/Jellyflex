@@ -17,6 +17,7 @@ import '../../l10n/strings.dart';
 import '../../core/format.dart';
 import '../../widgets/theme_picker.dart';
 import '../../core/image_cache.dart';
+import 'about_section.dart';
 import '../../core/downloads.dart' show formatBytes;
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -375,6 +376,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             _ImageCacheRow(
                               limitMb: s.imageCacheMb,
                               onLimit: (mb) => ctrl.update((s) => s.copyWith(imageCacheMb: mb)),
+                            ),
+                          ],
+                        ),
+
+                        _Section(
+                          title: tr.about,
+                          icon: Icons.info_outline_rounded,
+                          children: [
+                            AboutRows(
+                              row: ({required title, subtitle, required trailing}) =>
+                                  _Row(title: title, subtitle: subtitle, trailing: trailing),
+                              toggle: ({required value, required onChanged}) =>
+                                  _Toggle(value: value, onChanged: onChanged),
                             ),
                           ],
                         ),

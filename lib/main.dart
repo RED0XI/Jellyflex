@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
@@ -7,12 +9,28 @@ import 'app.dart';
 import 'core/ui_sounds.dart';
 import 'core/system_certs.dart';
 import 'core/redact.dart';
+import 'core/app_log.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Zugangsdaten nie in Protokolle schreiben (auch nicht aus Fehlermeldungen).
   final print = debugPrint;
-  debugPrint = (message, {wrapWidth}) => print(message == null ? null : redactSecrets(message), wrapWidth: wrapWidth);
+  debugPrint = (message, {wrapWidth}) {
+    if (message == null) return;
+    final clean = redactSecrets(message);
+    AppLog.add(clean);
+    print(clean, wrapWidth: wrapWidth);
+  };
+  // Fehler für den (lokalen) Fehlerbericht merken.
+  final presentError = FlutterError.onError;
+  FlutterError.onError = (details) {
+    AppLog.add('FEHLER: ${details.exceptionAsString()}\n${details.stack.toString().split('\n').take(6).join('\n')}');
+    presentError?.call(details);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLog.add('FEHLER: $error\n${stack.toString().split('\n').take(6).join('\n')}');
+    return false;
+  };
   MediaKit.ensureInitialized();
   UiSounds.preload();
   // Stammzertifikate für den Video-Player schon beim Start bereitlegen.

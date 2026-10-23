@@ -42,6 +42,30 @@ class S {
   String get pause => _t('Pause', 'Pause');
   String get off => _t('Off', 'Aus');
   String get storage => _t('Storage', 'Speicher');
+  String get about => _t('About Jellyflex', 'Über Jellyflex');
+  String get appVersionLabel => _t('App version', 'App-Version');
+  String get updateCheck => _t('Look for updates', 'Nach Updates sehen');
+  String get updateCheckHint => _t(
+    'At start, asks GitHub only for the newest version number – nothing about you or your server. Off by default.',
+    'Fragt beim Start nur GitHub nach der neuesten Versionsnummer – nichts über dich oder deinen Server. Standardmäßig aus.',
+  );
+  String get checkNow => _t('Check now', 'Jetzt prüfen');
+  String updateAvailable(String v) => _t('Version $v is available', 'Version $v ist verfügbar');
+  String get upToDate => _t('You have the newest version', 'Du hast die neueste Version');
+  String get updateCheckFailed => _t('Couldn’t check for updates', 'Konnte nicht nach Updates sehen');
+  String get errorReport => _t('Error report', 'Fehlerbericht');
+  String get errorReportHint => _t(
+    'Version, settings and recent messages as a text file – to pass on if something goes wrong.',
+    'Version, Einstellungen und letzte Meldungen als Textdatei – zum Weitergeben, wenn etwas nicht klappt.',
+  );
+  String get errorReportPrivacy => _t(
+    'Nothing is sent. Passwords, tokens, server address, names and your user folder are removed.',
+    'Es wird nichts verschickt. Passwörter, Tokens, Server-Adresse, Namen und dein Benutzerordner sind entfernt.',
+  );
+  String get create => _t('Create', 'Erstellen');
+  String get copy => _t('Copy', 'Kopieren');
+  String get copied => _t('Copied', 'Kopiert');
+  String get saveAs => _t('Save as …', 'Speichern unter …');
   String get imageCache => _t('Image cache', 'Bild-Zwischenspeicher');
   String imageCacheHint(String used) => _t(
     'Posters and backgrounds are kept on disk so they appear instantly. In use: $used',

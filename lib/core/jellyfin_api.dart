@@ -6,6 +6,7 @@ import 'images.dart';
 import 'models.dart';
 import '../l10n/strings.dart';
 import 'redact.dart';
+import 'version.dart';
 
 class ServerInfo {
   const ServerInfo({required this.url, required this.name, required this.version});
@@ -100,7 +101,7 @@ class JellyfinApi {
   }
 
   static const clientName = 'Jellyflex';
-  static const clientVersion = '0.2.0';
+  static const clientVersion = appVersion;
 
   /// Felder, die für Karten und Detailansichten gebraucht werden.
   static const _fields = 'Overview,PrimaryImageAspectRatio,Genres,ChildCount,Taglines';

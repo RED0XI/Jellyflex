@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/branding.dart';
+import 'core/update_check.dart';
+import 'features/settings/about_section.dart';
 import 'core/route_observer.dart';
 import 'core/session.dart';
 import 'core/settings.dart';
@@ -103,6 +105,13 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
   @override
   void initState() {
     super.initState();
+    // Freiwillige Update-Prüfung (Standard: aus) – einmal pro Start, etwas verzögert.
+    if (ref.read(settingsProvider).updateCheck) {
+      Future<void>.delayed(const Duration(seconds: 8), () async {
+        final latest = await UpdateCheck.latestVersion();
+        if (mounted && latest != null && UpdateCheck.isNewer(latest)) showUpdateNotice(latest);
+      });
+    }
     // Eigener Name/Logo: Fenstertitel und Taskleisten-Symbol mitziehen.
     ref.listenManual(
       settingsProvider.select((s) => (s.appName, s.logoPath)),
