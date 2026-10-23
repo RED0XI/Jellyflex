@@ -56,6 +56,8 @@ flutter test integration_test/downloads_test.dart -d windows
 - Anmeldung mit Passwort oder **Quick Connect**; Login wird mit Windows-DPAPI verschlüsselt gespeichert
 - Startseite mit wechselndem Banner, Weiterschauen, Als Nächstes, Neu in …, Favoriten, Bibliotheken
 - Detailseiten mit Hintergrund-Diashow, Logo, Bewertungen, Staffeln & Episoden, Besetzung, Ähnliches
+- **Personenseiten**: Klick auf jemanden aus der Besetzung zeigt Foto, Lebensdaten, Biografie und
+  alle Filme, Serien und Gastauftritte dieser Person auf deinem Server
 - Bibliotheksraster mit Nachladen und Sortierung, Live-Suche
 - **Direct Play** aller Formate über mpv (HEVC, AV1, HDR, DTS/TrueHD, ASS/PGS-Untertitel)
 - Ton-/Untertitelauswahl nach deinen Jellyfin-Einstellungen, externe Untertiteldateien (.srt/.ass)

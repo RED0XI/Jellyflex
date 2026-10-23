@@ -123,27 +123,63 @@ Map<String, dynamic> _userData({int position = 0, bool played = false, bool favo
   'UnplayedItemCount': ?unplayed,
 };
 
-List<Map<String, dynamic>> _people() => [
+const _personNames = [
+  'Lena Brandt',
+  'Jonas Weber',
+  'Mira Okafor',
+  'Tom Hendriks',
+  'Sara Lindqvist',
+  'Ali Demir',
+  'Nora Kim',
+  'Paul Roth',
+  'Elif Arslan',
+  'Henrik Sand',
+  'Julia Marx',
+  'Kofi Mensah',
+];
+const _roles = ['Hauptrolle', 'Kommissar', 'Wissenschaftlerin', 'Pilot', 'Mutter', 'Hacker', 'Agentin', 'Erzähler'];
+
+/// Besetzung: 8 von 12 Personen, je nach [seed] verschieden.
+List<Map<String, dynamic>> _people(int seed) => [
   for (var i = 0; i < 8; i++)
     {
-      'Id': 'person$i',
-      'Name': [
-        'Lena Brandt',
-        'Jonas Weber',
-        'Mira Okafor',
-        'Tom Hendriks',
-        'Sara Lindqvist',
-        'Ali Demir',
-        'Nora Kim',
-        'Paul Roth',
-      ][i],
-      'Role': ['Hauptrolle', 'Kommissar', 'Wissenschaftlerin', 'Pilot', 'Mutter', 'Hacker', 'Agentin', 'Erzähler'][i],
+      'Id': 'person${(seed + i * 5) % 12}',
+      'Name': _personNames[(seed + i * 5) % 12],
+      'Role': _roles[i],
       'Type': 'Actor',
-      'PrimaryImageTag': 'p$i',
+      'PrimaryImageTag': 'p',
     },
 ];
 
+/// Personen als eigene Einträge (für die Personenseite).
+void _seedPeople() {
+  for (var i = 0; i < _personNames.length; i++) {
+    byId['person$i'] = {
+      'Id': 'person$i',
+      'Name': _personNames[i],
+      'Type': 'Person',
+      'Overview': i == 0
+          ? '${_personNames[i]} wuchs in Hamburg auf und stand schon als Kind auf der Theaterbühne. Nach der '
+                'Schauspielschule in Berlin folgten erste Fernsehrollen, bevor ihr mit „Das Echo der Sterne“ der '
+                'Durchbruch im Kino gelang. Seitdem wechselt sie mühelos zwischen großen Produktionen und kleinen '
+                'Autorenfilmen. Für ihre Darstellung in „Kalte Brandung“ wurde sie mehrfach ausgezeichnet. Neben '
+                'der Schauspielerei engagiert sie sich für Nachwuchsprojekte und schreibt an ihrem ersten '
+                'Drehbuch. Sie lebt mit ihrer Familie an der Ostsee und spricht fließend Englisch, Französisch '
+                'und Schwedisch. In Interviews betont sie gern, dass ihre liebsten Rollen die leisen sind.'
+          : 'Bekannt aus zahlreichen Film- und Fernsehproduktionen.',
+      'PremiereDate': '${1960 + i * 3}-0${1 + i % 9}-1${i % 9}T00:00:00.0000000Z',
+      if (i == 7) 'EndDate': '2021-11-03T00:00:00.0000000Z',
+      'ProductionLocations': [
+        ['Hamburg, Deutschland', 'Wien, Österreich', 'Lagos, Nigeria', 'Rotterdam, Niederlande'][i % 4],
+      ],
+      'ImageTags': {'Primary': 'p'},
+      'UserData': _userData(),
+    };
+  }
+}
+
 void _seed() {
+  _seedPeople();
   byId['boxset0'] = {
     'Id': 'boxset0',
     'Name': 'Die Sterne-Trilogie',
@@ -173,7 +209,7 @@ void _seed() {
       'ImageTags': {'Primary': 'p', if (i % 3 == 0) 'Logo': 'l', if (i % 2 == 0) 'Thumb': 't'},
       'BackdropImageTags': i % 4 == 0 ? ['b0', 'b1', 'b2'] : ['b0'],
       'PrimaryImageAspectRatio': 0.6667,
-      'People': _people(),
+      'People': _people(i),
       'UserData': _userData(
         position: i < 3 ? (runtime * (0.2 + i * 0.25)).round() : 0,
         played: i == 5,
@@ -220,7 +256,7 @@ void _seed() {
       'ChildCount': 2,
       'ImageTags': {'Primary': 'p', 'Logo': 'l', 'Thumb': 't'},
       'BackdropImageTags': ['b0', 'b1'],
-      'People': _people(),
+      'People': _people(s + 3),
       'UserData': _userData(unplayed: 10 + s, favorite: s == 2),
     };
     series.add(ser);
@@ -280,6 +316,17 @@ void _seed() {
           'ParentLogoImageTag': 'l',
           'ParentThumbItemId': seriesId,
           'ParentThumbImageTag': 't',
+          // Gastauftritt in einzelnen Folgen.
+          if (s == 0 && n == 1 && (e == 2 || e == 5))
+            'People': [
+              {
+                'Id': 'person0',
+                'Name': _personNames[0],
+                'Role': 'Gaststar',
+                'Type': 'GuestStar',
+                'PrimaryImageTag': 'p',
+              },
+            ],
           'UserData': _userData(
             played: s < 2 && n == 1 && e < 4,
             position: s < 2 && n == 1 && e == 4 ? runtime ~/ 3 : 0,
@@ -457,6 +504,10 @@ Object? _handle(HttpRequest req) {
     if (types.contains('Movie') && q['parentId'] != 'lib-shows') list.addAll(movies);
     if (types.contains('Series') && q['parentId'] != 'lib-movies') list.addAll(series);
     if (types.contains('Episode')) list.addAll([for (final e in episodes.values) ...e]);
+    final personId = q['personIds'];
+    if (personId != null) {
+      list = list.where((i) => ((i['People'] as List?) ?? const []).any((p) => p['Id'] == personId)).toList();
+    }
     final term = q['searchTerm']?.toLowerCase();
     if (term != null) list = list.where((i) => (i['Name'] as String).toLowerCase().contains(term)).toList();
     if (q['filters'] == 'IsFavorite') list = list.where((i) => i['UserData']['IsFavorite'] == true).toList();

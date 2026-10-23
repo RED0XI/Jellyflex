@@ -370,6 +370,18 @@ class JellyfinApi {
     return items.map((g) => g.name).where((n) => n.isNotEmpty).toList();
   }
 
+  /// Titel, in denen eine Person mitwirkt (neueste zuerst) – z. B. 'Movie,Series' oder 'Episode'.
+  Future<List<BaseItem>> getPersonItems(String personId, {String includeItemTypes = 'Movie,Series', int limit = 300}) =>
+      _getItems('/Items', {
+        ..._common,
+        'personIds': personId,
+        'recursive': true,
+        'includeItemTypes': includeItemTypes,
+        'sortBy': 'PremiereDate,ProductionYear,SortName',
+        'sortOrder': 'Descending',
+        'limit': limit,
+      });
+
   Future<List<BaseItem>> getSeasons(String seriesId) => _getItems('/Shows/$seriesId/Seasons', {..._common});
 
   Future<List<BaseItem>> getEpisodes(String seriesId, String seasonId) =>

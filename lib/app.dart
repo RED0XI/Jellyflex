@@ -10,6 +10,7 @@ import 'features/home/home_screen.dart';
 import 'features/live_handler.dart';
 import 'features/library/library_screen.dart';
 import 'features/login/login_screen.dart';
+import 'features/person/person_screen.dart';
 import 'features/player/player_screen.dart';
 import 'features/search/search_screen.dart';
 import 'features/settings/settings_screen.dart';
@@ -56,6 +57,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/item/:id',
         builder: (_, state) => DetailsScreen(itemId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/person/:id',
+        builder: (_, state) => PersonScreen(personId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: '/play/:id',

@@ -35,6 +35,9 @@ class BaseItem {
   List<String> get genres => _stringList(raw['Genres']);
   List<String> get taglines => _stringList(raw['Taglines']);
 
+  /// Bei Personen: Geburtsort.
+  List<String> get productionLocations => _stringList(raw['ProductionLocations']);
+
   bool get isMovie => type == 'Movie';
   bool get isSeries => type == 'Series';
   bool get isEpisode => type == 'Episode';

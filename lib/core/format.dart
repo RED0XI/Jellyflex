@@ -20,6 +20,32 @@ String formatTimecode(Duration d) {
 /// "22:41"
 String formatClock(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
+const _months = [
+  'Januar',
+  'Februar',
+  'März',
+  'April',
+  'Mai',
+  'Juni',
+  'Juli',
+  'August',
+  'September',
+  'Oktober',
+  'November',
+  'Dezember',
+];
+
+/// "12. März 1975"
+String formatDate(DateTime d) => '${d.day}. ${_months[d.month - 1]} ${d.year}';
+
+/// Alter in Jahren am Tag [at] (Standard: heute).
+int ageAt(DateTime birth, [DateTime? at]) {
+  final day = at ?? DateTime.now();
+  var age = day.year - birth.year;
+  if (day.month < birth.month || (day.month == birth.month && day.day < birth.day)) age--;
+  return age;
+}
+
 /// Restlaufzeit für "Fortsetzen"-Buttons, z. B. "noch 34 Min."
 String? remainingLabel(BaseItem item) {
   final total = item.runTimeTicks;
