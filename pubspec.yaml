@@ -46,6 +46,7 @@ dependencies:
   google_fonts: 8.0.0
   ffi: ^2.2.0
   gamepads: ^0.1.12
+  file_selector: ^1.1.0
 
 dev_dependencies:
   flutter_test:
@@ -70,6 +71,10 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/icon.png
+    - assets/app_icon.ico
 
   # To add assets to your application, add an assets section, like this:
   # assets:

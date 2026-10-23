@@ -1,10 +1,13 @@
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/branding.dart';
 import '../../core/jellyfin_api.dart';
 import '../../core/session.dart';
 import '../../core/settings.dart';
 import '../../theme.dart';
+import '../../widgets/brand_logo.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/top_scrim.dart';
@@ -19,11 +22,40 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _scroll = ScrollController();
+  late final _nameController = TextEditingController(text: ref.read(settingsProvider).appName ?? '');
+  bool _importingLogo = false;
 
   @override
   void dispose() {
     _scroll.dispose();
+    _nameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickLogo() async {
+    final file = await openFile(
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'Bilder', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']),
+      ],
+    );
+    if (file == null) return;
+    setState(() => _importingLogo = true);
+    try {
+      final path = await importLogo(file.path);
+      ref.read(settingsProvider.notifier).update((s) => s.copyWith(logoPath: () => path));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text('Dieses Bild konnte nicht gelesen werden.'),
+            behavior: SnackBarBehavior.floating,
+            width: 420,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importingLogo = false);
+    }
   }
 
   @override
@@ -178,6 +210,78 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
 
                         _Section(
+                          title: 'Personalisieren',
+                          icon: Icons.auto_awesome_outlined,
+                          children: [
+                            Container(
+                              height: 96,
+                              margin: const EdgeInsets.all(16),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: AppColors.background,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const BrandLogo(size: 34),
+                            ),
+                            _Row(
+                              title: 'Name der App',
+                              subtitle: 'Erscheint in der Titelleiste, im Fenstertitel und bei der Anmeldung.',
+                              trailing: SizedBox(
+                                width: 260,
+                                child: TextField(
+                                  controller: _nameController,
+                                  maxLength: 30,
+                                  decoration: const InputDecoration(
+                                    hintText: defaultAppName,
+                                    counterText: '',
+                                    isDense: true,
+                                  ),
+                                  onChanged: (v) =>
+                                      ctrl.update((s) => s.copyWith(appName: () => v.trim().isEmpty ? null : v.trim())),
+                                ),
+                              ),
+                            ),
+                            _Row(
+                              title: 'Logo',
+                              subtitle: 'Ein Bild (PNG, JPG …) – wird vor dem Namen und als Symbol in der Taskleiste gezeigt.',
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  GlassButton(
+                                    label: _importingLogo ? 'Lädt …' : 'Bild wählen …',
+                                    icon: Icons.image_outlined,
+                                    onPressed: _importingLogo ? null : _pickLogo,
+                                  ),
+                                  if (s.logoPath != null) ...[
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      tooltip: 'Logo entfernen',
+                                      onPressed: () => ctrl.update((s) => s.copyWith(logoPath: () => null)),
+                                      icon: const Icon(Icons.delete_outline_rounded),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            if (s.appName != null || s.logoPath != null)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    onPressed: () {
+                                      _nameController.clear();
+                                      ctrl.update((s) => s.copyWith(appName: () => null, logoPath: () => null));
+                                    },
+                                    icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                                    label: const Text('Auf Jellyflex zurücksetzen'),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+
+                        _Section(
                           title: 'Konto',
                           icon: Icons.person_outline_rounded,
                           children: [
@@ -232,10 +336,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
 
                         const SizedBox(height: 8),
-                        const Center(
+                        Center(
                           child: Text(
-                            'Jellyflex ${JellyfinApi.clientVersion}',
-                            style: TextStyle(color: AppColors.textMuted),
+                            appDisplayName(s) == defaultAppName
+                                ? 'Jellyflex ${JellyfinApi.clientVersion}'
+                                : '${appDisplayName(s)} · basiert auf Jellyflex ${JellyfinApi.clientVersion}',
+                            style: const TextStyle(color: AppColors.textMuted),
                           ),
                         ),
                       ],

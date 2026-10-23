@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'core/branding.dart';
 import 'core/route_observer.dart';
 import 'core/session.dart';
+import 'core/settings.dart';
 import 'features/details/details_screen.dart';
 import 'features/downloads/downloads_screen.dart';
 import 'features/home/home_screen.dart';
@@ -79,14 +81,30 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class JellyflexApp extends ConsumerWidget {
+class JellyflexApp extends ConsumerStatefulWidget {
   const JellyflexApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<JellyflexApp> createState() => _JellyflexAppState();
+}
+
+class _JellyflexAppState extends ConsumerState<JellyflexApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Eigener Name/Logo: Fenstertitel und Taskleisten-Symbol mitziehen.
+    ref.listenManual(
+      settingsProvider.select((s) => (s.appName, s.logoPath)),
+      (_, _) => applyWindowBranding(ref.read(settingsProvider)),
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
-      title: 'Jellyflex',
+      title: appDisplayName(ref.watch(settingsProvider)),
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       routerConfig: router,

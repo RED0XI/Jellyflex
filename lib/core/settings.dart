@@ -55,7 +55,15 @@ class AppSettings {
     this.subtitleBackground = false,
     this.maxBitrate,
     this.bannerTrailers = true,
+    this.appName,
+    this.logoPath,
   });
+
+  /// Eigener App-Name (Titelleiste, Fenstertitel, Anmeldung …); `null` = "Jellyflex".
+  final String? appName;
+
+  /// Eigenes Logo (Kopie im App-Datenordner); `null` = Standard.
+  final String? logoPath;
 
   /// Trailer stumm im Startseiten-Banner abspielen.
   final bool bannerTrailers;
@@ -94,6 +102,8 @@ class AppSettings {
     bool? subtitleBackground,
     int? Function()? maxBitrate,
     bool? bannerTrailers,
+    String? Function()? appName,
+    String? Function()? logoPath,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -104,6 +114,8 @@ class AppSettings {
     subtitleBackground: subtitleBackground ?? this.subtitleBackground,
     maxBitrate: maxBitrate != null ? maxBitrate() : this.maxBitrate,
     bannerTrailers: bannerTrailers ?? this.bannerTrailers,
+    appName: appName != null ? appName() : this.appName,
+    logoPath: logoPath != null ? logoPath() : this.logoPath,
   );
 
   Map<String, dynamic> toJson() => {
@@ -116,6 +128,8 @@ class AppSettings {
     'subtitleBackground': subtitleBackground,
     'maxBitrate': maxBitrate,
     'bannerTrailers': bannerTrailers,
+    'appName': appName,
+    'logoPath': logoPath,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -128,8 +142,13 @@ class AppSettings {
     subtitleBackground: json['subtitleBackground'] as bool? ?? false,
     maxBitrate: (json['maxBitrate'] as num?)?.toInt(),
     bannerTrailers: json['bannerTrailers'] as bool? ?? true,
+    appName: json['appName'] as String?,
+    logoPath: json['logoPath'] as String?,
   );
 }
+
+/// Ordner für Einstellungen und eigene Dateien (z. B. das eigene Logo).
+Directory get appDataDir => Directory('${Platform.environment['APPDATA'] ?? Directory.systemTemp.path}\\Jellyflex');
 
 /// Lädt/speichert die Einstellungen als JSON unter `%APPDATA%\Jellyflex\settings.json`.
 class SettingsController extends Notifier<AppSettings> {
@@ -137,9 +156,7 @@ class SettingsController extends Notifier<AppSettings> {
 
   final File? _fileOverride;
 
-  File get _file =>
-      _fileOverride ??
-      File('${Platform.environment['APPDATA'] ?? Directory.systemTemp.path}\\Jellyflex\\settings.json');
+  File get _file => _fileOverride ?? File('${appDataDir.path}\\settings.json');
 
   @override
   AppSettings build() {
