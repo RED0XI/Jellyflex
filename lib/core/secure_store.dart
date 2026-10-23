@@ -5,6 +5,8 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+import '../l10n/strings.dart';
+
 /// Kleiner verschlüsselter Schlüssel-Wert-Speicher für Windows.
 ///
 /// Die Daten werden mit der Windows-Datenschutz-API (DPAPI) verschlüsselt
@@ -51,7 +53,7 @@ class SecureStore {
       final file = _file;
       await file.parent.create(recursive: true);
       final encrypted = _Dpapi.protect(Uint8List.fromList(utf8.encode(jsonEncode(_cache ?? {}))));
-      if (encrypted == null) throw const FileSystemException('Verschlüsselung fehlgeschlagen');
+      if (encrypted == null) throw FileSystemException(tr.encryptionFailed);
       final tmp = File('${file.path}.tmp');
       await tmp.writeAsBytes(encrypted, flush: true);
       await tmp.rename(file.path);

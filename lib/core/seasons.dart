@@ -1,7 +1,22 @@
 // Jahreszeitliche Akzente: Halloween, Weihnachten, Silvester, Valentinstag –
 // je eine passende Reihe auf der Startseite und kleine Effekte über dem Banner.
 
-enum Season { halloween, christmas, newYear, valentine }
+import '../l10n/strings.dart';
+
+enum Season {
+  halloween,
+  christmas,
+  newYear,
+  valentine;
+
+  /// Name der Saison in der Sprache der Oberfläche.
+  String get title => switch (this) {
+    halloween => tr.halloween,
+    christmas => tr.christmas,
+    newYear => tr.newYearsEve,
+    valentine => tr.valentinesDay,
+  };
+}
 
 /// Uhr für die Saison-Erkennung (in Tests austauschbar).
 DateTime Function() seasonClock = DateTime.now;
@@ -19,10 +34,9 @@ Season? currentSeason([DateTime? date]) {
 }
 
 class SeasonInfo {
-  const SeasonInfo({required this.emoji, required this.title, this.genres = const [], this.keywords = const []});
+  const SeasonInfo({required this.emoji, this.genres = const [], this.keywords = const []});
 
   final String emoji;
-  final String title;
 
   /// Genres für die Reihe (deutsche und englische Namen, je nach Metadaten).
   final List<String> genres;
@@ -34,25 +48,17 @@ class SeasonInfo {
 const seasonInfo = <Season, SeasonInfo>{
   Season.halloween: SeasonInfo(
     emoji: '🎃',
-    title: 'Gruselzeit',
     genres: ['Horror', 'Mystery', 'Thriller'],
     keywords: ['Halloween', 'Hexe', 'Witch', 'Vampir', 'Vampire', 'Zombie', 'Geist', 'Ghost'],
   ),
   Season.christmas: SeasonInfo(
     emoji: '🎄',
-    title: 'Weihnachtszeit',
     keywords: ['Weihnacht', 'Christmas', 'Santa', 'Grinch', 'Xmas', 'Nikolaus', 'Kevin', 'Polar Express'],
   ),
   Season.newYear: SeasonInfo(
     emoji: '🥂',
-    title: 'Silvester',
     genres: ['Komödie', 'Comedy'],
     keywords: ['Silvester', 'New Year', 'Dinner for One', 'Party'],
   ),
-  Season.valentine: SeasonInfo(
-    emoji: '💘',
-    title: 'Valentinstag',
-    genres: ['Liebesfilm', 'Romantik', 'Romance'],
-    keywords: ['Love', 'Liebe'],
-  ),
+  Season.valentine: SeasonInfo(emoji: '💘', genres: ['Liebesfilm', 'Romantik', 'Romance'], keywords: ['Love', 'Liebe']),
 };

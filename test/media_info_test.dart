@@ -1,10 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jellyflex/core/media_info.dart';
 import 'package:jellyflex/core/models.dart';
+import 'package:jellyflex/l10n/strings.dart';
 
 MediaStream _video(Map<String, Object> extra) => MediaStream({'Type': 'Video', ...extra});
 
 void main() {
+  // Diese Tests prüfen die deutschen Texte.
+  setUp(() => appLanguage = AppLanguage.de);
+
   test('Auflösung: auch Kino-Formate richtig einordnen', () {
     expect(resolutionLabel(_video({'Width': 3840, 'Height': 2160})), '4K');
     expect(resolutionLabel(_video({'Width': 3840, 'Height': 1600})), '4K');

@@ -5,6 +5,7 @@ import '../../core/format.dart';
 import '../../core/media_info.dart';
 import '../../core/models.dart';
 import '../../theme.dart';
+import '../../l10n/strings.dart';
 
 /// Technische Infos zu einer Fassung: Datei, Video, Tonspuren, Untertitel.
 Future<void> showMediaInfoDialog(BuildContext context, BaseItem item, MediaSource source) {
@@ -46,14 +47,14 @@ class _MediaInfoDialog extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Medieninfo', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                        Text(tr.mediaInfo, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                         const SizedBox(height: 2),
                         Text(versionLabel(source), style: const TextStyle(color: AppColors.textSecondary)),
                       ],
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Schließen',
+                    tooltip: tr.close,
                     autofocus: true,
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close_rounded),
@@ -68,41 +69,41 @@ class _MediaInfoDialog extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _Section(
-                      title: 'Datei',
+                      title: tr.file,
                       icon: Icons.insert_drive_file_outlined,
                       rows: [
-                        if (source.name case final name? when name.isNotEmpty) ('Fassung', name),
-                        ('Format', (source.container ?? '?').toUpperCase()),
-                        if (source.size case final size? when size > 0) ('Größe', formatBytes(size)),
-                        if (source.bitrate case final rate? when rate > 0) ('Gesamtbitrate', formatBitrate(rate)),
-                        if (runtime != null) ('Laufzeit', formatRuntime(ticksToDuration(runtime))),
-                        if (fileName != null) ('Dateiname', fileName),
+                        if (source.name case final name? when name.isNotEmpty) (tr.version, name),
+                        (tr.format, (source.container ?? '?').toUpperCase()),
+                        if (source.size case final size? when size > 0) (tr.size, formatBytes(size)),
+                        if (source.bitrate case final rate? when rate > 0) (tr.totalBitrate, formatBitrate(rate)),
+                        if (runtime != null) (tr.runtime, formatRuntime(ticksToDuration(runtime))),
+                        if (fileName != null) (tr.fileName, fileName),
                       ],
                     ),
                     if (video != null)
                       _Section(
-                        title: 'Video',
+                        title: tr.video,
                         icon: Icons.movie_outlined,
                         rows: [
                           if (video.width != null && video.height != null)
                             (
-                              'Auflösung',
+                              tr.resolution,
                               [
                                 '${video.width} × ${video.height}',
                                 if (resolutionLabel(video) case final r?) '($r)',
                               ].join('  '),
                             ),
-                          ('Codec', [codecLabel(video.codec), ?video.profile].join(' · ')),
-                          ('Dynamikumfang', hdrLabel(video) ?? 'SDR'),
-                          if (video.bitDepth != null) ('Farbtiefe', '${video.bitDepth} Bit'),
+                          (tr.codec, [codecLabel(video.codec), ?video.profile].join(' · ')),
+                          (tr.dynamicRange, hdrLabel(video) ?? 'SDR'),
+                          if (video.bitDepth != null) (tr.bitDepth, '${video.bitDepth} Bit'),
                           if (video.frameRate case final fps? when fps > 0)
-                            ('Bildrate', '${fps.toStringAsFixed(fps % 1 == 0 ? 0 : 3).replaceAll('.', ',')} fps'),
-                          if (video.bitRate case final rate? when rate > 0) ('Bitrate', formatBitrate(rate)),
+                            (tr.frameRate, '${tr.decimal(fps, fps % 1 == 0 ? 0 : 3)} fps'),
+                          if (video.bitRate case final rate? when rate > 0) (tr.bitrate, formatBitrate(rate)),
                         ],
                       ),
                     if (audio.isNotEmpty)
                       _Section(
-                        title: 'Ton (${audio.length})',
+                        title: tr.audioCount(audio.length),
                         icon: Icons.graphic_eq_rounded,
                         tracks: [
                           for (final a in audio)
@@ -113,14 +114,14 @@ class _MediaInfoDialog extends StatelessWidget {
                                 if (a.bitRate case final rate? when rate > 0) formatBitrate(rate),
                                 if (a.sampleRate case final hz? when hz > 0)
                                   '${(hz / 1000).toStringAsFixed(hz % 1000 == 0 ? 0 : 1).replaceAll('.', ',')} kHz',
-                                if (a.isDefault) 'Standard',
+                                if (a.isDefault) tr.defaultTrack,
                               ].join(' · '),
                             ),
                         ],
                       ),
                     if (subtitles.isNotEmpty)
                       _Section(
-                        title: 'Untertitel (${subtitles.length})',
+                        title: tr.subtitlesCount(subtitles.length),
                         icon: Icons.subtitles_outlined,
                         tracks: [
                           for (final s in subtitles)
@@ -128,9 +129,9 @@ class _MediaInfoDialog extends StatelessWidget {
                               s.displayTitle ?? languageName(s.language),
                               [
                                 codecLabel(s.codec),
-                                if (s.isExternal) 'Datei',
-                                if (s.isForced) 'Erzwungen',
-                                if (s.isDefault) 'Standard',
+                                if (s.isExternal) tr.file,
+                                if (s.isForced) tr.forced,
+                                if (s.isDefault) tr.defaultTrack,
                               ].join(' · '),
                             ),
                         ],

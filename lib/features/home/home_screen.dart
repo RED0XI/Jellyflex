@@ -19,6 +19,7 @@ import '../../widgets/states.dart';
 import 'hero_banner.dart';
 import 'home_providers.dart';
 import '../../widgets/focusable.dart';
+import '../../l10n/strings.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -101,10 +102,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   error: (e, _) => [
                     SliverToBoxAdapter(
                       child: ErrorView(
-                        message: 'Die Startseite konnte nicht geladen werden.\n$e',
+                        message: tr.homeCouldNotLoad(e),
                         onRetry: () => ref.invalidate(homeProvider),
                         // Ohne Verbindung: heruntergeladene Titel gehen trotzdem.
-                        secondaryLabel: 'Downloads ansehen',
+                        secondaryLabel: tr.viewDownloads,
                         onSecondary: () => context.push('/downloads'),
                       ),
                     ),
@@ -149,7 +150,7 @@ class _LibrariesRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MediaRow(
-      title: 'Bibliotheken',
+      title: tr.libraries,
       itemCount: libraries.length,
       height: 160,
       itemBuilder: (context, i) => _LibraryTile(library: libraries[i]),
@@ -281,35 +282,35 @@ class _TopNav extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(left: 8),
                 child: Tooltip(
-                  message: seasonInfo[season]!.title,
+                  message: season.title,
                   child: Text(seasonInfo[season]!.emoji, style: const TextStyle(fontSize: 20)),
                 ),
               ),
             const SizedBox(width: 40),
-            const _NavLink(label: 'Startseite', active: true),
+            _NavLink(label: tr.home, active: true),
             for (final lib in libraries) _NavLink(label: lib.name, onTap: () => openLibrary(context, lib)),
-            _NavLink(label: 'Downloads', onTap: () => context.push('/downloads')),
+            _NavLink(label: tr.downloads, onTap: () => context.push('/downloads')),
             const Spacer(),
             IconButton(
-              tooltip: 'Film-Quiz',
+              tooltip: tr.movieQuiz,
               icon: const Icon(Icons.quiz_outlined, size: 24),
               onPressed: () => context.push('/quiz'),
             ),
             const SizedBox(width: 4),
             IconButton(
-              tooltip: 'Überrasch mich',
+              tooltip: tr.surpriseMe,
               icon: const Icon(Icons.casino_outlined, size: 25),
               onPressed: () => context.push('/roulette'),
             ),
             const SizedBox(width: 4),
             IconButton(
-              tooltip: 'Suchen (Strg+F)',
+              tooltip: tr.searchCtrlF,
               icon: const Icon(Icons.search_rounded, size: 26),
               onPressed: () => context.push('/search'),
             ),
             const SizedBox(width: 10),
             PopupMenuButton<String>(
-              tooltip: session?.userName ?? 'Profil',
+              tooltip: session?.userName ?? tr.profile,
               offset: const Offset(0, 48),
               onSelected: (value) {
                 if (value == 'logout') ref.read(sessionProvider.notifier).logout();
@@ -326,31 +327,27 @@ class _TopNav extends ConsumerWidget {
                   ),
                 ),
                 const PopupMenuDivider(),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'switch',
                   child: Row(
-                    children: [
-                      Icon(Icons.switch_account_outlined, size: 20),
-                      SizedBox(width: 12),
-                      Text('Benutzer wechseln'),
-                    ],
+                    children: [Icon(Icons.switch_account_outlined, size: 20), SizedBox(width: 12), Text(tr.switchUser)],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'wrapped',
                   child: Row(
-                    children: [Icon(Icons.auto_graph_rounded, size: 20), SizedBox(width: 12), Text('Jahresrückblick')],
+                    children: [Icon(Icons.auto_graph_rounded, size: 20), SizedBox(width: 12), Text(tr.yearlyRecap)],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'settings',
                   child: Row(
-                    children: [Icon(Icons.settings_outlined, size: 20), SizedBox(width: 12), Text('Einstellungen')],
+                    children: [Icon(Icons.settings_outlined, size: 20), SizedBox(width: 12), Text(tr.settings)],
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'logout',
-                  child: Row(children: [Icon(Icons.logout_rounded, size: 20), SizedBox(width: 12), Text('Abmelden')]),
+                  child: Row(children: [Icon(Icons.logout_rounded, size: 20), SizedBox(width: 12), Text(tr.signOut)]),
                 ),
               ],
               child: Container(

@@ -11,6 +11,7 @@ import '../../theme.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/focusable.dart';
+import '../../l10n/strings.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -77,7 +78,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       });
       _userFocus.requestFocus();
     } catch (_) {
-      setState(() => _error = 'Unter dieser Adresse wurde kein Jellyfin-Server gefunden.');
+      setState(() => _error = tr.noServerAtAddress);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -96,11 +97,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final status = e.response?.statusCode;
       setState(
         () => _error = status == 401 || status == 400
-            ? 'Benutzername oder Passwort ist falsch.'
-            : 'Anmeldung fehlgeschlagen (${status ?? e.type.name}).',
+            ? tr.wrongCredentials
+            : tr.signInFailedCode('${status ?? e.type.name}'),
       );
     } catch (e) {
-      setState(() => _error = 'Anmeldung fehlgeschlagen: $e');
+      setState(() => _error = tr.signInFailed(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -127,13 +128,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           if (mounted) {
             setState(() {
               _quickConnectCode = null;
-              _error = 'Quick Connect ist abgelaufen. Bitte erneut versuchen.';
+              _error = tr.quickConnectExpired;
             });
           }
         }
       });
     } catch (_) {
-      setState(() => _error = 'Quick Connect konnte nicht gestartet werden.');
+      setState(() => _error = tr.quickConnectFailed);
     }
   }
 
@@ -174,7 +175,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   const BrandLogo(size: 42),
                   const SizedBox(height: 8),
-                  const Text('Dein Kino. Auf dem Desktop.', style: TextStyle(color: AppColors.textSecondary)),
+                  Text(tr.tagline, style: TextStyle(color: AppColors.textSecondary)),
                   const SizedBox(height: 36),
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
@@ -214,7 +215,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Column(
       key: const ValueKey('profiles'),
       children: [
-        const Text('Wer schaut?', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+        Text(tr.whoIsWatching, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
         const SizedBox(height: 24),
         Wrap(
           spacing: 18,
@@ -230,7 +231,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onForget: () => ref.read(sessionProvider.notifier).forgetAccount(a),
               ),
             _ProfileTile(
-              name: 'Konto hinzufügen',
+              name: tr.addAccount,
               icon: Icons.add_rounded,
               onTap: () => setState(() => _addingAccount = true),
             ),
@@ -251,18 +252,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: TextButton.icon(
               onPressed: () => setState(() => _addingAccount = false),
               icon: const Icon(Icons.arrow_back_rounded, size: 18),
-              label: const Text('Zur Profilauswahl'),
+              label: Text(tr.toProfileSelection),
             ),
           ),
-        const Text('Server verbinden', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+        Text(tr.connectServer, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
         const SizedBox(height: 6),
-        const Text('Gib die Adresse deines Jellyfin-Servers ein.', style: TextStyle(color: AppColors.textSecondary)),
+        Text(tr.enterServerAddress, style: TextStyle(color: AppColors.textSecondary)),
         const SizedBox(height: 24),
         TextField(
           controller: _serverCtrl,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Server-Adresse',
+          decoration: InputDecoration(
+            labelText: tr.serverAddress,
             hintText: 'https://jellyfin.example.com',
             prefixIcon: Icon(Icons.dns_rounded),
           ),
@@ -270,7 +271,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         _ErrorText(_error),
         const SizedBox(height: 24),
-        PrimaryButton(label: 'Verbinden', onPressed: _connect, loading: _busy),
+        PrimaryButton(label: tr.connect, onPressed: _connect, loading: _busy),
       ],
     );
   }
@@ -284,10 +285,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         children: [
           const Text('Quick Connect', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),
-          const Text(
-            'Öffne Jellyfin auf einem angemeldeten Gerät → Profil → Quick Connect und gib diesen Code ein:',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
+          Text(tr.quickConnectHint, style: TextStyle(color: AppColors.textSecondary)),
           const SizedBox(height: 28),
           Center(
             child: ShaderMask(
@@ -311,7 +309,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               _quickConnectTimer?.cancel();
               setState(() => _quickConnectCode = null);
             },
-            child: const Text('Abbrechen'),
+            child: Text(tr.cancel),
           ),
         ],
       );
@@ -323,13 +321,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       children: [
         Row(
           children: [
-            IconButton(onPressed: _back, icon: const Icon(Icons.arrow_back_rounded), tooltip: 'Anderer Server'),
+            IconButton(onPressed: _back, icon: const Icon(Icons.arrow_back_rounded), tooltip: tr.otherServer),
             const SizedBox(width: 4),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Anmelden', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                  Text(tr.signIn, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
                   Text(
                     '${server.name} · Jellyfin ${server.version}',
                     style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
@@ -361,7 +359,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         TextField(
           controller: _userCtrl,
           focusNode: _userFocus,
-          decoration: const InputDecoration(labelText: 'Benutzername', prefixIcon: Icon(Icons.person_rounded)),
+          decoration: InputDecoration(labelText: tr.username, prefixIcon: Icon(Icons.person_rounded)),
           textInputAction: TextInputAction.next,
         ),
         const SizedBox(height: 14),
@@ -369,17 +367,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           controller: _passCtrl,
           focusNode: _passFocus,
           obscureText: true,
-          decoration: const InputDecoration(labelText: 'Passwort', prefixIcon: Icon(Icons.lock_rounded)),
+          decoration: InputDecoration(labelText: tr.password, prefixIcon: Icon(Icons.lock_rounded)),
           onSubmitted: (_) => _login(),
         ),
         _ErrorText(_error),
         const SizedBox(height: 24),
-        PrimaryButton(label: 'Anmelden', onPressed: _login, loading: _busy),
+        PrimaryButton(label: tr.signIn, onPressed: _login, loading: _busy),
         if (_quickConnectAvailable) ...[
           const SizedBox(height: 12),
           Center(
             child: GlassButton(
-              label: 'Mit Quick Connect anmelden',
+              label: tr.signInWithQuickConnect,
               icon: Icons.bolt_rounded,
               onPressed: _startQuickConnect,
             ),
@@ -489,11 +487,11 @@ class _ProfileTileState extends State<_ProfileTile> {
     final choice = await showMenu<String>(
       context: context,
       position: RelativeRect.fromRect(position & const Size(1, 1), Offset.zero & overlay.size),
-      items: const [
+      items: [
         PopupMenuItem(
           value: 'forget',
           child: Row(
-            children: [Icon(Icons.person_remove_outlined, size: 20), SizedBox(width: 12), Text('Konto entfernen')],
+            children: [Icon(Icons.person_remove_outlined, size: 20), SizedBox(width: 12), Text(tr.removeAccount)],
           ),
         ),
       ],

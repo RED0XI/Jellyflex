@@ -17,6 +17,7 @@ import '../../widgets/buttons.dart';
 import '../../widgets/jf_image.dart';
 import '../../widgets/media_cards.dart';
 import 'home_providers.dart';
+import '../../l10n/strings.dart';
 
 /// Großes Banner oben auf der Startseite. Wechselt alle paar Sekunden
 /// mit Überblendung und langsamem Zoom ("Ken-Burns-Effekt").
@@ -320,7 +321,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
                     ignoring: !_trailerVisible,
                     child: CircleIconButton(
                       icon: _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                      tooltip: _muted ? 'Ton an' : 'Ton aus',
+                      tooltip: _muted ? tr.soundOn : tr.soundOff,
                       size: 46,
                       onPressed: _toggleMute,
                     ),
@@ -373,8 +374,7 @@ class _HeroInfo extends ConsumerWidget {
     final meta = <String>[
       ?yearLabel(item),
       if (item.isMovie && item.runtime != null) formatRuntime(item.runtime!),
-      if (item.isSeries && item.childCount != null)
-        '${item.childCount} ${item.childCount == 1 ? 'Staffel' : 'Staffeln'}',
+      if (item.isSeries && item.childCount != null) tr.seasonsCount(item.childCount!),
     ];
 
     return Column(
@@ -424,18 +424,14 @@ class _HeroInfo extends ConsumerWidget {
           children: [
             if (item.isMovie)
               PrimaryButton(
-                label: item.userData.hasResumePosition ? 'Fortsetzen' : 'Abspielen',
+                label: item.userData.hasResumePosition ? tr.resume : tr.play,
                 icon: Icons.play_arrow_rounded,
                 onPressed: () => playItem(context, item),
               )
             else
-              PrimaryButton(label: 'Ansehen', icon: Icons.play_arrow_rounded, onPressed: () => openItem(context, item)),
+              PrimaryButton(label: tr.watch, icon: Icons.play_arrow_rounded, onPressed: () => openItem(context, item)),
             const SizedBox(width: 12),
-            GlassButton(
-              label: 'Mehr Infos',
-              icon: Icons.info_outline_rounded,
-              onPressed: () => openItem(context, item),
-            ),
+            GlassButton(label: tr.moreInfo, icon: Icons.info_outline_rounded, onPressed: () => openItem(context, item)),
           ],
         ),
       ],

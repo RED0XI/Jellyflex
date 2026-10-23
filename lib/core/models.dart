@@ -4,6 +4,8 @@
 /// So bleibt die App robust, wenn der Server Felder weglässt.
 library;
 
+import '../l10n/strings.dart';
+
 typedef Json = Map<String, dynamic>;
 
 Duration ticksToDuration(int ticks) => Duration(microseconds: ticks ~/ 10);
@@ -238,11 +240,11 @@ class Recommendation {
 
   /// Überschrift für die Reihe auf der Startseite.
   String get title => switch (type) {
-    'SimilarToRecentlyPlayed' => 'Weil du „$baselineItemName“ angesehen hast',
-    'SimilarToLikedItem' => 'Weil dir „$baselineItemName“ gefällt',
-    'HasDirectorFromRecentlyPlayed' || 'HasLikedDirector' => 'Mehr von $baselineItemName',
-    'HasActorFromRecentlyPlayed' || 'HasLikedActor' => 'Mit $baselineItemName',
-    _ => 'Empfehlungen',
+    'SimilarToRecentlyPlayed' => tr.becauseYouWatched(baselineItemName),
+    'SimilarToLikedItem' => tr.becauseYouLike(baselineItemName),
+    'HasDirectorFromRecentlyPlayed' || 'HasLikedDirector' => tr.moreFrom(baselineItemName),
+    'HasActorFromRecentlyPlayed' || 'HasLikedActor' => tr.withPerson(baselineItemName),
+    _ => tr.recommendations,
   };
 }
 

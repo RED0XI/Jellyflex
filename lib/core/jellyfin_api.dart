@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import 'images.dart';
 import 'models.dart';
+import '../l10n/strings.dart';
 
 class ServerInfo {
   const ServerInfo({required this.url, required this.name, required this.version});
@@ -124,7 +125,7 @@ class JellyfinApi {
         );
         final res = await dio.get('$url/System/Info/Public');
         final data = (res.data as Map).cast<String, dynamic>();
-        if (data['Id'] == null) throw const FormatException('Kein Jellyfin-Server');
+        if (data['Id'] == null) throw FormatException(tr.notAJellyfinServer);
         return ServerInfo(
           url: url,
           name: (data['ServerName'] as String?) ?? 'Jellyfin',
@@ -134,7 +135,7 @@ class JellyfinApi {
         lastError = e;
       }
     }
-    throw lastError ?? Exception('Server nicht erreichbar');
+    throw lastError ?? Exception(tr.serverNotReachable);
   }
 
   Future<AuthResult> authenticate(String username, String password) async {

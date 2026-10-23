@@ -10,6 +10,7 @@ import '../../widgets/media_cards.dart';
 import '../../widgets/media_row.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/top_scrim.dart';
+import '../../l10n/strings.dart';
 
 /// Suche mit Live-Ergebnissen, gruppiert nach Filmen, Serien und Folgen.
 class SearchScreen extends ConsumerStatefulWidget {
@@ -90,7 +91,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       onSubmitted: (v) => _search(v.trim()),
                       style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
                       decoration: InputDecoration(
-                        hintText: 'Filme, Serien und Folgen suchen …',
+                        hintText: tr.searchHint,
                         prefixIcon: const Padding(
                           padding: EdgeInsets.only(left: 18, right: 10),
                           child: Icon(Icons.search_rounded, size: 30),
@@ -108,7 +109,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             ? null
                             : IconButton(
                                 icon: const Icon(Icons.close_rounded),
-                                tooltip: 'Leeren',
+                                tooltip: tr.clear,
                                 onPressed: () {
                                   _controller.clear();
                                   _search('');
@@ -121,22 +122,22 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
                 if (_error != null)
                   SliverToBoxAdapter(
-                    child: _Hint(icon: Icons.cloud_off_rounded, text: 'Suche fehlgeschlagen: $_error'),
+                    child: _Hint(icon: Icons.cloud_off_rounded, text: tr.searchFailed(_error!)),
                   )
                 else if (_term.isEmpty)
-                  const SliverToBoxAdapter(
-                    child: _Hint(icon: Icons.movie_filter_rounded, text: 'Wonach ist dir heute?'),
+                  SliverToBoxAdapter(
+                    child: _Hint(icon: Icons.movie_filter_rounded, text: tr.whatDoYouFeelLike),
                   )
                 else if (!_loading && _results.isEmpty)
                   SliverToBoxAdapter(
-                    child: _Hint(icon: Icons.search_off_rounded, text: 'Nichts gefunden für „$_term“.'),
+                    child: _Hint(icon: Icons.search_off_rounded, text: tr.nothingFoundFor(_term)),
                   )
                 else
                   SliverList.list(
                     children: [
                       if (movies.isNotEmpty)
                         MediaRow(
-                          title: 'Filme',
+                          title: tr.movies,
                           itemCount: movies.length,
                           height: posterHeight,
                           itemBuilder: (context, i) => PosterCard(item: movies[i]),
@@ -144,7 +145,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       if (series.isNotEmpty) ...[
                         const SizedBox(height: 22),
                         MediaRow(
-                          title: 'Serien',
+                          title: tr.shows,
                           itemCount: series.length,
                           height: posterHeight,
                           itemBuilder: (context, i) => PosterCard(item: series[i]),
@@ -153,7 +154,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       if (episodes.isNotEmpty) ...[
                         const SizedBox(height: 22),
                         MediaRow(
-                          title: 'Folgen',
+                          title: tr.episodes,
                           itemCount: episodes.length,
                           height: landscapeHeight,
                           itemBuilder: (context, i) => LandscapeCard(item: episodes[i]),

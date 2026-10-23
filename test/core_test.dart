@@ -6,8 +6,12 @@ import 'package:jellyflex/core/images.dart';
 import 'package:jellyflex/core/jellyfin_api.dart';
 import 'package:jellyflex/core/models.dart';
 import 'package:jellyflex/core/secure_store.dart';
+import 'package:jellyflex/l10n/strings.dart';
 
 void main() {
+  // Diese Tests prüfen die deutschen Texte.
+  setUp(() => appLanguage = AppLanguage.de);
+
   group('Images (wie jellyfin-web)', () {
     final episode = BaseItem({
       'Id': 'ep1',

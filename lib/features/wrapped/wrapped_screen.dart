@@ -16,6 +16,7 @@ import '../../theme.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/jf_image.dart';
 import 'wrapped_stats.dart';
+import '../../l10n/strings.dart';
 
 /// Gesehene Filme, Folgen und die zugehörigen Serien (für alle Jahre).
 final _wrappedDataProvider = FutureProvider.autoDispose<(List<BaseItem>, List<BaseItem>, Map<String, BaseItem>)>((
@@ -103,7 +104,7 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
       final png = await image.toByteData(format: ui.ImageByteFormat.png);
       final dir = Directory('${Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path}\\Pictures');
       await dir.create(recursive: true);
-      final name = '${appDisplayName(ref.read(settingsProvider))} Rückblick ${stats.year}.png'.replaceAll(
+      final name = '${tr.recapFileName(appDisplayName(ref.read(settingsProvider)), stats.year)}.png'.replaceAll(
         RegExp(r'[\\/:*?"<>|]'),
         '',
       );
@@ -111,16 +112,14 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
       await file.writeAsBytes(png!.buffer.asUint8List());
       messenger?.showSnackBar(
         SnackBar(
-          content: Text('Gespeichert in Bilder: $name'),
+          content: Text(tr.savedToPictures(name)),
           behavior: SnackBarBehavior.floating,
           width: 520,
-          action: SnackBarAction(label: 'Anzeigen', onPressed: () => Process.run('explorer', ['/select,', file.path])),
+          action: SnackBarAction(label: tr.show, onPressed: () => Process.run('explorer', ['/select,', file.path])),
         ),
       );
     } catch (_) {
-      messenger?.showSnackBar(
-        const SnackBar(content: Text('Das Bild konnte nicht gespeichert werden.'), behavior: SnackBarBehavior.floating),
-      );
+      messenger?.showSnackBar(SnackBar(content: Text(tr.imageNotSaved), behavior: SnackBarBehavior.floating));
     }
   }
 
@@ -129,18 +128,18 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
     final data = ref.watch(_wrappedDataProvider);
     return Scaffold(
       body: data.when(
-        loading: () => const Center(
+        loading: () => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               CircularProgressIndicator(),
               SizedBox(height: 16),
-              Text('Wir rechnen dein Jahr zusammen …', style: TextStyle(color: AppColors.textSecondary)),
+              Text(tr.calculatingYear, style: TextStyle(color: AppColors.textSecondary)),
             ],
           ),
         ),
-        error: (e, _) => const Center(
-          child: Text('Der Server ist gerade nicht erreichbar.', style: TextStyle(color: AppColors.textSecondary)),
+        error: (e, _) => Center(
+          child: Text(tr.serverUnreachable, style: TextStyle(color: AppColors.textSecondary)),
         ),
         data: (d) {
           final (movies, episodes, series) = d;
@@ -220,11 +219,11 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
                         spacing: 12,
                         children: [
                           PrimaryButton(
-                            label: 'Als Bild speichern',
+                            label: tr.saveAsImage,
                             icon: Icons.download_rounded,
                             onPressed: () => _saveImage(stats),
                           ),
-                          GlassButton(label: 'Nochmal ansehen', icon: Icons.replay_rounded, onPressed: () => _go(-99)),
+                          GlassButton(label: tr.watchAgain, icon: Icons.replay_rounded, onPressed: () => _go(-99)),
                         ],
                       ),
                     ),
@@ -249,12 +248,12 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
         ),
         const SizedBox(height: 10),
         Text(
-          'Dein Jahr ${s.year}',
+          tr.yourYear(s.year),
           style: const TextStyle(fontSize: 76, fontWeight: FontWeight.w900, letterSpacing: -2, height: 1),
         ),
         const SizedBox(height: 16),
         Text(
-          s.isEmpty ? 'In diesem Jahr hast du noch nichts zu Ende geschaut.' : 'Lass uns zurückblicken.',
+          s.isEmpty ? tr.nothingThisYear : tr.letsLookBack,
           style: const TextStyle(fontSize: 22, color: Colors.white70),
         ),
         if (years.length > 1) ...[
@@ -288,15 +287,15 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
       _Slide(
         colors: const [Color(0xFF0E5E6F), Color(0xFF07131A)],
         children: [
-          const Text('Du hast', style: TextStyle(fontSize: 26, color: Colors.white70)),
+          Text(tr.youWatched, style: TextStyle(fontSize: 26, color: Colors.white70)),
           _CountUp(
             value: hours,
             decimals: hours < 10 ? 1 : 0,
-            suffix: ' Stunden',
+            suffix: tr.hoursSuffix,
             style: const TextStyle(fontSize: 92, fontWeight: FontWeight.w900, letterSpacing: -2),
           ),
           Text(
-            'geschaut. ${_timeComparison(s.totalMinutes)}',
+            tr.watchedComparison(_timeComparison(s.totalMinutes)),
             style: const TextStyle(fontSize: 24, color: Colors.white70),
           ),
         ],
@@ -304,21 +303,21 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
       _Slide(
         colors: const [Color(0xFF7A2E5A), Color(0xFF160A12)],
         children: [
-          const Text('Das waren', style: TextStyle(fontSize: 26, color: Colors.white70)),
+          Text(tr.thatWas, style: TextStyle(fontSize: 26, color: Colors.white70)),
           const SizedBox(height: 18),
           Wrap(
             spacing: 56,
             runSpacing: 20,
             children: [
-              _BigStat(value: s.movies, label: s.movies == 1 ? 'Film' : 'Filme'),
-              _BigStat(value: s.episodes, label: s.episodes == 1 ? 'Folge' : 'Folgen'),
-              _BigStat(value: s.series, label: s.series == 1 ? 'Serie' : 'Serien'),
+              _BigStat(value: s.movies, label: s.movies == 1 ? tr.movieWord : tr.moviesWord),
+              _BigStat(value: s.episodes, label: s.episodes == 1 ? tr.episodeWord : tr.episodesWord),
+              _BigStat(value: s.series, label: s.series == 1 ? tr.showWord : tr.showsWord),
             ],
           ),
           if (s.longestMovie case final longest?) ...[
             const SizedBox(height: 26),
             Text(
-              'Der längste Film: ${longest.name} (${formatRuntime(longest.runtime ?? Duration.zero)})',
+              tr.longestMovie(longest.name, formatRuntime(longest.runtime ?? Duration.zero)),
               style: const TextStyle(fontSize: 20, color: Colors.white70),
             ),
           ],
@@ -328,7 +327,7 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
         _Slide(
           colors: const [Color(0xFF8A4B12), Color(0xFF1A0E05)],
           children: [
-            const Text('Dein Lieblingsgenre', style: TextStyle(fontSize: 26, color: Colors.white70)),
+            Text(tr.favoriteGenre, style: TextStyle(fontSize: 26, color: Colors.white70)),
             Text(topGenre.$1, style: const TextStyle(fontSize: 84, fontWeight: FontWeight.w900, letterSpacing: -2)),
             const SizedBox(height: 26),
             for (final (genre, minutes) in s.topGenres) _GenreBar(label: genre, minutes: minutes, max: topGenre.$2),
@@ -339,19 +338,16 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
           colors: const [Color(0xFF1C2F7A), Color(0xFF070A18)],
           background: Images.backdrop(series),
           children: [
-            const Text('Deine Serie des Jahres', style: TextStyle(fontSize: 26, color: Colors.white70)),
+            Text(tr.showOfTheYear, style: TextStyle(fontSize: 26, color: Colors.white70)),
             Text(series.name, style: const TextStyle(fontSize: 76, fontWeight: FontWeight.w900, letterSpacing: -1.5)),
-            Text(
-              '${s.topSeriesEpisodes} ${s.topSeriesEpisodes == 1 ? 'Folge' : 'Folgen'} geschaut',
-              style: const TextStyle(fontSize: 26, color: Colors.white70),
-            ),
+            Text(tr.episodesWatched(s.topSeriesEpisodes), style: const TextStyle(fontSize: 26, color: Colors.white70)),
           ],
         ),
       if (s.topActor case final actor?)
         _Slide(
           colors: const [Color(0xFF1F6B3A), Color(0xFF06140B)],
           children: [
-            const Text('Am häufigsten gesehen', style: TextStyle(fontSize: 26, color: Colors.white70)),
+            Text(tr.seenMostOften, style: TextStyle(fontSize: 26, color: Colors.white70)),
             const SizedBox(height: 20),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -378,10 +374,7 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(actor.name, style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w900)),
-                    Text(
-                      'in ${actor.count} ${actor.count == 1 ? 'Titel' : 'Titeln'}',
-                      style: const TextStyle(fontSize: 26, color: Colors.white70),
-                    ),
+                    Text(tr.inTitles(actor.count), style: const TextStyle(fontSize: 26, color: Colors.white70)),
                   ],
                 ),
               ],
@@ -392,13 +385,13 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
         _Slide(
           colors: const [Color(0xFF6E1E1E), Color(0xFF160606)],
           children: [
-            const Text('Dein größter Marathon', style: TextStyle(fontSize: 26, color: Colors.white70)),
+            Text(tr.biggestMarathon, style: TextStyle(fontSize: 26, color: Colors.white70)),
             Text(
               formatWeekdayDate(day),
               style: const TextStyle(fontSize: 64, fontWeight: FontWeight.w900, letterSpacing: -1),
             ),
             Text(
-              '${formatRuntime(Duration(minutes: s.bingeMinutes))} an einem Tag 🍿',
+              tr.inOneDay(formatRuntime(Duration(minutes: s.bingeMinutes))),
               style: const TextStyle(fontSize: 26, color: Colors.white70),
             ),
           ],
@@ -408,10 +401,7 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
           colors: const [Color(0xFF2C2366), Color(0xFF09071A)],
           children: [
             Text(_watcherType(favHour), style: const TextStyle(fontSize: 64, fontWeight: FontWeight.w900)),
-            Text(
-              'Am liebsten schaust du gegen $favHour Uhr.',
-              style: const TextStyle(fontSize: 24, color: Colors.white70),
-            ),
+            Text(tr.favoriteHourText(favHour), style: const TextStyle(fontSize: 24, color: Colors.white70)),
             const SizedBox(height: 30),
             _HourChart(histogram: s.hourHistogram),
           ],
@@ -430,17 +420,17 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
 
   String _timeComparison(int minutes) {
     final days = minutes / 1440;
-    if (days >= 1) return 'Das sind ${days.toStringAsFixed(1).replaceAll('.', ',')} Tage am Stück.';
+    if (days >= 1) return tr.daysInARow(tr.decimal(days, 1));
     final titanic = minutes / 195;
-    if (titanic >= 1) return 'So lang wie ${titanic.toStringAsFixed(1).replaceAll('.', ',')}× „Titanic“.';
+    if (titanic >= 1) return tr.asLongAsTitanic(tr.decimal(titanic, 1));
     return '';
   }
 
   static String _watcherType(int hour) => switch (hour) {
-    >= 22 || <= 3 => 'Nachteule 🦉',
-    >= 4 && <= 11 => 'Frühaufsteher ☀️',
-    >= 17 && <= 21 => 'Feierabend-Gucker 🛋️',
-    _ => 'Nachmittags-Gucker ☕',
+    >= 22 || <= 3 => tr.nightOwl,
+    >= 4 && <= 11 => tr.earlyBird,
+    >= 17 && <= 21 => tr.eveningWatcher,
+    _ => tr.afternoonWatcher,
   };
 }
 
@@ -504,7 +494,7 @@ class _CountUp extends StatelessWidget {
       tween: Tween(begin: 0, end: value),
       duration: const Duration(milliseconds: 1800),
       curve: Curves.easeOutExpo,
-      builder: (context, v, _) => Text('${v.toStringAsFixed(decimals).replaceAll('.', ',')}$suffix', style: style),
+      builder: (context, v, _) => Text('${tr.decimal(v, decimals)}$suffix', style: style),
     );
   }
 }
@@ -566,7 +556,7 @@ class _GenreBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-          Text('${(minutes / 60).round()} Std.', style: const TextStyle(color: Colors.white70)),
+          Text(tr.hours((minutes / 60).round()), style: const TextStyle(color: Colors.white70)),
         ],
       ),
     );
@@ -646,23 +636,23 @@ class _SummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$appName · Rückblick ${stats.year}', style: const TextStyle(fontSize: 16, color: Colors.white70)),
+          Text(tr.recapTitle(appName, stats.year), style: const TextStyle(fontSize: 16, color: Colors.white70)),
           const SizedBox(height: 18),
           Wrap(
             spacing: 44,
             runSpacing: 18,
             children: [
-              stat('${(stats.totalMinutes / 60).round()}', 'Stunden'),
-              stat('${stats.movies}', 'Filme'),
-              stat('${stats.episodes}', 'Folgen'),
-              stat('${stats.series}', 'Serien'),
+              stat('${(stats.totalMinutes / 60).round()}', tr.hoursWord),
+              stat('${stats.movies}', tr.moviesTitle),
+              stat('${stats.episodes}', tr.episodesTitle),
+              stat('${stats.series}', tr.showsTitle),
             ],
           ),
           const SizedBox(height: 22),
-          if (stats.topGenres.firstOrNull case final g?) _line('Lieblingsgenre', g.$1),
-          if (stats.topSeries case final series?) _line('Serie des Jahres', series.name),
-          if (stats.topActor case final actor?) _line('Am häufigsten gesehen', actor.name),
-          if (stats.favoriteHour case final hour?) _line('Lieblingszeit', '$hour Uhr'),
+          if (stats.topGenres.firstOrNull case final g?) _line(tr.favoriteGenreShort, g.$1),
+          if (stats.topSeries case final series?) _line(tr.showOfTheYearShort, series.name),
+          if (stats.topActor case final actor?) _line(tr.seenMostOften, actor.name),
+          if (stats.favoriteHour case final hour?) _line(tr.favoriteTime, tr.timeOfDay(hour)),
         ],
       ),
     );

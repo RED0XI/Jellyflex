@@ -14,6 +14,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:jellyflex/core/jellyfin_api.dart';
 import 'package:jellyflex/core/models.dart';
 import 'package:jellyflex/core/session.dart';
+import 'package:jellyflex/core/settings.dart';
 import 'package:jellyflex/features/home/home_screen.dart';
 import 'package:jellyflex/features/library/library_screen.dart';
 import 'package:jellyflex/features/login/login_screen.dart';
@@ -21,6 +22,8 @@ import 'package:jellyflex/features/home/home_providers.dart';
 import 'package:jellyflex/features/settings/settings_screen.dart';
 import 'package:jellyflex/theme.dart';
 import 'package:media_kit/media_kit.dart';
+
+import 'test_settings.dart';
 
 class _FakeSession extends SessionController {
   @override
@@ -106,6 +109,7 @@ Future<void> _pumpFor(WidgetTester tester, Duration total) async {
 Widget _app(Widget page) => ProviderScope(
   overrides: [
     sessionProvider.overrideWith(_FakeSession.new),
+    settingsProvider.overrideWith(testSettings),
     userImageProvider.overrideWith((ref) async => null),
     apiProvider.overrideWithValue(_ShotApi()),
   ],
@@ -150,7 +154,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1440, 2900));
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [sessionProvider.overrideWith(_DemoSession.new)],
+        overrides: [sessionProvider.overrideWith(_DemoSession.new), settingsProvider.overrideWith(testSettings)],
         child: RepaintBoundary(
           key: _shotKey,
           child: MaterialApp(debugShowCheckedModeBanner: false, theme: buildTheme(), home: const HomeScreen()),
@@ -172,7 +176,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1440, 900));
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [sessionProvider.overrideWith(_DemoSession.new)],
+        overrides: [sessionProvider.overrideWith(_DemoSession.new), settingsProvider.overrideWith(testSettings)],
         child: RepaintBoundary(
           key: _shotKey,
           child: MaterialApp(debugShowCheckedModeBanner: false, theme: buildTheme(), home: const HomeScreen()),
@@ -203,6 +207,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          settingsProvider.overrideWith(testSettings),
           savedAccountsProvider.overrideWith(
             (ref) async => const [
               AuthSession(

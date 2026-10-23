@@ -1,12 +1,13 @@
+import '../l10n/strings.dart';
 import 'models.dart';
 
-/// "1 Std. 45 Min." bzw. "48 Min."
+/// "1 Std. 45 Min." bzw. "1 hr 45 min"
 String formatRuntime(Duration d) {
   final h = d.inHours;
   final m = d.inMinutes.remainder(60);
-  if (h == 0) return '$m Min.';
-  if (m == 0) return '$h Std.';
-  return '$h Std. $m Min.';
+  if (h == 0) return tr.minutes(m);
+  if (m == 0) return tr.hours(h);
+  return '${tr.hours(h)} ${tr.minutes(m)}';
 }
 
 /// Player-Zeitanzeige: "1:05:09" bzw. "05:09"
@@ -20,28 +21,11 @@ String formatTimecode(Duration d) {
 /// "22:41"
 String formatClock(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-const _months = [
-  'Januar',
-  'Februar',
-  'März',
-  'April',
-  'Mai',
-  'Juni',
-  'Juli',
-  'August',
-  'September',
-  'Oktober',
-  'November',
-  'Dezember',
-];
+/// "12. März 1975" bzw. "March 12, 1975"
+String formatDate(DateTime d) => tr.date(d);
 
-/// "12. März 1975"
-String formatDate(DateTime d) => '${d.day}. ${_months[d.month - 1]} ${d.year}';
-
-const _weekdays = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-
-/// "Donnerstag, 23. Oktober"
-String formatWeekdayDate(DateTime d) => '${_weekdays[d.weekday - 1]}, ${d.day}. ${_months[d.month - 1]}';
+/// "Donnerstag, 23. Oktober" bzw. "Thursday, October 23"
+String formatWeekdayDate(DateTime d) => tr.weekdayDate(d);
 
 /// Alter in Jahren am Tag [at] (Standard: heute).
 int ageAt(DateTime birth, [DateTime? at]) {
@@ -56,7 +40,7 @@ String? remainingLabel(BaseItem item) {
   final total = item.runTimeTicks;
   final pos = item.userData.playbackPositionTicks;
   if (total == null || pos <= 0 || pos >= total) return null;
-  return 'noch ${formatRuntime(ticksToDuration(total - pos))}';
+  return tr.remaining(formatRuntime(ticksToDuration(total - pos)));
 }
 
 /// Jahr bzw. Jahresspanne bei Serien ("2019–2023", "2021–").
@@ -93,41 +77,46 @@ double? progressOf(BaseItem item) {
   return null;
 }
 
-const _languageNames = {
-  'ger': 'Deutsch',
-  'deu': 'Deutsch',
-  'de': 'Deutsch',
-  'eng': 'Englisch',
-  'en': 'Englisch',
-  'jpn': 'Japanisch',
-  'ja': 'Japanisch',
-  'fre': 'Französisch',
-  'fra': 'Französisch',
-  'fr': 'Französisch',
-  'spa': 'Spanisch',
-  'es': 'Spanisch',
-  'ita': 'Italienisch',
-  'it': 'Italienisch',
-  'tur': 'Türkisch',
-  'tr': 'Türkisch',
-  'kor': 'Koreanisch',
-  'ko': 'Koreanisch',
-  'rus': 'Russisch',
-  'ru': 'Russisch',
-  'por': 'Portugiesisch',
-  'pt': 'Portugiesisch',
-  'dut': 'Niederländisch',
-  'nld': 'Niederländisch',
-  'nl': 'Niederländisch',
-  'pol': 'Polnisch',
-  'pl': 'Polnisch',
-  'chi': 'Chinesisch',
-  'zho': 'Chinesisch',
-  'zh': 'Chinesisch',
-  'und': 'Unbekannt',
+/// Sprachcodes (ISO 639-2 wie "ger"/"deu", ISO 639-1 wie "de") → einheitlicher Code.
+const _languageCodes = {
+  'ger': 'de',
+  'deu': 'de',
+  'de': 'de',
+  'eng': 'en',
+  'en': 'en',
+  'jpn': 'ja',
+  'ja': 'ja',
+  'fre': 'fr',
+  'fra': 'fr',
+  'fr': 'fr',
+  'spa': 'es',
+  'es': 'es',
+  'ita': 'it',
+  'it': 'it',
+  'tur': 'tr',
+  'tr': 'tr',
+  'kor': 'ko',
+  'ko': 'ko',
+  'rus': 'ru',
+  'ru': 'ru',
+  'por': 'pt',
+  'pt': 'pt',
+  'dut': 'nl',
+  'nld': 'nl',
+  'nl': 'nl',
+  'pol': 'pl',
+  'pl': 'pl',
+  'chi': 'zh',
+  'zho': 'zh',
+  'zh': 'zh',
 };
 
+/// Einheitlicher Sprachcode (z. B. "de") oder `null`, wenn unbekannt.
+String? languageKey(String? code) => code == null ? null : _languageCodes[code.toLowerCase()];
+
+/// Name einer Sprache in der Sprache der Oberfläche ("Deutsch" bzw. "German").
 String languageName(String? code) {
-  if (code == null || code.isEmpty) return 'Unbekannt';
-  return _languageNames[code.toLowerCase()] ?? code.toUpperCase();
+  if (code == null || code.isEmpty || code.toLowerCase() == 'und') return tr.unknown;
+  final key = languageKey(code);
+  return (key == null ? null : tr.languageName(key)) ?? code.toUpperCase();
 }

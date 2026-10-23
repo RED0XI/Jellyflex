@@ -15,6 +15,7 @@ import '../../widgets/focusable.dart';
 import '../../widgets/jf_image.dart';
 import '../../widgets/media_cards.dart';
 import '../details/details_screen.dart';
+import '../../l10n/strings.dart';
 
 enum _Kind { movies, series, both }
 
@@ -138,10 +139,10 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
         _reel = items;
         _offset = items.length > 2 ? 2 : 0;
         _winner = null;
-        _message = items.isEmpty ? 'Nichts gefunden – lockere die Filter etwas.' : null;
+        _message = items.isEmpty ? tr.nothingFoundLoosen : null;
       });
     } catch (e) {
-      if (mounted) setState(() => _message = 'Der Server ist gerade nicht erreichbar.');
+      if (mounted) setState(() => _message = tr.serverUnreachable);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -161,7 +162,7 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
       if (mounted) {
         setState(() {
           _loading = false;
-          _message = 'Der Server ist gerade nicht erreichbar.';
+          _message = tr.serverUnreachable;
         });
       }
       return;
@@ -170,7 +171,7 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
     if (items.isEmpty) {
       setState(() {
         _loading = false;
-        _message = 'Nichts gefunden – lockere die Filter etwas.';
+        _message = tr.nothingFoundLoosen;
       });
       return;
     }
@@ -245,21 +246,18 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
                           Icon(Icons.casino_rounded, size: 34, color: AppColors.accent),
                           SizedBox(width: 12),
                           Text(
-                            'Überrasch mich',
+                            tr.surpriseMe,
                             style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -0.8),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Lass den Zufall entscheiden, was heute läuft.',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 15),
-                      ),
+                      Text(tr.letChanceDecide, style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
                       const SizedBox(height: 20),
                       _filters(),
                     ],
@@ -278,7 +276,7 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
                 const SizedBox(height: 26),
                 Center(
                   child: PrimaryButton(
-                    label: _spin.isAnimating ? 'Dreht …' : (winner == null ? 'Drehen' : 'Nochmal drehen'),
+                    label: _spin.isAnimating ? tr.spinning : (winner == null ? tr.spin : tr.spinAgain),
                     icon: Icons.casino_rounded,
                     loading: _loading,
                     onPressed: _spin.isAnimating ? null : _spinNow,
@@ -316,7 +314,7 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
       _fillReel();
     }
 
-    String endLabel(int? h) => h == null ? 'Egal' : (h == 24 ? 'Mitternacht' : '$h:00 Uhr');
+    String endLabel(int? h) => h == null ? tr.anyTime : (h == 24 ? tr.midnight : tr.timeOfDay(h));
     final now = DateTime.now().hour;
     // Sinnvolle Uhrzeiten: die nächsten Stunden bis 2 Uhr nachts.
     final hours = [for (var h = now + 2; h <= 26; h++) h].take(6).toList();
@@ -326,7 +324,7 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
       runSpacing: 10,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        for (final (kind, label) in [(_Kind.movies, 'Filme'), (_Kind.series, 'Serien'), (_Kind.both, 'Beides')])
+        for (final (kind, label) in [(_Kind.movies, tr.movies), (_Kind.series, tr.shows), (_Kind.both, tr.both)])
           _Chip(
             label: label,
             selected: _kind == kind,
@@ -338,20 +336,20 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
           ),
         const SizedBox(width: 10),
         _Chip(
-          label: 'Nur Ungesehenes',
+          label: tr.unwatchedOnly,
           icon: _unplayedOnly ? Icons.check_rounded : null,
           selected: _unplayedOnly,
           onTap: () => refilter(() => _unplayedOnly = !_unplayedOnly),
         ),
         _MenuChip<String?>(
-          label: 'Genre: ${_genre ?? 'Alle'}',
-          options: [(null, 'Alle'), for (final g in _genres) (g, g)],
+          label: tr.genreLabel(_genre ?? tr.all),
+          options: [(null, tr.all), for (final g in _genres) (g, g)],
           onSelected: (g) => refilter(() => _genre = g),
         ),
         if (_kind != _Kind.series)
           _MenuChip<int?>(
-            label: 'Fertig bis: ${endLabel(_endBy)}',
-            options: [(null, 'Egal'), for (final h in hours) (h, endLabel(h % 24 == 0 ? 24 : h % 24))],
+            label: tr.finishedBy(endLabel(_endBy)),
+            options: [(null, tr.anyTime), for (final h in hours) (h, endLabel(h % 24 == 0 ? 24 : h % 24))],
             onSelected: (h) => refilter(() => _endBy = h == null ? null : (h % 24 == 0 ? 24 : h % 24)),
           ),
       ],
@@ -526,7 +524,7 @@ class _WinnerCard extends StatelessWidget {
     final meta = [
       ?yearLabel(item),
       if (runtime != null && !item.isSeries) formatRuntime(runtime),
-      if (runtime != null && !item.isSeries) 'Endet um ${formatClock(DateTime.now().add(runtime))}',
+      if (runtime != null && !item.isSeries) tr.endsAt(formatClock(DateTime.now().add(runtime))),
       if (item.communityRating != null) '★ ${item.communityRating!.toStringAsFixed(1)}',
     ];
     return Padding(
@@ -563,11 +561,11 @@ class _WinnerCard extends StatelessWidget {
                 alignment: WrapAlignment.center,
                 children: [
                   PrimaryButton(
-                    label: item.isSeries ? 'Serie starten' : 'Abspielen',
+                    label: item.isSeries ? tr.startSeries : tr.play,
                     icon: Icons.play_arrow_rounded,
                     onPressed: onPlay,
                   ),
-                  GlassButton(label: 'Details', icon: Icons.info_outline_rounded, onPressed: onDetails),
+                  GlassButton(label: tr.details, icon: Icons.info_outline_rounded, onPressed: onDetails),
                 ],
               ),
             ],

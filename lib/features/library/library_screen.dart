@@ -10,17 +10,25 @@ import '../../widgets/smooth_scroll.dart';
 import '../../widgets/states.dart';
 import '../../widgets/top_scrim.dart';
 import '../../widgets/focusable.dart';
+import '../../l10n/strings.dart';
 
 enum LibrarySort {
-  name('Titel', 'SortName', 'Ascending'),
-  added('Zuletzt hinzugefügt', 'DateCreated,SortName', 'Descending'),
-  released('Erscheinungsdatum', 'PremiereDate,ProductionYear,SortName', 'Descending'),
-  rating('Bewertung', 'CommunityRating,SortName', 'Descending'),
-  random('Zufällig', 'Random', 'Ascending');
+  name('SortName', 'Ascending'),
+  added('DateCreated,SortName', 'Descending'),
+  released('PremiereDate,ProductionYear,SortName', 'Descending'),
+  rating('CommunityRating,SortName', 'Descending'),
+  random('Random', 'Ascending');
 
-  const LibrarySort(this.label, this.sortBy, this.sortOrder);
+  const LibrarySort(this.sortBy, this.sortOrder);
 
-  final String label;
+  String get label => switch (this) {
+    name => tr.sortTitle,
+    added => tr.sortAdded,
+    released => tr.sortReleased,
+    rating => tr.sortRating,
+    random => tr.sortRandom,
+  };
+
   final String sortBy;
   final String sortOrder;
 }
@@ -228,7 +236,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -0.8),
                         ),
                         Text(
-                          _total == null ? ' ' : '$_total Titel',
+                          _total == null ? ' ' : tr.titlesCount(_total!),
                           style: const TextStyle(color: AppColors.textSecondary),
                         ),
                         const SizedBox(height: 18),
@@ -246,13 +254,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                               onSelected: (s) => _apply(f.copyWith(sort: s)),
                             ),
                             _ToggleChip(
-                              label: 'Ungesehen',
+                              label: tr.unwatched,
                               icon: Icons.visibility_off_outlined,
                               active: f.unplayed,
                               onTap: () => _apply(f.copyWith(unplayed: !f.unplayed)),
                             ),
                             _ToggleChip(
-                              label: 'Favoriten',
+                              label: tr.favorites,
                               icon: Icons.favorite_border_rounded,
                               active: f.favorites,
                               onTap: () => _apply(f.copyWith(favorites: !f.favorites)),
@@ -260,19 +268,19 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             if (_genres.isNotEmpty)
                               _PillMenu<String?>(
                                 icon: Icons.theater_comedy_outlined,
-                                label: f.genre ?? 'Genre',
+                                label: f.genre ?? tr.genre,
                                 active: f.genre != null,
-                                options: [(null, 'Alle Genres'), for (final g in _genres) (g, g)],
+                                options: [(null, tr.allGenres), for (final g in _genres) (g, g)],
                                 selected: f.genre,
                                 onSelected: (g) => _apply(f.copyWith(genre: () => g)),
                               ),
                             _PillMenu<int?>(
                               icon: Icons.calendar_month_outlined,
-                              label: f.decade == null ? 'Jahrzehnt' : _decadeLabel(f.decade!),
+                              label: f.decade == null ? tr.decade : tr.decadeLabel(f.decade!),
                               active: f.decade != null,
                               options: [
-                                (null, 'Alle Jahre'),
-                                for (var d = thisDecade; d >= 1950; d -= 10) (d, _decadeLabel(d)),
+                                (null, tr.allYears),
+                                for (var d = thisDecade; d >= 1950; d -= 10) (d, tr.decadeLabel(d)),
                               ],
                               selected: f.decade,
                               onSelected: (d) => _apply(f.copyWith(decade: () => d)),
@@ -281,7 +289,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                               TextButton.icon(
                                 onPressed: () => _apply(LibraryFilter(sort: f.sort)),
                                 icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
-                                label: const Text('Filter zurücksetzen'),
+                                label: Text(tr.resetFilters),
                               ),
                           ],
                         ),
@@ -305,7 +313,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 ),
                 if (_error != null && _items.isEmpty)
                   SliverToBoxAdapter(
-                    child: ErrorView(message: 'Bibliothek konnte nicht geladen werden.\n$_error', onRetry: _loadMore),
+                    child: ErrorView(message: tr.libraryCouldNotLoad(_error!), onRetry: _loadMore),
                   )
                 else if (!_loading && _total == 0)
                   SliverToBoxAdapter(
@@ -315,13 +323,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         children: [
                           const Icon(Icons.filter_alt_outlined, size: 48, color: AppColors.textMuted),
                           const SizedBox(height: 12),
-                          const Text(
-                            'Keine Titel passen zu diesen Filtern.',
-                            style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
-                          ),
+                          Text(tr.noTitlesMatch, style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
                           const SizedBox(height: 16),
                           GlassButton(
-                            label: 'Filter zurücksetzen',
+                            label: tr.resetFilters,
                             icon: Icons.filter_alt_off_outlined,
                             onPressed: () => _apply(LibraryFilter(sort: f.sort)),
                           ),
@@ -366,8 +371,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       ),
     );
   }
-
-  static String _decadeLabel(int d) => d >= 2000 ? '${d}er' : '${d % 100}er';
 }
 
 class _ToggleChip extends StatefulWidget {

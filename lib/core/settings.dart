@@ -3,26 +3,15 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/strings.dart';
 import 'format.dart';
 
-/// Wählbare Sprachen (ISO 639-2, wie Jellyfin/mpv sie liefern).
-const settingsLanguages = <String, String>{
-  'ger': 'Deutsch',
-  'eng': 'Englisch',
-  'jpn': 'Japanisch',
-  'fre': 'Französisch',
-  'spa': 'Spanisch',
-  'ita': 'Italienisch',
-  'tur': 'Türkisch',
-  'kor': 'Koreanisch',
-  'rus': 'Russisch',
-  'por': 'Portugiesisch',
-  'chi': 'Chinesisch',
-};
+/// Wählbare Sprachen für Ton und Untertitel (ISO 639-2, wie Jellyfin/mpv sie liefern).
+const settingsLanguages = ['ger', 'eng', 'jpn', 'fre', 'spa', 'ita', 'tur', 'kor', 'rus', 'por', 'chi'];
 
 /// Qualitätsstufen (bit/s); `null` = Original ohne Umrechnung.
-const qualityOptions = <(int?, String)>[
-  (null, 'Original'),
+List<(int?, String)> get qualityOptions => [
+  (null, tr.original),
   (40000000, '40 Mbit/s · 4K'),
   (20000000, '20 Mbit/s · 1080p'),
   (10000000, '10 Mbit/s · 1080p'),
@@ -40,8 +29,8 @@ const subtitlesOff = 'off';
 /// Gleiche Sprache, egal ob "ger", "deu" oder "de".
 bool sameLanguage(String? a, String? b) {
   if (a == null || b == null) return false;
-  final na = languageName(a);
-  return na != 'Unbekannt' && na == languageName(b);
+  final ka = languageKey(a);
+  return ka != null && ka == languageKey(b);
 }
 
 /// Ambilight: aus, nur im Fenster oder auch im Vollbild.
@@ -64,7 +53,11 @@ class AppSettings {
     this.seasonalThemes = true,
     this.ambilight = AmbilightMode.window,
     this.quizHighscore = 0,
+    this.language = AppLanguage.en,
   });
+
+  /// Sprache der Oberfläche (Standard: Englisch).
+  final AppLanguage language;
 
   /// Bester Punktestand im Film-Quiz.
   final int quizHighscore;
@@ -127,6 +120,7 @@ class AppSettings {
     bool? seasonalThemes,
     AmbilightMode? ambilight,
     int? quizHighscore,
+    AppLanguage? language,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -143,6 +137,7 @@ class AppSettings {
     seasonalThemes: seasonalThemes ?? this.seasonalThemes,
     ambilight: ambilight ?? this.ambilight,
     quizHighscore: quizHighscore ?? this.quizHighscore,
+    language: language ?? this.language,
   );
 
   Map<String, dynamic> toJson() => {
@@ -161,6 +156,7 @@ class AppSettings {
     'seasonalThemes': seasonalThemes,
     'ambilight': ambilight.name,
     'quizHighscore': quizHighscore,
+    'language': language.name,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -179,6 +175,7 @@ class AppSettings {
     seasonalThemes: json['seasonalThemes'] as bool? ?? true,
     ambilight: AmbilightMode.values.asNameMap()[json['ambilight']] ?? AmbilightMode.window,
     quizHighscore: (json['quizHighscore'] as num?)?.toInt() ?? 0,
+    language: AppLanguage.values.asNameMap()[json['language']] ?? AppLanguage.en,
   );
 }
 
@@ -197,7 +194,9 @@ class SettingsController extends Notifier<AppSettings> {
   AppSettings build() {
     try {
       if (_file.existsSync()) {
-        return AppSettings.fromJson(jsonDecode(_file.readAsStringSync()) as Map<String, dynamic>);
+        final loaded = AppSettings.fromJson(jsonDecode(_file.readAsStringSync()) as Map<String, dynamic>);
+        appLanguage = loaded.language;
+        return loaded;
       }
     } catch (_) {
       // Kaputte Datei → Standardwerte.
@@ -206,7 +205,9 @@ class SettingsController extends Notifier<AppSettings> {
   }
 
   void update(AppSettings Function(AppSettings s) change) {
-    state = change(state);
+    final next = change(state);
+    appLanguage = next.language;
+    state = next;
     try {
       _file.parent.createSync(recursive: true);
       _file.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(state.toJson()));

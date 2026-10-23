@@ -8,6 +8,7 @@ import '../core/session.dart';
 import '../theme.dart';
 import 'details/details_screen.dart';
 import 'downloads/downloads_screen.dart';
+import '../l10n/strings.dart';
 
 enum _ItemAction {
   play,
@@ -63,26 +64,24 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
           style: const TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600, fontSize: 13),
         ),
       ),
-      if (canPlay)
-        entry(_ItemAction.play, Icons.play_arrow_rounded, data.hasResumePosition ? 'Fortsetzen' : 'Abspielen'),
-      if (canPlay && data.hasResumePosition)
-        entry(_ItemAction.playFromStart, Icons.replay_rounded, 'Von vorne abspielen'),
-      entry(_ItemAction.details, Icons.info_outline_rounded, 'Details'),
-      if (item.isEpisode && item.seriesId != null) entry(_ItemAction.series, Icons.tv_rounded, 'Zur Serie'),
+      if (canPlay) entry(_ItemAction.play, Icons.play_arrow_rounded, data.hasResumePosition ? tr.resume : tr.play),
+      if (canPlay && data.hasResumePosition) entry(_ItemAction.playFromStart, Icons.replay_rounded, tr.playFromStart),
+      entry(_ItemAction.details, Icons.info_outline_rounded, tr.details),
+      if (item.isEpisode && item.seriesId != null) entry(_ItemAction.series, Icons.tv_rounded, tr.goToSeries),
       const PopupMenuDivider(),
       if (data.played)
-        entry(_ItemAction.markUnplayed, Icons.remove_done_rounded, 'Als ungesehen markieren')
+        entry(_ItemAction.markUnplayed, Icons.remove_done_rounded, tr.markUnplayed)
       else
-        entry(_ItemAction.markPlayed, Icons.check_rounded, 'Bereits angeschaut'),
+        entry(_ItemAction.markPlayed, Icons.check_rounded, tr.alreadyWatched),
       if (data.isFavorite)
-        entry(_ItemAction.unfavorite, Icons.heart_broken_rounded, 'Aus Favoriten entfernen')
+        entry(_ItemAction.unfavorite, Icons.heart_broken_rounded, tr.removeFavorite)
       else
-        entry(_ItemAction.favorite, Icons.favorite_border_rounded, 'Zu Favoriten hinzufügen'),
-      if (data.hasResumePosition) entry(_ItemAction.forget, Icons.history_toggle_off_rounded, 'Vergessen'),
+        entry(_ItemAction.favorite, Icons.favorite_border_rounded, tr.addFavorite),
+      if (data.hasResumePosition) entry(_ItemAction.forget, Icons.history_toggle_off_rounded, tr.forget),
       if (canPlay) const PopupMenuDivider(),
-      if (canPlay && downloaded == null) entry(_ItemAction.download, Icons.download_rounded, 'Herunterladen'),
+      if (canPlay && downloaded == null) entry(_ItemAction.download, Icons.download_rounded, tr.download),
       if (canPlay && downloaded != null)
-        entry(_ItemAction.removeDownload, Icons.delete_outline_rounded, 'Download löschen'),
+        entry(_ItemAction.removeDownload, Icons.delete_outline_rounded, tr.deleteDownload),
     ],
   );
   restoreFocusAfterMenu(previousFocus);
@@ -97,7 +96,7 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
       refreshItemDataIn(container, item);
       messenger?.showSnackBar(_snack(done));
     } catch (_) {
-      messenger?.showSnackBar(_snack('Das hat leider nicht geklappt.'));
+      messenger?.showSnackBar(_snack(tr.didNotWork));
     }
   }
 
@@ -111,22 +110,22 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
     case _ItemAction.series:
       router.push('/item/${item.seriesId}');
     case _ItemAction.markPlayed:
-      await run(() => api.setPlayed(item.id, true), '„${item.name}“ als angeschaut markiert');
+      await run(() => api.setPlayed(item.id, true), tr.markedWatched(item.name));
     case _ItemAction.markUnplayed:
-      await run(() => api.setPlayed(item.id, false), '„${item.name}“ als ungesehen markiert');
+      await run(() => api.setPlayed(item.id, false), tr.markedUnwatched(item.name));
     case _ItemAction.favorite:
-      await run(() => api.setFavorite(item.id, true), 'Zu Favoriten hinzugefügt');
+      await run(() => api.setFavorite(item.id, true), tr.addedToFavorites);
     case _ItemAction.unfavorite:
-      await run(() => api.setFavorite(item.id, false), 'Aus Favoriten entfernt');
+      await run(() => api.setFavorite(item.id, false), tr.removedFromFavorites);
     case _ItemAction.download:
       await container.read(downloadsProvider.notifier).enqueue(item);
-      messenger?.showSnackBar(_snack('Download gestartet: ${item.name}'));
+      messenger?.showSnackBar(_snack(tr.downloadStarted(item.name)));
     case _ItemAction.removeDownload:
       if (!context.mounted || !await confirmRemoveDownload(context, item.name)) return;
       await container.read(downloadsProvider.notifier).remove(item.id);
-      messenger?.showSnackBar(_snack('Download gelöscht'));
+      messenger?.showSnackBar(_snack(tr.downloadDeleted));
     case _ItemAction.forget:
-      await run(() => api.clearResumePosition(item.id), 'Aus „Weiterschauen“ entfernt');
+      await run(() => api.clearResumePosition(item.id), tr.removedFromContinue);
   }
 }
 

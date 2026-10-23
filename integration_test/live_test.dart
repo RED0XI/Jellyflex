@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:jellyflex/app.dart';
 import 'package:jellyflex/core/session.dart';
+import 'package:jellyflex/core/settings.dart';
 import 'package:jellyflex/core/gamepad_input.dart';
 import 'package:jellyflex/features/details/details_screen.dart';
 import 'package:jellyflex/features/player/player_screen.dart';
@@ -20,6 +21,8 @@ import 'package:jellyflex/features/search/search_screen.dart';
 import 'package:jellyflex/widgets/focusable.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
+
+import 'test_settings.dart';
 
 class _DemoSession extends SessionController {
   @override
@@ -66,7 +69,10 @@ void main() {
     PlayerScreen.debugBeforeOpen = (p) async => player = p;
 
     await tester.pumpWidget(
-      ProviderScope(overrides: [sessionProvider.overrideWith(_DemoSession.new)], child: const JellyflexApp()),
+      ProviderScope(
+        overrides: [sessionProvider.overrideWith(_DemoSession.new), settingsProvider.overrideWith(testSettings)],
+        child: const JellyflexApp(),
+      ),
     );
     await _pumpFor(tester, const Duration(seconds: 4));
 
@@ -128,7 +134,10 @@ void main() {
     }
     await windowManager.ensureInitialized();
     await tester.pumpWidget(
-      ProviderScope(overrides: [sessionProvider.overrideWith(_DemoSession.new)], child: const JellyflexApp()),
+      ProviderScope(
+        overrides: [sessionProvider.overrideWith(_DemoSession.new), settingsProvider.overrideWith(testSettings)],
+        child: const JellyflexApp(),
+      ),
     );
     await _pumpFor(tester, const Duration(seconds: 4));
 

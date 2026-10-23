@@ -1,5 +1,6 @@
 import 'downloads.dart' show formatBytes;
 import 'models.dart';
+import '../l10n/strings.dart';
 
 /// Lesbare Beschreibungen für Fassungen und Spuren ("4K", "HDR10", "TrueHD Atmos 7.1" …).
 
@@ -57,7 +58,7 @@ String channelsLabel(int channels) => switch (channels) {
   2 => 'Stereo',
   6 => '5.1',
   8 => '7.1',
-  _ => '$channels Kanäle',
+  _ => tr.channels(channels),
 };
 
 /// Besonderes Tonformat (Atmos, DTS:X, DTS-HD MA) aus Profil oder Titel.
@@ -82,7 +83,7 @@ String audioSummary(MediaStream audio) {
 /// "24,5 Mbit/s" bzw. "640 kbit/s"
 String formatBitrate(int bitsPerSecond) {
   if (bitsPerSecond >= 1000000) {
-    return '${(bitsPerSecond / 1000000).toStringAsFixed(1).replaceAll('.', ',')} Mbit/s';
+    return '${tr.decimal(bitsPerSecond / 1000000, 1)} Mbit/s';
   }
   return '${(bitsPerSecond / 1000).round()} kbit/s';
 }
@@ -91,7 +92,7 @@ String formatBitrate(int bitsPerSecond) {
 String versionLabel(MediaSource source) {
   final video = source.videoStream;
   final parts = [?resolutionLabel(video), ?hdrLabel(video), if (video != null) codecLabel(video.codec)];
-  return parts.isEmpty ? (source.name ?? 'Fassung') : parts.join(' · ');
+  return parts.isEmpty ? (source.name ?? tr.version) : parts.join(' · ');
 }
 
 /// Zweite Zeile im Versionsmenü: Name der Fassung, Größe, Bitrate.

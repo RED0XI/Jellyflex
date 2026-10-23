@@ -7,6 +7,8 @@ import 'package:jellyflex/core/jellyfin_api.dart';
 import 'package:jellyflex/core/models.dart';
 import 'package:jellyflex/core/session.dart';
 import 'package:jellyflex/widgets/media_cards.dart';
+import 'package:jellyflex/l10n/strings.dart';
+import 'package:jellyflex/core/settings.dart';
 
 class _RecordingApi extends JellyfinApi {
   _RecordingApi() : super(baseUrl: 'http://localhost', deviceId: 'd', token: 't', userId: 'u');
@@ -23,7 +25,16 @@ class _RecordingApi extends JellyfinApi {
   Future<void> setFavorite(String id, bool favorite) async => calls.add('favorite:$id:$favorite');
 }
 
+/// Einstellungen nur im Speicher – Tests lesen nie die echte Einstellungsdatei.
+class _MemorySettings extends SettingsController {
+  @override
+  AppSettings build() => const AppSettings(language: AppLanguage.de);
+}
+
 void main() {
+  // Diese Tests prüfen die deutschen Texte.
+  setUp(() => appLanguage = AppLanguage.de);
+
   final episode = BaseItem({
     'Id': 'ep1',
     'Name': 'Gegenwind',
@@ -52,7 +63,7 @@ void main() {
     );
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [apiProvider.overrideWithValue(api)],
+        overrides: [apiProvider.overrideWithValue(api), settingsProvider.overrideWith(_MemorySettings.new)],
         child: MaterialApp.router(routerConfig: router),
       ),
     );

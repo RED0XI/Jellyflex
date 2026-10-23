@@ -5,6 +5,7 @@ import 'package:jellyflex/core/jellyfin_api.dart';
 import 'package:jellyflex/core/models.dart';
 import 'package:jellyflex/core/session.dart';
 import 'package:jellyflex/features/library/library_screen.dart';
+import 'package:jellyflex/l10n/strings.dart';
 
 class _FilterApi extends JellyfinApi {
   _FilterApi() : super(baseUrl: 'http://localhost', deviceId: 'd', token: 't', userId: 'u');
@@ -47,6 +48,9 @@ class _FilterApi extends JellyfinApi {
 }
 
 void main() {
+  // Diese Tests prüfen die deutschen Texte.
+  setUp(() => appLanguage = AppLanguage.de);
+
   Future<_FilterApi> pump(WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(1400, 1000));
     final api = _FilterApi();

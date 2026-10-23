@@ -9,14 +9,15 @@ import '../../core/settings.dart';
 import '../../theme.dart';
 import '../../widgets/jf_image.dart';
 import '../../widgets/focusable.dart';
+import '../../l10n/strings.dart';
 
 /// Beschriftung für "… überspringen" je nach Abschnittstyp.
 String _skipLabel(String type) => switch (type) {
-  'Intro' => 'Intro überspringen',
-  'Recap' => 'Rückblick überspringen',
-  'Preview' => 'Vorschau überspringen',
-  'Commercial' => 'Werbung überspringen',
-  _ => 'Überspringen',
+  'Intro' => tr.skipIntro,
+  'Recap' => tr.skipRecap,
+  'Preview' => tr.skipPreview,
+  'Commercial' => tr.skipCommercial,
+  _ => tr.skip,
 };
 
 /// Blendet je nach Position "Intro überspringen" oder die Karte
@@ -284,8 +285,8 @@ class _NextEpisodeCardState extends State<_NextEpisodeCard> with SingleTickerPro
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'NÄCHSTE FOLGE',
+                Text(
+                  tr.nextEpisodeCaps,
                   style: TextStyle(
                     fontSize: 11.5,
                     letterSpacing: 1.2,
@@ -313,13 +314,13 @@ class _NextEpisodeCardState extends State<_NextEpisodeCard> with SingleTickerPro
                     _countdown.stop();
                     widget.onDismiss();
                   },
-                  child: const Text('Abspann ansehen'),
+                  child: Text(tr.watchCredits),
                 ),
                 const SizedBox(width: 4),
                 FilledButton.icon(
                   onPressed: widget.onPlay,
                   icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Jetzt ansehen'),
+                  label: Text(tr.watchNow),
                 ),
               ],
             ),
@@ -484,24 +485,24 @@ class PlaybackPanel extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _PanelTitle('Geschwindigkeit'),
+                _PanelTitle(tr.speed),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
                     for (final r in rates)
                       _Chip(
-                        label: '${r.toString().replaceAll('.', ',').replaceAll(RegExp(r',0$'), '')}×',
+                        label: '${tr.decimal(r, r == r.roundToDouble() ? 0 : 2).replaceAll(RegExp(r'[.,]?0+$'), '')}×',
                         selected: (r - rate).abs() < 0.01,
                         onTap: () => onRate(r),
                       ),
                   ],
                 ),
                 const SizedBox(height: 22),
-                const _PanelTitle('Synchronisation'),
-                _DelayRow(label: 'Ton', value: audioDelay, onChanged: onAudioDelay),
+                _PanelTitle(tr.sync),
+                _DelayRow(label: tr.sound, value: audioDelay, onChanged: onAudioDelay),
                 const SizedBox(height: 8),
-                _DelayRow(label: 'Untertitel', value: subtitleDelay, onChanged: onSubtitleDelay),
+                _DelayRow(label: tr.subtitles, value: subtitleDelay, onChanged: onSubtitleDelay),
               ],
             ),
           ),
@@ -510,11 +511,11 @@ class PlaybackPanel extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _PanelTitle('Qualität'),
+                _PanelTitle(tr.quality),
                 for (final q in qualityOptions)
                   _SelectRow(
                     label: q.$2,
-                    hint: q.$1 == null ? 'ohne Umrechnung' : null,
+                    hint: q.$1 == null ? tr.withoutConversion : null,
                     selected: q.$1 == maxBitrate,
                     onTap: () => onQuality(q.$1),
                   ),
@@ -628,7 +629,7 @@ class _DelayRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = '${value > 0 ? '+' : ''}${value.toStringAsFixed(1).replaceAll('.', ',')} s';
+    final text = '${value > 0 ? '+' : ''}${tr.decimal(value, 1)} s';
     return Row(
       children: [
         SizedBox(
@@ -648,7 +649,7 @@ class _DelayRow extends StatelessWidget {
         if (value != 0) ...[
           const SizedBox(width: 6),
           Tooltip(
-            message: 'Zurücksetzen',
+            message: tr.reset,
             child: _RoundButton(icon: Icons.restart_alt_rounded, onTap: () => onChanged(0)),
           ),
         ],

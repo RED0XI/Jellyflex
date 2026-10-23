@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 import 'buttons.dart';
+import '../l10n/strings.dart';
 
 /// Pulsierender Platzhalter, solange Inhalte laden.
 class Skeleton extends StatefulWidget {
@@ -103,7 +104,7 @@ class ErrorView extends StatelessWidget {
             Wrap(
               spacing: 12,
               children: [
-                GlassButton(label: 'Erneut versuchen', icon: Icons.refresh_rounded, onPressed: onRetry),
+                GlassButton(label: tr.retry, icon: Icons.refresh_rounded, onPressed: onRetry),
                 if (secondaryLabel != null && onSecondary != null)
                   GlassButton(label: secondaryLabel!, icon: Icons.download_done_rounded, onPressed: onSecondary),
               ],

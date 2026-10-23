@@ -13,6 +13,8 @@ import '../../widgets/buttons.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/top_scrim.dart';
 import '../home/home_providers.dart';
+import '../../l10n/strings.dart';
+import '../../core/format.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -35,8 +37,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _pickLogo() async {
     final file = await openFile(
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'Bilder', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']),
+      acceptedTypeGroups: [
+        XTypeGroup(label: tr.images, extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']),
       ],
     );
     if (file == null) return;
@@ -46,13 +48,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ref.read(settingsProvider.notifier).update((s) => s.copyWith(logoPath: () => path));
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          const SnackBar(
-            content: Text('Dieses Bild konnte nicht gelesen werden.'),
-            behavior: SnackBarBehavior.floating,
-            width: 420,
-          ),
-        );
+        ScaffoldMessenger.maybeOf(
+          context,
+        )?.showSnackBar(SnackBar(content: Text(tr.imageUnreadable), behavior: SnackBarBehavior.floating, width: 420));
       }
     } finally {
       if (mounted) setState(() => _importingLogo = false);
@@ -68,8 +66,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     String languageLabel(String? code, {required String fallback}) {
       if (code == null) return fallback;
-      if (code == subtitlesOff) return 'Aus';
-      return settingsLanguages[code] ?? code;
+      if (code == subtitlesOff) return tr.off;
+      return languageName(code);
     }
 
     return Scaffold(
@@ -88,48 +86,63 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Einstellungen',
+                        Text(
+                          tr.settings,
                           style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -0.8),
                         ),
                         const SizedBox(height: 28),
 
                         _Section(
-                          title: 'Wiedergabe',
+                          title: tr.language,
+                          icon: Icons.translate_rounded,
+                          children: [
+                            _Row(
+                              title: tr.appLanguage,
+                              subtitle: tr.appLanguageHint,
+                              trailing: _Choice<AppLanguage>(
+                                value: s.language,
+                                label: s.language.nativeName,
+                                options: [for (final l in AppLanguage.values) (l, l.nativeName)],
+                                onChanged: (v) => ctrl.update((s) => s.copyWith(language: v)),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        _Section(
+                          title: tr.playback,
                           icon: Icons.play_circle_outline_rounded,
                           children: [
                             _Row(
-                              title: 'Bevorzugte Tonspur',
-                              subtitle: 'Wird beim Start gewählt, falls vorhanden.',
+                              title: tr.preferredAudio,
+                              subtitle: tr.preferredAudioHint,
                               trailing: _Choice<String?>(
                                 value: s.audioLanguage,
-                                label: languageLabel(s.audioLanguage, fallback: 'Wie in Jellyfin'),
+                                label: languageLabel(s.audioLanguage, fallback: tr.asInJellyfin),
                                 options: [
-                                  (null, 'Wie in Jellyfin'),
-                                  for (final e in settingsLanguages.entries) (e.key, e.value),
+                                  (null, tr.asInJellyfin),
+                                  for (final code in settingsLanguages) (code, languageName(code)),
                                 ],
                                 onChanged: (v) => ctrl.update((s) => s.copyWith(audioLanguage: () => v)),
                               ),
                             ),
                             _Row(
-                              title: 'Bevorzugte Untertitel',
-                              subtitle: 'Vollständige Untertitel werden vor erzwungenen gewählt.',
+                              title: tr.preferredSubtitles,
+                              subtitle: tr.preferredSubtitlesHint,
                               trailing: _Choice<String?>(
                                 value: s.subtitleLanguage,
-                                label: languageLabel(s.subtitleLanguage, fallback: 'Wie in Jellyfin'),
+                                label: languageLabel(s.subtitleLanguage, fallback: tr.asInJellyfin),
                                 options: [
-                                  (null, 'Wie in Jellyfin'),
-                                  (subtitlesOff, 'Aus'),
-                                  for (final e in settingsLanguages.entries) (e.key, e.value),
+                                  (null, tr.asInJellyfin),
+                                  (subtitlesOff, tr.off),
+                                  for (final code in settingsLanguages) (code, languageName(code)),
                                 ],
                                 onChanged: (v) => ctrl.update((s) => s.copyWith(subtitleLanguage: () => v)),
                               ),
                             ),
                             _Row(
-                              title: 'Qualität',
-                              subtitle:
-                                  'Original spielt die Datei direkt ab. Niedrigere Stufen lassen den '
-                                  'Server umrechnen – gut bei langsamer Verbindung.',
+                              title: tr.quality,
+                              subtitle: tr.qualityHint,
                               trailing: _Choice<int?>(
                                 value: s.maxBitrate,
                                 label: qualityLabel(s.maxBitrate),
@@ -138,36 +151,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ),
                             _Row(
-                              title: 'Ambilight-Leuchten',
-                              subtitle:
-                                  'Die Farben des Bildes leuchten sanft in den schwarzen Balken neben bzw. '
-                                  'über dem Video.',
+                              title: tr.ambilight,
+                              subtitle: tr.ambilightHint,
                               trailing: _Choice<AmbilightMode>(
                                 value: s.ambilight,
                                 label: switch (s.ambilight) {
-                                  AmbilightMode.off => 'Aus',
-                                  AmbilightMode.window => 'Nur im Fenster',
-                                  AmbilightMode.always => 'Immer',
+                                  AmbilightMode.off => tr.off,
+                                  AmbilightMode.window => tr.onlyInWindow,
+                                  AmbilightMode.always => tr.always,
                                 },
-                                options: const [
-                                  (AmbilightMode.off, 'Aus'),
-                                  (AmbilightMode.window, 'Nur im Fenster'),
-                                  (AmbilightMode.always, 'Immer (auch Vollbild)'),
+                                options: [
+                                  (AmbilightMode.off, tr.off),
+                                  (AmbilightMode.window, tr.onlyInWindow),
+                                  (AmbilightMode.always, tr.alwaysInclFullscreen),
                                 ],
                                 onChanged: (v) => ctrl.update((s) => s.copyWith(ambilight: v)),
                               ),
                             ),
                             _Row(
-                              title: 'Intro & Rückblick automatisch überspringen',
-                              subtitle: 'Aus: Es erscheint nur der Knopf „Intro überspringen“.',
+                              title: tr.autoSkipIntro,
+                              subtitle: tr.autoSkipIntroHint,
                               trailing: _Toggle(
                                 value: s.autoSkipIntro,
                                 onChanged: (v) => ctrl.update((s) => s.copyWith(autoSkipIntro: v)),
                               ),
                             ),
                             _Row(
-                              title: 'Nächste Folge automatisch abspielen',
-                              subtitle: 'Mit Countdown am Ende einer Folge.',
+                              title: tr.autoplayNext,
+                              subtitle: tr.autoplayNextHint,
                               trailing: _Toggle(
                                 value: s.nextEpisodeCountdown,
                                 onChanged: (v) => ctrl.update((s) => s.copyWith(nextEpisodeCountdown: v)),
@@ -177,12 +188,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
 
                         _Section(
-                          title: 'Untertitel-Darstellung',
+                          title: tr.subtitleAppearance,
                           icon: Icons.subtitles_outlined,
                           children: [
                             _SubtitlePreview(scale: s.subtitleScale, background: s.subtitleBackground),
                             _Row(
-                              title: 'Größe',
+                              title: tr.size,
                               subtitle: '${(s.subtitleScale * 100).round()} %',
                               trailing: SizedBox(
                                 width: 260,
@@ -196,8 +207,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ),
                             _Row(
-                              title: 'Hintergrund',
-                              subtitle: 'Halbtransparenter Kasten hinter dem Text.',
+                              title: tr.background,
+                              subtitle: tr.subtitleBackgroundHint,
                               trailing: _Toggle(
                                 value: s.subtitleBackground,
                                 onChanged: (v) => ctrl.update((s) => s.copyWith(subtitleBackground: v)),
@@ -207,42 +218,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
 
                         _Section(
-                          title: 'Startseite',
+                          title: tr.home,
                           icon: Icons.home_outlined,
                           children: [
                             _Row(
-                              title: 'Trailer im Banner',
-                              subtitle:
-                                  'Spielt nach ein paar Sekunden stumm den Trailer des Titels ab (falls vorhanden).',
+                              title: tr.bannerTrailers,
+                              subtitle: tr.bannerTrailersHint,
                               trailing: _Toggle(
                                 value: s.bannerTrailers,
                                 onChanged: (v) => ctrl.update((s) => s.copyWith(bannerTrailers: v)),
                               ),
                             ),
                             _Row(
-                              title: 'Bildschirmschoner',
-                              subtitle:
-                                  'Zeigt nach einer Weile ohne Eingabe Bilder deiner Filme und Serien mit Uhr. '
-                                  'Nie während der Wiedergabe.',
+                              title: tr.screensaver,
+                              subtitle: tr.screensaverHint,
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(
-                                    tooltip: 'Jetzt anzeigen',
+                                    tooltip: tr.showNow,
                                     onPressed: () => screensaverPreview.value++,
                                     icon: const Icon(Icons.play_circle_outline_rounded),
                                   ),
                                   const SizedBox(width: 6),
                                   _Choice<int>(
                                     value: s.screensaverMinutes,
-                                    label: s.screensaverMinutes == 0 ? 'Aus' : 'Nach ${s.screensaverMinutes} Min.',
-                                    options: const [
-                                      (0, 'Aus'),
-                                      (2, 'Nach 2 Min.'),
-                                      (5, 'Nach 5 Min.'),
-                                      (10, 'Nach 10 Min.'),
-                                      (15, 'Nach 15 Min.'),
-                                      (30, 'Nach 30 Min.'),
+                                    label: s.screensaverMinutes == 0 ? tr.off : tr.afterMinutes(s.screensaverMinutes),
+                                    options: [
+                                      (0, tr.off),
+                                      for (final m in const [2, 5, 10, 15, 30]) (m, tr.afterMinutes(m)),
                                     ],
                                     onChanged: (v) => ctrl.update((s) => s.copyWith(screensaverMinutes: v)),
                                   ),
@@ -250,18 +254,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ),
                             _Row(
-                              title: 'Saisonale Akzente',
-                              subtitle:
-                                  'Zu Halloween, Weihnachten, Silvester und Valentinstag: passende Reihe '
-                                  'und kleine Effekte auf der Startseite.',
+                              title: tr.seasonalThemes,
+                              subtitle: tr.seasonalThemesHint,
                               trailing: _Toggle(
                                 value: s.seasonalThemes,
                                 onChanged: (v) => ctrl.update((s) => s.copyWith(seasonalThemes: v)),
                               ),
                             ),
                             _Row(
-                              title: 'Episodenbilder bei „Weiterschauen“',
-                              subtitle: 'Aus: Statt des Standbilds der Folge das Bild der Serie zeigen.',
+                              title: tr.episodeImages,
+                              subtitle: tr.episodeImagesHint,
                               trailing: _Toggle(
                                 value: s.episodeImagesInRows,
                                 onChanged: (v) => ctrl.update((s) => s.copyWith(episodeImagesInRows: v)),
@@ -271,7 +273,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
 
                         _Section(
-                          title: 'Personalisieren',
+                          title: tr.personalize,
                           icon: Icons.auto_awesome_outlined,
                           children: [
                             Container(
@@ -285,8 +287,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               child: const BrandLogo(size: 34),
                             ),
                             _Row(
-                              title: 'Name der App',
-                              subtitle: 'Erscheint in der Titelleiste, im Fenstertitel und bei der Anmeldung.',
+                              title: tr.appName,
+                              subtitle: tr.appNameHint,
                               trailing: SizedBox(
                                 width: 260,
                                 child: TextField(
@@ -303,20 +305,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ),
                             _Row(
-                              title: 'Logo',
-                              subtitle: 'Ein Bild (PNG, JPG …) – wird vor dem Namen und als Symbol in der Taskleiste gezeigt.',
+                              title: tr.logo,
+                              subtitle: tr.logoHint,
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   GlassButton(
-                                    label: _importingLogo ? 'Lädt …' : 'Bild wählen …',
+                                    label: _importingLogo ? tr.loading : tr.chooseImage,
                                     icon: Icons.image_outlined,
                                     onPressed: _importingLogo ? null : _pickLogo,
                                   ),
                                   if (s.logoPath != null) ...[
                                     const SizedBox(width: 8),
                                     IconButton(
-                                      tooltip: 'Logo entfernen',
+                                      tooltip: tr.removeLogo,
                                       onPressed: () => ctrl.update((s) => s.copyWith(logoPath: () => null)),
                                       icon: const Icon(Icons.delete_outline_rounded),
                                     ),
@@ -335,7 +337,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       ctrl.update((s) => s.copyWith(appName: () => null, logoPath: () => null));
                                     },
                                     icon: const Icon(Icons.restart_alt_rounded, size: 18),
-                                    label: const Text('Auf Jellyflex zurücksetzen'),
+                                    label: Text(tr.resetToJellyflex),
                                   ),
                                 ),
                               ),
@@ -343,7 +345,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
 
                         _Section(
-                          title: 'Konto',
+                          title: tr.account,
                           icon: Icons.person_outline_rounded,
                           children: [
                             Padding(
@@ -386,7 +388,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     ),
                                   ),
                                   GlassButton(
-                                    label: 'Abmelden',
+                                    label: tr.signOut,
                                     icon: Icons.logout_rounded,
                                     onPressed: () => ref.read(sessionProvider.notifier).logout(),
                                   ),
@@ -401,7 +403,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           child: Text(
                             appDisplayName(s) == defaultAppName
                                 ? 'Jellyflex ${JellyfinApi.clientVersion}'
-                                : '${appDisplayName(s)} · basiert auf Jellyflex ${JellyfinApi.clientVersion}',
+                                : tr.basedOn(appDisplayName(s), JellyfinApi.clientVersion),
                             style: const TextStyle(color: AppColors.textMuted),
                           ),
                         ),
@@ -594,7 +596,7 @@ class _SubtitlePreview extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
         ),
         child: Text(
-          'So sehen deine Untertitel aus.',
+          tr.subtitlePreview,
           style: TextStyle(
             fontSize: baseSize * scale,
             fontWeight: FontWeight.w600,

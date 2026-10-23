@@ -22,6 +22,7 @@ import '../home/hero_banner.dart';
 import '../home/home_providers.dart';
 import '../../widgets/focusable.dart';
 import 'media_info_dialog.dart';
+import '../../l10n/strings.dart';
 
 final itemProvider = FutureProvider.autoDispose.family<BaseItem, String>((ref, id) async {
   try {
@@ -114,10 +115,8 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
     return Scaffold(
       body: itemAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => ErrorView(
-          message: 'Inhalt konnte nicht geladen werden.\n$e',
-          onRetry: () => ref.invalidate(itemProvider(widget.itemId)),
-        ),
+        error: (e, _) =>
+            ErrorView(message: tr.contentCouldNotLoad(e), onRetry: () => ref.invalidate(itemProvider(widget.itemId))),
         data: (item) => _buildContent(context, item),
       ),
     );
@@ -198,7 +197,7 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                   child: _EpisodesRow(
                     seriesId: item.seriesId!,
                     seasonId: item.seasonId!,
-                    title: item.seasonName ?? 'Weitere Folgen',
+                    title: item.seasonName ?? tr.moreEpisodes,
                     highlightId: item.id,
                   ),
                 ),
@@ -256,14 +255,13 @@ class _Header extends ConsumerWidget {
         ),
       if (yearLabel(item) case final year?) Text(year),
       if (runtime != null && !item.isSeries) Text(formatRuntime(runtime)),
-      if (item.isSeries && item.childCount != null)
-        Text('${item.childCount} ${item.childCount == 1 ? 'Staffel' : 'Staffeln'}'),
+      if (item.isSeries && item.childCount != null) Text(tr.seasonsCount(item.childCount!)),
       if (item.officialRating != null) RatingBadge(item.officialRating!),
       if (source != null && !item.isSeries && !item.isCollection)
         for (final badge in qualityBadges(source!)) _QualityBadge(badge),
       if (remaining != null && !item.isSeries && remaining > Duration.zero)
         Text(
-          'Endet um ${formatClock(DateTime.now().add(remaining))}',
+          tr.endsAt(formatClock(DateTime.now().add(remaining))),
           style: const TextStyle(color: AppColors.textSecondary),
         ),
     ];
@@ -291,8 +289,8 @@ class _Header extends ConsumerWidget {
               const SizedBox(height: 18),
               Text(
                 [
-                  if (item.parentIndexNumber != null) 'Staffel ${item.parentIndexNumber}',
-                  if (item.indexNumber != null) 'Folge ${item.indexNumber}',
+                  if (item.parentIndexNumber != null) tr.seasonN(item.parentIndexNumber!),
+                  if (item.indexNumber != null) tr.episodeN(item.indexNumber!),
                 ].join(' · '),
                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 15, fontWeight: FontWeight.w600),
               ),
@@ -446,7 +444,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       final items = ref.watch(collectionItemsProvider(item.id)).value ?? const <BaseItem>[];
       final next = items.where((i) => !i.userData.played).firstOrNull ?? items.firstOrNull;
       playButtons = PrimaryButton(
-        label: next == null ? 'Abspielen' : 'Abspielen  ·  ${next.name}',
+        label: next == null ? tr.play : '${tr.play}  ·  ${next.name}',
         icon: Icons.play_arrow_rounded,
         onPressed: next == null || next.isSeries ? null : () => playItem(context, next),
       );
@@ -456,8 +454,8 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       final resuming = episode?.userData.hasResumePosition ?? false;
       playButtons = PrimaryButton(
         label: episode == null
-            ? 'Abspielen'
-            : '${resuming ? 'Fortsetzen' : 'Abspielen'}  ·  ${episode.episodeLabel ?? episode.name}',
+            ? tr.play
+            : '${resuming ? tr.resume : tr.play}  ·  ${episode.episodeLabel ?? episode.name}',
         icon: Icons.play_arrow_rounded,
         loading: nextUp.isLoading,
         onPressed: episode == null ? null : () => playItem(context, episode),
@@ -468,14 +466,14 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
         mainAxisSize: MainAxisSize.min,
         children: [
           PrimaryButton(
-            label: resuming ? 'Fortsetzen  ·  ${remainingLabel(item) ?? ''}' : 'Abspielen',
+            label: resuming ? '${tr.resume}  ·  ${remainingLabel(item) ?? ''}' : tr.play,
             icon: Icons.play_arrow_rounded,
             onPressed: () => playItem(context, item, mediaSourceId: _chosenSourceId),
           ),
           if (resuming) ...[
             const SizedBox(width: 12),
             GlassButton(
-              label: 'Von vorne',
+              label: tr.fromStart,
               icon: Icons.replay_rounded,
               onPressed: () => playItem(context, item, fromStart: true, mediaSourceId: _chosenSourceId),
             ),
@@ -493,21 +491,21 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
         if (item.mediaSources.length > 1 && source != null)
           Builder(
             builder: (buttonContext) => GlassButton(
-              label: 'Fassung: ${_shortVersion(source)}',
+              label: tr.versionLabel(_shortVersion(source)),
               icon: Icons.video_settings_rounded,
               onPressed: () => _chooseVersion(buttonContext),
             ),
           ),
         CircleIconButton(
           icon: Icons.check_rounded,
-          tooltip: played ? 'Als ungesehen markieren' : 'Als gesehen markieren',
+          tooltip: played ? tr.markUnplayed : tr.markPlayed,
           active: played,
           activeColor: AppColors.accentAlt,
           onPressed: _togglePlayed,
         ),
         CircleIconButton(
           icon: favorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-          tooltip: favorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen',
+          tooltip: favorite ? tr.removeFavorite : tr.addFavorite,
           active: favorite,
           activeColor: const Color(0xFFFF5C8A),
           onPressed: _toggleFavorite,
@@ -516,7 +514,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
         if (source != null && !item.isSeries && !item.isCollection)
           CircleIconButton(
             icon: Icons.info_outline_rounded,
-            tooltip: 'Medieninfo (Auflösung, Ton, Untertitel …)',
+            tooltip: tr.mediaInfoTooltip,
             onPressed: () => showMediaInfoDialog(context, item, source),
           ),
       ],
@@ -540,14 +538,14 @@ class _DownloadButton extends ConsumerWidget {
     if (entry == null) {
       return CircleIconButton(
         icon: Icons.download_rounded,
-        tooltip: 'Herunterladen (offline ansehen)',
+        tooltip: tr.downloadOffline,
         onPressed: () => manager.enqueue(item, mediaSourceId: mediaSourceId),
       );
     }
     if (entry.isDone) {
       return CircleIconButton(
         icon: Icons.download_done_rounded,
-        tooltip: 'Heruntergeladen – klicken zum Löschen',
+        tooltip: tr.downloadedClickToDelete,
         active: true,
         activeColor: AppColors.accentAlt,
         onPressed: () async {
@@ -572,7 +570,7 @@ class _DownloadButton extends ConsumerWidget {
         ),
         CircleIconButton(
           icon: running ? Icons.pause_rounded : Icons.play_arrow_rounded,
-          tooltip: running ? 'Download pausieren' : 'Download fortsetzen',
+          tooltip: running ? tr.pauseDownload : tr.resumeDownload,
           size: 44,
           onPressed: () => running ? manager.pause(item.id) : manager.resume(item.id),
         ),
@@ -633,18 +631,14 @@ class _SeasonsSectionState extends ConsumerState<_SeasonsSection> {
                 final added = await ref.read(downloadsProvider.notifier).enqueueAll(episodes);
                 messenger?.showSnackBar(
                   SnackBar(
-                    content: Text(
-                      added == 0
-                          ? 'Alle Folgen dieser Staffel sind schon heruntergeladen'
-                          : '$added ${added == 1 ? 'Folge wird' : 'Folgen werden'} heruntergeladen',
-                    ),
+                    content: Text(added == 0 ? tr.seasonAlreadyDownloaded : tr.episodesDownloading(added)),
                     behavior: SnackBarBehavior.floating,
                     width: 420,
                   ),
                 );
               },
               icon: const Icon(Icons.download_rounded, size: 18),
-              label: const Text('Staffel herunterladen'),
+              label: Text(tr.downloadSeason),
             ),
           ),
         ),
@@ -746,7 +740,7 @@ class _EpisodesRow extends ConsumerWidget {
                   title: '${ep.indexNumber != null ? '${ep.indexNumber}. ' : ''}${ep.name}',
                   subtitle: [
                     if (ep.runtime != null) formatRuntime(ep.runtime!),
-                    if (ep.id == highlightId) 'Diese Folge',
+                    if (ep.id == highlightId) tr.thisEpisode,
                   ].join(' · '),
                   onTap: () => playItem(context, ep),
                 ),
@@ -779,7 +773,7 @@ class _CastRow extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 12, bottom: 20),
       child: MediaRow(
-        title: 'Besetzung',
+        title: tr.cast,
         itemCount: people.length,
         height: 190,
         spacing: 22,
@@ -853,7 +847,7 @@ class _SimilarRow extends ConsumerWidget {
     final items = ref.watch(similarProvider(itemId)).value ?? const <BaseItem>[];
     if (items.isEmpty) return const SizedBox.shrink();
     return MediaRow(
-      title: 'Das könnte dir auch gefallen',
+      title: tr.youMightLike,
       itemCount: items.length,
       height: kPosterWidth * 1.5 + kCardTextHeight,
       itemBuilder: (context, i) => PosterCard(item: items[i]),
@@ -874,7 +868,7 @@ class _CollectionRow extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: MediaRow(
-        title: 'In dieser Sammlung',
+        title: tr.inThisCollection,
         itemCount: items.length,
         height: kPosterWidth * 1.5 + kCardTextHeight,
         itemBuilder: (context, i) => PosterCard(item: items[i]),

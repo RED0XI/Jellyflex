@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -23,6 +24,8 @@ import 'features/splash_screen.dart';
 import 'features/wrapped/wrapped_screen.dart';
 import 'theme.dart';
 import 'widgets/window_frame.dart';
+import 'l10n/strings.dart';
+import 'features/home/home_providers.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Bei jeder An-/Abmeldung die Weiterleitungen neu prüfen.
@@ -59,7 +62,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/library/:id',
         builder: (_, state) => LibraryScreen(
           libraryId: state.pathParameters['id']!,
-          name: state.uri.queryParameters['name'] ?? 'Bibliothek',
+          name: state.uri.queryParameters['name'] ?? tr.library,
           collectionType: state.uri.queryParameters['type'],
         ),
       ),
@@ -105,6 +108,18 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
       (_, _) => applyWindowBranding(ref.read(settingsProvider)),
       fireImmediately: true,
     );
+    // Andere Sprache: alles neu zeichnen und Reihen mit Überschriften neu laden.
+    ref.listenManual(settingsProvider.select((s) => s.language), (_, _) {
+      ref.invalidate(homeProvider);
+      ref.invalidate(discoverProvider);
+      ref.invalidate(seasonalSectionProvider);
+      void rebuild(Element element) {
+        element.markNeedsBuild();
+        element.visitChildren(rebuild);
+      }
+
+      (context as Element).visitChildren(rebuild);
+    });
   }
 
   @override
@@ -113,6 +128,9 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
     return MaterialApp.router(
       title: appDisplayName(ref.watch(settingsProvider)),
       debugShowCheckedModeBanner: false,
+      locale: Locale(ref.watch(settingsProvider.select((s) => s.language)).name),
+      supportedLocales: [for (final l in AppLanguage.values) Locale(l.name)],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: buildTheme(),
       routerConfig: router,
       scrollBehavior: const _AppScrollBehavior(),

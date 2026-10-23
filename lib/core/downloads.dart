@@ -10,6 +10,7 @@ import 'images.dart';
 import 'jellyfin_api.dart';
 import 'models.dart';
 import 'session.dart';
+import '../l10n/strings.dart';
 
 enum DownloadStatus { queued, downloading, paused, done, failed }
 
@@ -391,7 +392,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     final session = ref.read(sessionProvider).value;
     // Nur mit dem Konto fortsetzen, das den Download begonnen hat.
     if (session == null || session.serverUrl != entry.serverUrl || session.userId != entry.userId) {
-      _update(entry.itemId, (e) => e.copyWith(status: DownloadStatus.paused, error: () => 'Anderes Konto angemeldet'));
+      _update(entry.itemId, (e) => e.copyWith(status: DownloadStatus.paused, error: () => tr.otherAccountSignedIn));
       return;
     }
     final api = ref.read(apiProvider);
@@ -405,7 +406,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       final item = await api.getItem(entry.itemId);
       final sources = item.mediaSources;
       final source = sources.where((s) => s.id == entry.mediaSourceId).firstOrNull ?? sources.firstOrNull;
-      if (source == null) throw Exception('Keine Datei gefunden');
+      if (source == null) throw Exception(tr.noFileFound);
       await File(entry.itemJsonPath).writeAsString(jsonEncode(item.raw));
       await _downloadImages(api, item, entry);
       await _downloadSubtitles(api, item, source, entry);
@@ -453,7 +454,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       // Abgebrochen (Pause/Löschen): Teildatei bleibt für später liegen.
       if (cancel.isCancelled) return;
       if (total > 0 && received < total) {
-        throw Exception('Verbindung unterbrochen (${formatBytes(received)} von ${formatBytes(total)})');
+        throw Exception(tr.connectionInterrupted(formatBytes(received), formatBytes(total)));
       }
       if (await target.exists()) await target.delete();
       await part.rename(target.path);
@@ -472,8 +473,8 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       // auch ein anderer Fehler als DioException entstehen (abgebrochene Verbindung).
       if (!cancel.isCancelled) {
         final message = switch (e) {
-          DioException(:final response?) => 'Server-Fehler ${response.statusCode}',
-          DioException() => 'Keine Verbindung zum Server',
+          DioException(:final response?) => tr.serverError(response.statusCode),
+          DioException() => tr.noConnectionToServer,
           _ => '$e'.replaceFirst('Exception: ', ''),
         };
         _update(entry.itemId, (x) => x.copyWith(status: DownloadStatus.failed, error: () => message));
@@ -544,5 +545,5 @@ final downloadedProvider = Provider.family<DownloadEntry?, String>((ref, itemId)
 String formatBytes(int bytes) {
   if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
   if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(0)} MB';
-  return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1).replaceAll('.', ',')} GB';
+  return '${tr.decimal(bytes / (1024 * 1024 * 1024), 1)} GB';
 }

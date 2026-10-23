@@ -21,6 +21,7 @@ import '../core/settings.dart';
 import '../features/player/player_screen.dart';
 import '../theme.dart';
 import '../widgets/window_frame.dart';
+import '../l10n/strings.dart';
 
 /// Angefragte Bitraten bei simulierter Umrechnung (für Tests).
 final harnessTranscodeRequests = <int>[];
@@ -147,12 +148,13 @@ Widget buildHarnessApp({AppSettings? settings}) {
   return ProviderScope(
     overrides: [
       apiProvider.overrideWithValue(_FakeApi()),
-      if (settings != null)
-        settingsProvider.overrideWith(() {
-          final file = File('${Directory.systemTemp.createTempSync('jellyflex_settings').path}\\settings.json')
-            ..writeAsStringSync(jsonEncode(settings.toJson()));
-          return SettingsController(file);
-        }),
+      // Immer eigene Einstellungen (nie die echte Datei); Tests prüfen deutsche Texte.
+      settingsProvider.overrideWith(() {
+        final file = File(
+          '${Directory.systemTemp.createTempSync('jellyflex_settings').path}\\settings.json',
+        )..writeAsStringSync(jsonEncode((settings ?? const AppSettings()).copyWith(language: AppLanguage.de).toJson()));
+        return SettingsController(file);
+      }),
     ],
     child: MaterialApp.router(
       theme: buildTheme(),

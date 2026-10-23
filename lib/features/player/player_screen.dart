@@ -27,6 +27,7 @@ import '../../widgets/window_frame.dart';
 import '../details/details_screen.dart';
 import 'player_overlays.dart';
 import '../../widgets/focusable.dart';
+import '../../l10n/strings.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key, required this.itemId, this.startTicks, this.restoreFullscreen, this.mediaSourceId});
@@ -193,22 +194,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       position: RelativeRect.fromLTRB(topLeft.dx - 180, topLeft.dy - 330, overlay.size.width - topLeft.dx - 40, 0),
       constraints: const BoxConstraints(minWidth: 240),
       items: [
-        const PopupMenuItem(
+        PopupMenuItem(
           enabled: false,
           height: 34,
-          child: Text('Schlaf-Timer', style: TextStyle(color: AppColors.textSecondary)),
+          child: Text(tr.sleepTimer, style: TextStyle(color: AppColors.textSecondary)),
         ),
-        if (timer.active) const PopupMenuItem(value: 0, child: Text('Aus')),
+        if (timer.active) PopupMenuItem(value: 0, child: Text(tr.off)),
         PopupMenuItem(
           value: -1,
           child: Row(
             children: [
-              Expanded(child: Text(isEpisode ? 'Am Ende dieser Folge' : 'Am Ende des Films')),
+              Expanded(child: Text(isEpisode ? tr.endOfThisEpisode : tr.endOfThisMovie)),
               if (timer.mode == SleepMode.endOfItem) const Icon(Icons.check_rounded, size: 18, color: AppColors.accent),
             ],
           ),
         ),
-        for (final m in const [15, 30, 45, 60, 90]) PopupMenuItem(value: m, child: Text('In $m Minuten')),
+        for (final m in const [15, 30, 45, 60, 90]) PopupMenuItem(value: m, child: Text(tr.inMinutes(m))),
       ],
     );
     _focus.requestFocus();
@@ -409,7 +410,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         info = PlaybackInfo(const {});
       }
       final sources = info.mediaSources.isNotEmpty ? info.mediaSources : item.mediaSources;
-      if (sources.isEmpty) throw Exception('Keine abspielbare Datei gefunden.');
+      if (sources.isEmpty) throw Exception(tr.noPlayableFile);
       final wanted = widget.mediaSourceId ?? (_localFile != null ? download?.mediaSourceId : null);
       final source = sources.where((s) => s.id == wanted).firstOrNull ?? sources.first;
       if (!mounted) return;
@@ -514,7 +515,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     );
     final media = info.mediaSources.firstOrNull;
     final url = media?.transcodingUrl;
-    if (media == null || url == null) throw Exception('Der Server hat keine umgerechnete Fassung geliefert.');
+    if (media == null || url == null) throw Exception(tr.noTranscodeFromServer);
     _playSessionId = info.playSessionId ?? _playSessionId;
     await _player.open(Media('${_api.baseUrl}$url', httpHeaders: headers, start: start));
 
@@ -558,7 +559,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final lower = message.toLowerCase();
     final isSubtitle = lower.contains('sub') || lower.contains('.srt') || lower.contains('.ass');
     if (!mounted || _error != null || isSubtitle || _player.state.duration > Duration.zero) return;
-    setState(() => _error = 'Die Datei konnte nicht geladen werden.\n$message');
+    setState(() => _error = tr.fileCouldNotLoad(message));
     _showControls(autoHide: false);
   }
 
@@ -1011,7 +1012,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         children: [
           const Icon(Icons.error_outline_rounded, size: 44, color: Color(0xFFFF6B6B)),
           const SizedBox(height: 14),
-          const Text('Wiedergabe nicht möglich', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+          Text(tr.playbackNotPossible, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
           Text(
             _error!,
@@ -1019,7 +1020,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
-          GlassButton(label: 'Zurück', icon: Icons.arrow_back_rounded, onPressed: _close),
+          GlassButton(label: tr.back, icon: Icons.arrow_back_rounded, onPressed: _close),
         ],
       ),
     );
@@ -1066,7 +1067,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             initialData: _player.state.playing,
             builder: (context, snap) => _PlayerIconButton(
               icon: (snap.data ?? false) ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              tooltip: (snap.data ?? false) ? 'Pause' : 'Abspielen',
+              tooltip: (snap.data ?? false) ? tr.pause : tr.play,
               size: 44,
               onPressed: _player.playOrPause,
             ),
@@ -1077,12 +1078,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           right: 6,
           child: Row(
             children: [
-              _PlayerIconButton(
-                icon: Icons.open_in_full_rounded,
-                tooltip: 'Großes Fenster (P)',
-                onPressed: _toggleMini,
-              ),
-              _PlayerIconButton(icon: Icons.close_rounded, tooltip: 'Schließen', onPressed: _close),
+              _PlayerIconButton(icon: Icons.open_in_full_rounded, tooltip: tr.bigWindow, onPressed: _toggleMini),
+              _PlayerIconButton(icon: Icons.close_rounded, tooltip: tr.close, onPressed: _close),
             ],
           ),
         ),
@@ -1157,7 +1154,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           child: _hoverZone(
             Row(
               children: [
-                _PlayerIconButton(icon: Icons.arrow_back_rounded, tooltip: 'Zurück (Esc)', onPressed: _close),
+                _PlayerIconButton(icon: Icons.arrow_back_rounded, tooltip: tr.backEsc, onPressed: _close),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -1199,19 +1196,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       initialData: _player.state.playing,
                       builder: (context, snap) => _PlayerIconButton(
                         icon: (snap.data ?? false) ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                        tooltip: (snap.data ?? false) ? 'Pause (Leertaste)' : 'Abspielen (Leertaste)',
+                        tooltip: (snap.data ?? false) ? tr.pauseSpace : tr.playSpace,
                         size: 40,
                         onPressed: _player.playOrPause,
                       ),
                     ),
                     _PlayerIconButton(
                       icon: Icons.replay_10_rounded,
-                      tooltip: '10 s zurück (←)',
+                      tooltip: tr.rewind10,
                       onPressed: () => _seekBy(-_seekStep),
                     ),
                     _PlayerIconButton(
                       icon: Icons.forward_10_rounded,
-                      tooltip: '10 s vor (→)',
+                      tooltip: tr.forward10,
                       onPressed: () => _seekBy(_seekStep),
                     ),
                     const SizedBox(width: 4),
@@ -1227,7 +1224,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         return Padding(
                           padding: const EdgeInsets.only(right: 12),
                           child: Text(
-                            'Endet um ${formatClock(DateTime.now().add(remaining))}',
+                            tr.endsAt(formatClock(DateTime.now().add(remaining))),
                             style: const TextStyle(color: AppColors.textSecondary, fontSize: 13.5),
                           ),
                         );
@@ -1261,11 +1258,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         final left = _sleepLeft.value;
                         final label = switch (timer.mode) {
                           SleepMode.off => null,
-                          SleepMode.endOfItem => 'am Ende',
+                          SleepMode.endOfItem => tr.atTheEnd,
                           SleepMode.minutes =>
                             left == null || left.inMinutes >= 1
-                                ? '${left?.inMinutes ?? 0} Min.'
-                                : '${left.inSeconds} s',
+                                ? tr.minutes(left?.inMinutes ?? 0)
+                                : tr.seconds(left.inSeconds),
                         };
                         return Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1282,7 +1279,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                             Builder(
                               builder: (buttonContext) => _PlayerIconButton(
                                 icon: timer.active ? Icons.bedtime_rounded : Icons.bedtime_outlined,
-                                tooltip: 'Schlaf-Timer',
+                                tooltip: tr.sleepTimer,
                                 onPressed: () => _showSleepMenu(buttonContext),
                               ),
                             ),
@@ -1292,22 +1289,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     ),
                     _PlayerIconButton(
                       icon: Icons.subtitles_rounded,
-                      tooltip: 'Audio & Untertitel',
+                      tooltip: tr.audioAndSubtitles,
                       onPressed: () => _setTrackPanel(!_trackPanelOpen),
                     ),
                     _PlayerIconButton(
                       icon: Icons.tune_rounded,
-                      tooltip: 'Wiedergabe: Geschwindigkeit, Qualität, Synchronisation',
+                      tooltip: tr.playbackOptions,
                       onPressed: () => _setPlaybackPanel(!_playbackPanelOpen),
                     ),
                     _PlayerIconButton(
                       icon: Icons.picture_in_picture_alt_rounded,
-                      tooltip: 'Mini-Player (P)',
+                      tooltip: tr.miniPlayer,
                       onPressed: _toggleMini,
                     ),
                     _PlayerIconButton(
                       icon: _fullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
-                      tooltip: _fullscreen ? 'Vollbild beenden (F)' : 'Vollbild (F)',
+                      tooltip: _fullscreen ? tr.exitFullscreen : tr.fullscreen,
                       onPressed: _toggleFullscreen,
                     ),
                   ],
@@ -1394,7 +1391,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   List<_TrackEntry> _subtitleEntries() {
     if (_transcoding) {
       return [
-        (id: 'no', label: 'Aus'),
+        (id: 'no', label: tr.off),
         for (final s in _source?.mediaStreams.where((s) => s.type == 'Subtitle') ?? const <MediaStream>[])
           (id: 'jf:${s.index}', label: s.displayTitle ?? languageName(s.language)),
       ];
@@ -1407,10 +1404,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       return n != null && (embeddedCount == null || embeddedCount == 0 || n <= embeddedCount);
     });
     return [
-      (id: 'no', label: 'Aus'),
+      (id: 'no', label: tr.off),
       for (final t in tracks) (id: t.id, label: _trackLabel('Subtitle', t.id, t.title, t.language, t.codec)),
       for (final s in _externalSubtitles)
-        (id: _subtitleUri(s), label: '${s.displayTitle ?? languageName(s.language)}  (Datei)'),
+        (id: _subtitleUri(s), label: '${s.displayTitle ?? languageName(s.language)}  (${tr.file})'),
     ];
   }
 
@@ -1599,19 +1596,16 @@ class _SleepOverlayState extends State<_SleepOverlay> {
             children: [
               const Icon(Icons.bedtime_rounded, size: 64, color: Color(0xFFFACC15)),
               const SizedBox(height: 18),
-              const Text('Gute Nacht', style: TextStyle(fontSize: 40, fontWeight: FontWeight.w800)),
+              Text(tr.goodNight, style: TextStyle(fontSize: 40, fontWeight: FontWeight.w800)),
               const SizedBox(height: 6),
-              const Text(
-                'Der Schlaf-Timer hat die Wiedergabe angehalten.',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
-              ),
+              Text(tr.sleepTimerPaused, style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
               const SizedBox(height: 28),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  PrimaryButton(label: 'Weiterschauen', icon: Icons.play_arrow_rounded, onPressed: widget.onContinue),
+                  PrimaryButton(label: tr.keepWatching, icon: Icons.play_arrow_rounded, onPressed: widget.onContinue),
                   const SizedBox(width: 12),
-                  GlassButton(label: 'Player schließen', icon: Icons.close_rounded, onPressed: widget.onClose),
+                  GlassButton(label: tr.closePlayer, icon: Icons.close_rounded, onPressed: widget.onClose),
                 ],
               ),
             ],
@@ -1849,7 +1843,7 @@ class _VolumeControl extends StatelessWidget {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _PlayerIconButton(icon: icon, tooltip: 'Stumm (M)', onPressed: onToggleMute),
+            _PlayerIconButton(icon: icon, tooltip: tr.mute, onPressed: onToggleMute),
             SizedBox(
               width: 110,
               child: SliderTheme(
@@ -1937,20 +1931,20 @@ class _TracksPanelState extends State<_TracksPanel> {
         children: [
           Expanded(
             child: _TrackColumn(
-              title: 'Audio',
+              title: tr.audio,
               entries: widget.audioEntries(),
               selectedId: widget.selectedAudio(),
-              emptyText: 'Keine Tonspuren gefunden',
+              emptyText: tr.noAudioTracks,
               onSelect: widget.onAudio,
             ),
           ),
           Container(width: 1, height: 300, color: Colors.white.withValues(alpha: 0.08)),
           Expanded(
             child: _TrackColumn(
-              title: 'Untertitel',
+              title: tr.subtitles,
               entries: widget.subtitleEntries(),
               selectedId: widget.selectedSubtitle(),
-              emptyText: 'Keine Untertitel vorhanden',
+              emptyText: tr.noSubtitles,
               onSelect: widget.onSubtitle,
             ),
           ),
@@ -1985,7 +1979,7 @@ class _TrackColumn extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
           child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         ),
-        if (entries.isEmpty || (entries.length == 1 && entries.first.id == 'no' && title == 'Untertitel'))
+        if (entries.isEmpty || (entries.length == 1 && entries.first.id == 'no'))
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(emptyText, style: const TextStyle(color: AppColors.textMuted)),

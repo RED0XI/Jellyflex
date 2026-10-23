@@ -20,6 +20,8 @@ import 'package:jellyflex/features/quiz/quiz_screen.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'test_settings.dart';
+
 const _server = 'http://localhost:8097';
 
 class _DemoSession extends SessionController {
@@ -70,7 +72,7 @@ void main() {
         ProviderScope(
           overrides: [
             sessionProvider.overrideWith(_DemoSession.new),
-            settingsProvider.overrideWith(() => SettingsController(File('${temp.path}\\settings.json'))),
+            settingsProvider.overrideWith(() => testSettings(temp)),
           ],
           child: RepaintBoundary(key: _shotKey, child: const JellyflexApp()),
         ),

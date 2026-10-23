@@ -15,6 +15,7 @@ import '../../widgets/smooth_scroll.dart';
 import '../../widgets/states.dart';
 import '../../widgets/top_scrim.dart';
 import '../details/details_screen.dart';
+import '../../l10n/strings.dart';
 
 /// Filme und Serien einer Person auf dem Server.
 final personItemsProvider = FutureProvider.autoDispose.family<List<BaseItem>, String>((ref, id) {
@@ -59,10 +60,8 @@ class _PersonScreenState extends ConsumerState<PersonScreen> {
     return Scaffold(
       body: personAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => ErrorView(
-          message: 'Person konnte nicht geladen werden.\n$e',
-          onRetry: () => ref.invalidate(itemProvider(widget.personId)),
-        ),
+        error: (e, _) =>
+            ErrorView(message: tr.personCouldNotLoad(e), onRetry: () => ref.invalidate(itemProvider(widget.personId))),
         data: (person) => _buildContent(context, person),
       ),
     );
@@ -141,13 +140,10 @@ class _PersonScreenState extends ConsumerState<PersonScreen> {
                   ),
                 )
               else if (items.isEmpty && episodes.isEmpty)
-                const SliverToBoxAdapter(
+                SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: kPageGutter, vertical: 20),
-                    child: Text(
-                      'Auf deinem Server gibt es keine Filme oder Serien mit dieser Person.',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
+                    child: Text(tr.noTitlesWithPerson, style: TextStyle(color: AppColors.textSecondary)),
                   ),
                 ),
               if (items.isNotEmpty) ...[
@@ -156,14 +152,14 @@ class _PersonScreenState extends ConsumerState<PersonScreen> {
                     padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 20),
                     child: Row(
                       children: [
-                        const Text('Auf deinem Server', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
+                        Text(tr.onYourServer, style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
                         const SizedBox(width: 24),
                         // Filter nur, wenn es beides gibt.
                         if (movies.isNotEmpty && series.isNotEmpty)
                           for (final (f, label) in [
-                            (_Filter.all, 'Alle (${items.length})'),
-                            (_Filter.movies, 'Filme (${movies.length})'),
-                            (_Filter.series, 'Serien (${series.length})'),
+                            (_Filter.all, tr.allCount(items.length)),
+                            (_Filter.movies, tr.moviesCount(movies.length)),
+                            (_Filter.series, tr.showsCount(series.length)),
                           ])
                             Padding(
                               padding: const EdgeInsets.only(right: 10),
@@ -205,7 +201,7 @@ class _PersonScreenState extends ConsumerState<PersonScreen> {
                   child: Padding(
                     padding: const EdgeInsets.only(top: 28),
                     child: MediaRow(
-                      title: 'Auftritte in einzelnen Folgen',
+                      title: tr.guestAppearances,
                       itemCount: episodes.length,
                       height: kLandscapeWidth * 9 / 16 + kCardTextHeight,
                       itemBuilder: (context, i) => LandscapeCard(item: episodes[i]),
@@ -248,14 +244,14 @@ class _HeaderState extends ConsumerState<_Header> {
 
     final facts = <String>[
       if (born != null)
-        'Geboren am ${formatDate(born)}${died == null ? ' (${ageAt(born)} Jahre)' : ''}${place != null ? ' in $place' : ''}'
+        tr.bornOn(formatDate(born), died == null ? ageAt(born) : null, place)
       else if (place != null)
-        'Geboren in $place',
-      if (died != null) 'Gestorben am ${formatDate(died)}${born != null ? ' (${ageAt(born, died)} Jahre)' : ''}',
+        tr.bornIn(place),
+      if (died != null) tr.diedOn(formatDate(died), born != null ? ageAt(born, died) : null),
     ];
     final counts = [
-      if (widget.movieCount > 0) '${widget.movieCount} ${widget.movieCount == 1 ? 'Film' : 'Filme'}',
-      if (widget.seriesCount > 0) '${widget.seriesCount} ${widget.seriesCount == 1 ? 'Serie' : 'Serien'}',
+      if (widget.movieCount > 0) tr.movieCount(widget.movieCount),
+      if (widget.seriesCount > 0) tr.showCount(widget.seriesCount),
     ];
 
     return Row(
@@ -300,7 +296,7 @@ class _HeaderState extends ConsumerState<_Header> {
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      '${counts.join(' · ')} auf deinem Server',
+                      tr.onYourServerCounts(counts.join(' · ')),
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                   ),
@@ -338,7 +334,7 @@ class _HeaderState extends ConsumerState<_Header> {
                               child: TextButton.icon(
                                 onPressed: () => setState(() => _expanded = !_expanded),
                                 icon: Icon(_expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded),
-                                label: Text(_expanded ? 'Weniger anzeigen' : 'Mehr anzeigen'),
+                                label: Text(_expanded ? tr.showLess : tr.showMore),
                               ),
                             ),
                         ],

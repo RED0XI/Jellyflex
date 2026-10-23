@@ -10,6 +10,7 @@ import '../core/gamepad_input.dart';
 import '../theme.dart';
 import 'focus_navigation.dart';
 import 'focusable.dart';
+import '../l10n/strings.dart';
 
 /// Steuert, ob die Fensterleiste sichtbar ist (der Player blendet sie aus).
 final windowChromeVisible = ValueNotifier<bool>(true);
@@ -280,7 +281,7 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
                         ? _TitleBarButton(
                             key: const ValueKey('back'),
                             icon: Icons.arrow_back_rounded,
-                            tooltip: 'Zurück',
+                            tooltip: tr.back,
                             onPressed: () => widget.router.pop(),
                           )
                         : const SizedBox(key: ValueKey('none'), width: 8),
@@ -288,13 +289,13 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
                   const Expanded(child: DragToMoveArea(child: SizedBox.expand())),
                   _TitleBarButton(
                     icon: Icons.remove_rounded,
-                    tooltip: 'Minimieren',
+                    tooltip: tr.minimize,
                     onPressed: () => windowManager.minimize(),
                   ),
                   _TitleBarButton(
                     icon: _maximized ? Icons.filter_none_rounded : Icons.crop_square_rounded,
                     iconSize: _maximized ? 14 : 16,
-                    tooltip: _maximized ? 'Wiederherstellen' : 'Maximieren',
+                    tooltip: _maximized ? tr.restore : tr.maximize,
                     onPressed: () async {
                       if (await windowManager.isMaximized()) {
                         await windowManager.unmaximize();
@@ -305,7 +306,7 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
                   ),
                   _TitleBarButton(
                     icon: Icons.close_rounded,
-                    tooltip: 'Schließen',
+                    tooltip: tr.close,
                     hoverColor: const Color(0xFFE81123),
                     onPressed: () => windowManager.close(),
                   ),

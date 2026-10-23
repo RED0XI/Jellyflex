@@ -13,6 +13,7 @@ import '../../theme.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/jf_image.dart';
+import '../../l10n/strings.dart';
 
 /// Eine Quizrunde: richtiger Titel, vier Antworten (in zufälliger Reihenfolge),
 /// Bildausschnitt, an dem gezoomt wird.
@@ -90,7 +91,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> with TickerProviderStat
       if (pool.length < 4) {
         setState(() {
           _loading = false;
-          _error = 'Für das Quiz braucht es mindestens 4 Filme oder Serien mit Hintergrundbild.';
+          _error = tr.quizNeedsTitles;
         });
         return;
       }
@@ -115,7 +116,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> with TickerProviderStat
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'Der Server ist gerade nicht erreichbar.';
+          _error = tr.serverUnreachable;
         });
       }
     }
@@ -229,14 +230,14 @@ class _QuizScreenState extends ConsumerState<QuizScreen> with TickerProviderStat
           children: [
             const Icon(Icons.quiz_rounded, color: AppColors.accent, size: 28),
             const SizedBox(width: 10),
-            const Text('Film-Quiz', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
+            Text(tr.movieQuiz, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
             const SizedBox(width: 20),
             Text(
-              'Runde ${_index + 1} von ${_rounds.length}',
+              tr.roundOf(_index + 1, _rounds.length),
               style: const TextStyle(color: AppColors.textSecondary, fontSize: 15),
             ),
             const Spacer(),
-            Text('$_score Punkte', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+            Text(tr.points(_score), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
           ],
         ),
         const SizedBox(height: 14),
@@ -304,7 +305,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> with TickerProviderStat
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _lastPoints > 0 ? 'Richtig! +$_lastPoints' : 'Leider nicht',
+                                  _lastPoints > 0 ? tr.correctPlus(_lastPoints) : tr.notQuite,
                                   style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                                 ),
                                 Text(
@@ -315,7 +316,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> with TickerProviderStat
                             ),
                           ),
                           PrimaryButton(
-                            label: _index + 1 >= _rounds.length ? 'Ergebnis' : 'Weiter',
+                            label: _index + 1 >= _rounds.length ? tr.result : tr.next,
                             icon: Icons.arrow_forward_rounded,
                             onPressed: _next,
                           ),
@@ -431,10 +432,10 @@ class _Result extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final verdict = switch (correct / rounds) {
-      >= 0.875 => 'Filmprofi! 🍿',
-      >= 0.6 => 'Starke Leistung! 🎬',
-      >= 0.3 => 'Nicht schlecht! 🎞️',
-      _ => 'Da geht noch was … 📼',
+      >= 0.875 => tr.verdictPro,
+      >= 0.6 => tr.verdictStrong,
+      >= 0.3 => tr.verdictNotBad,
+      _ => tr.verdictMore,
     };
     return Center(
       child: Column(
@@ -445,18 +446,18 @@ class _Result extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(gradient: AppColors.accentGradient, borderRadius: BorderRadius.circular(20)),
-              child: const Text('Neuer Rekord!', style: TextStyle(fontWeight: FontWeight.w800)),
+              child: Text(tr.newRecord, style: TextStyle(fontWeight: FontWeight.w800)),
             ),
           Text(verdict, style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
-          Text('$score Punkte', style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w300, height: 1.1)),
+          Text(tr.points(score), style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w300, height: 1.1)),
           const SizedBox(height: 6),
           Text(
-            '$correct von $rounds richtig  ·  Rekord: ${math.max(highscore, score)}',
+            tr.correctOf(correct, rounds, math.max(highscore, score)),
             style: const TextStyle(color: AppColors.textSecondary, fontSize: 16),
           ),
           const SizedBox(height: 28),
-          PrimaryButton(label: 'Nochmal spielen', icon: Icons.replay_rounded, onPressed: onAgain),
+          PrimaryButton(label: tr.playAgain, icon: Icons.replay_rounded, onPressed: onAgain),
         ],
       ),
     );

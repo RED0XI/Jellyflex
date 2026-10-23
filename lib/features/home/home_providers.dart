@@ -4,6 +4,7 @@ import '../../core/models.dart';
 import '../../core/seasons.dart';
 import '../../core/session.dart';
 import '../../core/settings.dart';
+import '../../l10n/strings.dart';
 
 enum SectionStyle { poster, landscape }
 
@@ -53,11 +54,11 @@ final homeProvider = FutureProvider.autoDispose<HomeData>((ref) async {
   final favorites = await favoritesFuture;
 
   return HomeData(libraries, [
-    if (resume.isNotEmpty) HomeSection('Weiterschauen', resume, SectionStyle.landscape),
-    if (nextUp.isNotEmpty) HomeSection('Als Nächstes', nextUp, SectionStyle.landscape),
+    if (resume.isNotEmpty) HomeSection(tr.continueWatching, resume, SectionStyle.landscape),
+    if (nextUp.isNotEmpty) HomeSection(tr.nextUp, nextUp, SectionStyle.landscape),
     for (var i = 0; i < libraries.length; i++)
-      if (latest[i].isNotEmpty) HomeSection('Neu in ${libraries[i].name}', latest[i], SectionStyle.poster),
-    if (favorites.isNotEmpty) HomeSection('Deine Favoriten', favorites, SectionStyle.poster),
+      if (latest[i].isNotEmpty) HomeSection(tr.newIn(libraries[i].name), latest[i], SectionStyle.poster),
+    if (favorites.isNotEmpty) HomeSection(tr.yourFavorites, favorites, SectionStyle.poster),
   ]);
 });
 
@@ -77,7 +78,7 @@ final discoverProvider = FutureProvider.autoDispose<List<HomeSection>>((ref) asy
   return [
     for (final r in recommendations)
       if (r.items.length >= 3) HomeSection(r.title, r.items, SectionStyle.poster),
-    if (collections.isNotEmpty) HomeSection('Sammlungen', collections, SectionStyle.poster),
+    if (collections.isNotEmpty) HomeSection(tr.collections, collections, SectionStyle.poster),
     for (final (genre, items) in genreRows)
       if (items.length >= 4) HomeSection(genre, items, SectionStyle.poster),
   ];
@@ -108,7 +109,7 @@ final seasonalSectionProvider = FutureProvider.autoDispose<HomeSection?>((ref) a
       if ((item.isMovie || item.isSeries) && seen.add(item.id)) item,
   ].take(24).toList();
   if (items.length < 3) return null;
-  return HomeSection('${info.emoji}  ${info.title}', items, SectionStyle.poster);
+  return HomeSection('${info.emoji}  ${season.title}', items, SectionStyle.poster);
 });
 
 /// URL des Profilbilds des angemeldeten Benutzers (oder `null`).

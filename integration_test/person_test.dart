@@ -14,10 +14,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:jellyflex/app.dart';
 import 'package:jellyflex/core/session.dart';
+import 'package:jellyflex/core/settings.dart';
 import 'package:jellyflex/features/details/details_screen.dart';
 import 'package:jellyflex/features/person/person_screen.dart';
 import 'package:jellyflex/widgets/media_cards.dart';
 import 'package:window_manager/window_manager.dart';
+
+import 'test_settings.dart';
 
 const _server = 'http://localhost:8097';
 
@@ -64,7 +67,7 @@ void main() {
     await windowManager.ensureInitialized();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [sessionProvider.overrideWith(_DemoSession.new)],
+        overrides: [sessionProvider.overrideWith(_DemoSession.new), settingsProvider.overrideWith(testSettings)],
         child: RepaintBoundary(key: _shotKey, child: const JellyflexApp()),
       ),
     );

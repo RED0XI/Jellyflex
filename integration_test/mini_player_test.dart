@@ -15,10 +15,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:jellyflex/app.dart';
 import 'package:jellyflex/core/session.dart';
+import 'package:jellyflex/core/settings.dart';
 import 'package:jellyflex/features/player/player_screen.dart';
 import 'package:jellyflex/widgets/window_frame.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
+
+import 'test_settings.dart';
 
 const _server = 'http://localhost:8097';
 
@@ -68,7 +71,7 @@ void main() {
     PlayerScreen.debugBeforeOpen = (p) async => player = p;
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [sessionProvider.overrideWith(_DemoSession.new)],
+        overrides: [sessionProvider.overrideWith(_DemoSession.new), settingsProvider.overrideWith(testSettings)],
         child: RepaintBoundary(key: _shotKey, child: const JellyflexApp()),
       ),
     );

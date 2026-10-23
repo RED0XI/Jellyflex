@@ -10,6 +10,7 @@ import '../../widgets/buttons.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/top_scrim.dart';
+import '../../l10n/strings.dart';
 
 /// Alle Downloads: laufende mit Fortschritt, fertige zum Offline-Schauen.
 class DownloadsScreen extends ConsumerStatefulWidget {
@@ -53,21 +54,21 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Downloads',
+                            Text(
+                              tr.downloads,
                               style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -0.8),
                             ),
                             Text(
                               entries.isEmpty
-                                  ? 'Zum Offline-Schauen auf diesem PC gespeichert'
-                                  : '${done.length} Titel · ${formatBytes(manager.usedBytes)} belegt',
+                                  ? tr.savedForOffline
+                                  : tr.downloadsSummary(done.length, formatBytes(manager.usedBytes)),
                               style: const TextStyle(color: AppColors.textSecondary),
                             ),
                           ],
                         ),
                         const Spacer(),
                         GlassButton(
-                          label: 'Ordner öffnen',
+                          label: tr.openFolder,
                           icon: Icons.folder_open_rounded,
                           onPressed: () {
                             manager.root.createSync(recursive: true);
@@ -79,29 +80,26 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                   ),
                 ),
                 if (entries.isEmpty)
-                  const SliverToBoxAdapter(
+                  SliverToBoxAdapter(
                     child: Padding(
                       padding: EdgeInsets.only(top: 80),
                       child: Column(
                         children: [
                           Icon(Icons.download_for_offline_outlined, size: 56, color: AppColors.textMuted),
                           SizedBox(height: 14),
-                          Text('Noch keine Downloads.', style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+                          Text(tr.noDownloadsYet, style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
                           SizedBox(height: 4),
-                          Text(
-                            'Auf einer Detailseite oder per Rechtsklick auf „Herunterladen“ tippen.',
-                            style: TextStyle(color: AppColors.textMuted),
-                          ),
+                          Text(tr.noDownloadsHint, style: TextStyle(color: AppColors.textMuted)),
                         ],
                       ),
                     ),
                   ),
                 if (active.isNotEmpty) ...[
-                  const _SectionTitle('Wird heruntergeladen'),
+                  _SectionTitle(tr.downloading),
                   SliverList.list(children: [for (final e in active) _ActiveRow(entry: e)]),
                 ],
                 if (done.isNotEmpty) ...[
-                  const _SectionTitle('Bereit zum Offline-Schauen'),
+                  _SectionTitle(tr.readyOffline),
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
                     sliver: SliverGrid.builder(
@@ -168,11 +166,11 @@ Future<bool> confirmRemoveDownload(BuildContext context, String name) async {
     context: context,
     builder: (context) => AlertDialog(
       backgroundColor: AppColors.surface,
-      title: const Text('Download löschen?'),
-      content: Text('„$name“ wird von diesem PC gelöscht. Auf dem Server bleibt alles erhalten.'),
+      title: Text(tr.deleteDownloadQuestion),
+      content: Text(tr.deleteDownloadText(name)),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),
-        FilledButton(autofocus: true, onPressed: () => Navigator.pop(context, true), child: const Text('Löschen')),
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr.cancel)),
+        FilledButton(autofocus: true, onPressed: () => Navigator.pop(context, true), child: Text(tr.delete)),
       ],
     ),
   );
@@ -197,12 +195,12 @@ class _ActiveRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final manager = ref.read(downloadsProvider.notifier);
     final status = switch (entry.status) {
-      DownloadStatus.queued => 'Wartet …',
+      DownloadStatus.queued => tr.waiting,
       DownloadStatus.downloading =>
-        entry.total > 0 ? '${formatBytes(entry.received)} von ${formatBytes(entry.total)}' : 'Startet …',
-      DownloadStatus.paused => 'Pausiert${entry.error != null ? ' – ${entry.error}' : ''}',
-      DownloadStatus.failed => 'Fehlgeschlagen: ${entry.error ?? 'unbekannt'}',
-      DownloadStatus.done => 'Fertig',
+        entry.total > 0 ? tr.receivedOf(formatBytes(entry.received), formatBytes(entry.total)) : tr.starting,
+      DownloadStatus.paused => tr.paused(entry.error),
+      DownloadStatus.failed => tr.failed(entry.error),
+      DownloadStatus.done => tr.done,
     };
     return Container(
       margin: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 12),
@@ -238,21 +236,21 @@ class _ActiveRow extends ConsumerWidget {
           if (entry.status == DownloadStatus.downloading || entry.status == DownloadStatus.queued)
             CircleIconButton(
               icon: Icons.pause_rounded,
-              tooltip: 'Pausieren',
+              tooltip: tr.pause,
               size: 44,
               onPressed: () => manager.pause(entry.itemId),
             )
           else
             CircleIconButton(
               icon: entry.status == DownloadStatus.failed ? Icons.refresh_rounded : Icons.play_arrow_rounded,
-              tooltip: entry.status == DownloadStatus.failed ? 'Erneut versuchen' : 'Fortsetzen',
+              tooltip: entry.status == DownloadStatus.failed ? tr.retry : tr.resume,
               size: 44,
               onPressed: () => manager.resume(entry.itemId),
             ),
           const SizedBox(width: 8),
           CircleIconButton(
             icon: Icons.close_rounded,
-            tooltip: 'Abbrechen und löschen',
+            tooltip: tr.cancelAndDelete,
             size: 44,
             onPressed: () async {
               if (await confirmRemoveDownload(context, _title(entry))) manager.remove(entry.itemId);
@@ -274,19 +272,19 @@ class _DoneCard extends ConsumerWidget {
     final choice = await showMenu<String>(
       context: context,
       position: RelativeRect.fromRect(position & const Size(1, 1), Offset.zero & overlay.size),
-      items: const [
+      items: [
         PopupMenuItem(
           value: 'play',
-          child: Row(children: [Icon(Icons.play_arrow_rounded, size: 20), SizedBox(width: 12), Text('Abspielen')]),
+          child: Row(children: [Icon(Icons.play_arrow_rounded, size: 20), SizedBox(width: 12), Text(tr.play)]),
         ),
         PopupMenuItem(
           value: 'details',
-          child: Row(children: [Icon(Icons.info_outline_rounded, size: 20), SizedBox(width: 12), Text('Details')]),
+          child: Row(children: [Icon(Icons.info_outline_rounded, size: 20), SizedBox(width: 12), Text(tr.details)]),
         ),
         PopupMenuItem(
           value: 'delete',
           child: Row(
-            children: [Icon(Icons.delete_outline_rounded, size: 20), SizedBox(width: 12), Text('Download löschen')],
+            children: [Icon(Icons.delete_outline_rounded, size: 20), SizedBox(width: 12), Text(tr.deleteDownload)],
           ),
         ),
       ],
