@@ -1041,4 +1041,87 @@ final class _Fr extends S {
   String serverError(int? code) => 'Erreur du serveur $code';
   @override
   String get encryptionFailed => 'Échec du chiffrement';
+
+  // --- Listen, Startseite, Tastenkürzel ---
+  @override
+  String get watchlist => 'Ma liste';
+  @override
+  String get myLists => 'Mes listes';
+  @override
+  String get addToWatchlist => 'Ajouter à ma liste';
+  @override
+  String get removeFromWatchlist => 'Retirer de ma liste';
+  @override
+  String addedToWatchlist(String name) => '« $name » est dans votre liste';
+  @override
+  String removedFromWatchlist(String name) => '« $name » retiré de votre liste';
+  @override
+  String get addToList => 'Ajouter à une liste';
+  @override
+  String get addToListMenu => 'Ajouter à une liste …';
+  @override
+  String addedToList(String list) => 'Ajouté à « $list »';
+  @override
+  String get newList => 'Nouvelle liste';
+  @override
+  String get listNameHint => 'Nom, par ex. « Soirée ciné »';
+  @override
+  String get listsHint => 'Listes privées sur votre serveur Jellyfin – disponibles sur tous vos appareils.';
+  @override
+  String get noListsYet =>
+      'Aucune liste pour l’instant. Utilisez le marque-page d’un titre ou « Ajouter à une liste ».';
+  @override
+  String get listEmpty => 'Cette liste est vide.';
+  @override
+  String get deleteList => 'Supprimer la liste';
+  @override
+  String deleteListQuestion(String name) => 'Supprimer « $name » ?';
+  @override
+  String get deleteListText => 'La liste est supprimée sur votre serveur. Les titres eux-mêmes restent.';
+  @override
+  String removeFromList(String name) => 'Retirer « $name » de la liste';
+  @override
+  String get homeRows => 'Rangées de l’accueil';
+  @override
+  String get homeRowsHint =>
+      'Glissez pour réordonner, désactivez le superflu. Les changements s’appliquent tout de suite.';
+  @override
+  String get homeRowsSettingsHint => 'Ordre et visibilité des rangées de la page d’accueil.';
+  @override
+  String get customize => 'Personnaliser';
+  @override
+  String get moveUp => 'Monter';
+  @override
+  String get moveDown => 'Descendre';
+  @override
+  String get resetToDefault => 'Rétablir par défaut';
+  @override
+  String homeRowName(String id) => switch (id) {
+    'seasonal' => 'Rangée de saison',
+    'latest' => 'Nouveautés de vos bibliothèques',
+    'genres' => 'Rangées par genre',
+    _ => super.homeRowName(id),
+  };
+  @override
+  String get shortcuts => 'Raccourcis clavier';
+  @override
+  String get shortcutsEverywhere => 'Partout';
+  @override
+  String get shortcutsPlayer => 'Lecteur';
+  @override
+  String get shortcutsController => 'Manette';
+  @override
+  String get shortcutMoveFocus => 'Déplacer la sélection';
+  @override
+  String get shortcutOpen => 'Ouvrir / choisir';
+  @override
+  String get shortcutSeek => '10 s en arrière / en avant';
+  @override
+  String get shortcutVolume => 'Volume';
+  @override
+  String get shortcutScreenshot => 'Capture d’écran';
+  @override
+  String get shortcutMenu => 'Menu (comme le clic droit)';
+  @override
+  String get keySpace => 'Espace';
 }

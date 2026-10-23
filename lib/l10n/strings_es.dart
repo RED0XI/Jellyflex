@@ -1041,4 +1041,85 @@ final class _Es extends S {
   String serverError(int? code) => 'Error del servidor $code';
   @override
   String get encryptionFailed => 'Error de cifrado';
+
+  // --- Listen, Startseite, Tastenkürzel ---
+  @override
+  String get watchlist => 'Mi lista';
+  @override
+  String get myLists => 'Mis listas';
+  @override
+  String get addToWatchlist => 'Añadir a mi lista';
+  @override
+  String get removeFromWatchlist => 'Quitar de mi lista';
+  @override
+  String addedToWatchlist(String name) => '«$name» está en tu lista';
+  @override
+  String removedFromWatchlist(String name) => '«$name» se quitó de tu lista';
+  @override
+  String get addToList => 'Añadir a una lista';
+  @override
+  String get addToListMenu => 'Añadir a una lista …';
+  @override
+  String addedToList(String list) => 'Añadido a «$list»';
+  @override
+  String get newList => 'Nueva lista';
+  @override
+  String get listNameHint => 'Nombre, p. ej. «Noche de cine»';
+  @override
+  String get listsHint => 'Listas privadas en tu servidor Jellyfin – disponibles en todos tus dispositivos.';
+  @override
+  String get noListsYet => 'Todavía no hay listas. Usa el marcador de un título o «Añadir a una lista».';
+  @override
+  String get listEmpty => 'Esta lista está vacía.';
+  @override
+  String get deleteList => 'Eliminar lista';
+  @override
+  String deleteListQuestion(String name) => '¿Eliminar «$name»?';
+  @override
+  String get deleteListText => 'La lista se elimina en tu servidor. Los títulos se mantienen.';
+  @override
+  String removeFromList(String name) => 'Quitar «$name» de la lista';
+  @override
+  String get homeRows => 'Filas de la página de inicio';
+  @override
+  String get homeRowsHint => 'Arrastra para reordenar y desactiva lo que no necesites. Se aplica al momento.';
+  @override
+  String get homeRowsSettingsHint => 'Orden y visibilidad de las filas en la página de inicio.';
+  @override
+  String get customize => 'Personalizar';
+  @override
+  String get moveUp => 'Subir';
+  @override
+  String get moveDown => 'Bajar';
+  @override
+  String get resetToDefault => 'Restablecer';
+  @override
+  String homeRowName(String id) => switch (id) {
+    'seasonal' => 'Fila de temporada',
+    'latest' => 'Novedades en tus bibliotecas',
+    'genres' => 'Filas por género',
+    _ => super.homeRowName(id),
+  };
+  @override
+  String get shortcuts => 'Atajos de teclado';
+  @override
+  String get shortcutsEverywhere => 'En todas partes';
+  @override
+  String get shortcutsPlayer => 'Reproductor';
+  @override
+  String get shortcutsController => 'Mando';
+  @override
+  String get shortcutMoveFocus => 'Mover la selección';
+  @override
+  String get shortcutOpen => 'Abrir / elegir';
+  @override
+  String get shortcutSeek => '10 s atrás / adelante';
+  @override
+  String get shortcutVolume => 'Volumen';
+  @override
+  String get shortcutScreenshot => 'Captura de pantalla';
+  @override
+  String get shortcutMenu => 'Menú (como el clic derecho)';
+  @override
+  String get keySpace => 'Espacio';
 }

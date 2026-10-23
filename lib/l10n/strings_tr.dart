@@ -1037,4 +1037,85 @@ final class _Tr extends S {
   String serverError(int? code) => 'Sunucu hatası $code';
   @override
   String get encryptionFailed => 'Şifreleme başarısız';
+
+  // --- Listen, Startseite, Tastenkürzel ---
+  @override
+  String get watchlist => 'İzleme listesi';
+  @override
+  String get myLists => 'Listelerim';
+  @override
+  String get addToWatchlist => 'İzleme listesine ekle';
+  @override
+  String get removeFromWatchlist => 'İzleme listesinden çıkar';
+  @override
+  String addedToWatchlist(String name) => '“$name” izleme listende';
+  @override
+  String removedFromWatchlist(String name) => '“$name” izleme listenden çıkarıldı';
+  @override
+  String get addToList => 'Listeye ekle';
+  @override
+  String get addToListMenu => 'Listeye ekle …';
+  @override
+  String addedToList(String list) => '“$list” listesine eklendi';
+  @override
+  String get newList => 'Yeni liste';
+  @override
+  String get listNameHint => 'Ad, ör. “Film gecesi”';
+  @override
+  String get listsHint => 'Jellyfin sunucundaki özel listeler – tüm cihazlarında kullanılabilir.';
+  @override
+  String get noListsYet => 'Henüz liste yok. Bir başlıktaki yer imini ya da “Listeye ekle”yi kullan.';
+  @override
+  String get listEmpty => 'Bu liste boş.';
+  @override
+  String get deleteList => 'Listeyi sil';
+  @override
+  String deleteListQuestion(String name) => '“$name” silinsin mi?';
+  @override
+  String get deleteListText => 'Liste sunucunda silinir. Başlıkların kendisi kalır.';
+  @override
+  String removeFromList(String name) => '“$name” listeden çıkar';
+  @override
+  String get homeRows => 'Ana sayfa sıraları';
+  @override
+  String get homeRowsHint => 'Sıralamak için sürükle, gerekmeyenleri kapat. Değişiklikler hemen uygulanır.';
+  @override
+  String get homeRowsSettingsHint => 'Ana sayfadaki sıraların düzeni ve görünürlüğü.';
+  @override
+  String get customize => 'Özelleştir';
+  @override
+  String get moveUp => 'Yukarı taşı';
+  @override
+  String get moveDown => 'Aşağı taşı';
+  @override
+  String get resetToDefault => 'Varsayılana dön';
+  @override
+  String homeRowName(String id) => switch (id) {
+    'seasonal' => 'Mevsim sırası',
+    'latest' => 'Kitaplıklarındaki yenilikler',
+    'genres' => 'Tür sıraları',
+    _ => super.homeRowName(id),
+  };
+  @override
+  String get shortcuts => 'Klavye kısayolları';
+  @override
+  String get shortcutsEverywhere => 'Her yerde';
+  @override
+  String get shortcutsPlayer => 'Oynatıcı';
+  @override
+  String get shortcutsController => 'Oyun kumandası';
+  @override
+  String get shortcutMoveFocus => 'Seçimi taşı';
+  @override
+  String get shortcutOpen => 'Aç / seç';
+  @override
+  String get shortcutSeek => '10 sn geri / ileri';
+  @override
+  String get shortcutVolume => 'Ses düzeyi';
+  @override
+  String get shortcutScreenshot => 'Ekran görüntüsü';
+  @override
+  String get shortcutMenu => 'Menü (sağ tık gibi)';
+  @override
+  String get keySpace => 'Boşluk';
 }
