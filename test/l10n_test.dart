@@ -33,6 +33,27 @@ void main() {
     expect(tr.decadeLabel(1980), '80er');
   });
 
+  test('Französisch, Spanisch, Türkisch', () {
+    appLanguage = AppLanguage.fr;
+    expect(tr.settings, 'Réglages');
+    expect(formatDate(DateTime(1975, 3, 12)), '12 mars 1975');
+    expect(formatBitrate(62000000), '62,0 Mbit/s');
+    expect(languageName('ger'), 'Allemand');
+    appLanguage = AppLanguage.es;
+    expect(tr.whoIsWatching, '¿Quién está viendo?');
+    expect(formatWeekdayDate(DateTime(2026, 10, 23)), 'viernes, 23 de octubre');
+    appLanguage = AppLanguage.tr;
+    expect(tr.continueWatching, 'İzlemeye devam et');
+    expect(formatDate(DateTime(1975, 3, 12)), '12 Mart 1975');
+    expect(tr.movieCount(3), '3 film');
+  });
+
+  test('Jede Sprache steht in der Auswahl mit eigenem Namen', () {
+    expect([for (final l in AppLanguage.values) l.nativeName], ['English', 'Deutsch', 'Français', 'Español', 'Türkçe']);
+    final json = const AppSettings(language: AppLanguage.tr).toJson();
+    expect(AppSettings.fromJson(json).language, AppLanguage.tr);
+  });
+
   test('Sprache wird mit den Einstellungen gespeichert', () {
     final json = const AppSettings(language: AppLanguage.de).toJson();
     expect(json['language'], 'de');

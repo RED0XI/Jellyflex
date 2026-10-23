@@ -1,11 +1,19 @@
 // Alle Texte der Oberfläche – Englisch (Standard) und Deutsch nebeneinander.
+// Weitere Sprachen (Französisch, Spanisch, Türkisch) überschreiben die Texte in
+// eigenen Dateien (strings_fr.dart …); was dort fehlt, erscheint auf Englisch.
 //
 // Verwendung überall (auch ohne BuildContext): `tr.downloads`, `tr.endsAt('22:41')`.
-// Eine weitere Sprache: [AppLanguage] ergänzen und in [S._t] einen Fall hinzufügen.
+
+part 'strings_es.dart';
+part 'strings_fr.dart';
+part 'strings_tr.dart';
 
 enum AppLanguage {
   en('English'),
-  de('Deutsch');
+  de('Deutsch'),
+  fr('Français'),
+  es('Español'),
+  tr('Türkçe');
 
   const AppLanguage(this.nativeName);
 
@@ -17,13 +25,22 @@ enum AppLanguage {
 AppLanguage appLanguage = AppLanguage.en;
 
 /// Texte in der aktuellen Sprache.
-S get tr => appLanguage == AppLanguage.de ? S.de : S.en;
+S get tr => switch (appLanguage) {
+  AppLanguage.en => S.en,
+  AppLanguage.de => S.de,
+  AppLanguage.fr => S.fr,
+  AppLanguage.es => S.es,
+  AppLanguage.tr => S.turkish,
+};
 
 class S {
   const S._(this._de);
 
   static const en = S._(false);
   static const de = S._(true);
+  static const S fr = _Fr();
+  static const S es = _Es();
+  static const S turkish = _Tr();
 
   final bool _de;
 
@@ -361,6 +378,11 @@ class S {
   );
   String get theme => _t('Theme', 'Theme');
   String get themeHint => _t('Colours of the whole app – changes instantly.', 'Farben der ganzen App – wirkt sofort.');
+
+  /// Name und Beschreibung eines Layouts (Englisch/Deutsch stehen im Layout selbst).
+  String layoutName(String id, String en, String de) => _t(en, de);
+  String layoutDescription(String id, String en, String de) => _t(en, de);
+
   String themeName(String id) => switch (id) {
     'midnight' => _t('Midnight', 'Mitternacht'),
     'oled' => _t('OLED Black', 'OLED-Schwarz'),

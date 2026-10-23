@@ -76,6 +76,19 @@ void main() {
 
       // Gespeichert?
       expect(File('${temp.path}\\settings.json').readAsStringSync(), contains('"language": "de"'));
+
+      // --- Weitere Sprachen ---
+      for (final (lang, home, row) in [
+        (AppLanguage.fr, 'Accueil', 'Reprendre'),
+        (AppLanguage.es, 'Inicio', 'Seguir viendo'),
+        (AppLanguage.tr, 'Ana sayfa', 'İzlemeye devam et'),
+      ]) {
+        container.read(settingsProvider.notifier).update((s) => s.copyWith(language: lang));
+        await pumpFor(tester, const Duration(seconds: 3));
+        expect(find.text(home), findsOneWidget, reason: lang.name);
+        expect(_rowTitles(), contains(row), reason: lang.name);
+        await saveShot(tester, 'language_home_${lang.name}');
+      }
     } finally {
       appLanguage = AppLanguage.en;
       await tester.pumpWidget(const SizedBox());

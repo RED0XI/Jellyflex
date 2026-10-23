@@ -43,10 +43,10 @@ class _LayoutTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = palette;
-    final german = appLanguage == AppLanguage.de;
+    final name = tr.layoutName(layout.id, layout.name, layout.nameDe);
     return Focusable(
       onTap: onTap,
-      semanticLabel: german ? layout.nameDe : layout.name,
+      semanticLabel: name,
       builder: (context, hovered) => SizedBox(
         width: 212,
         child: Column(
@@ -88,7 +88,7 @@ class _LayoutTile extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              german ? layout.nameDe : layout.name,
+              name,
               style: TextStyle(
                 fontFamily: layout.headingFont ?? layout.bodyFont,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
@@ -97,7 +97,7 @@ class _LayoutTile extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              german ? layout.descriptionDe : layout.description,
+              tr.layoutDescription(layout.id, layout.description, layout.descriptionDe),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(fontSize: 12, height: 1.3, color: AppColors.textMuted),
