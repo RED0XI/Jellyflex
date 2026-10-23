@@ -14,6 +14,7 @@ import 'features/library/library_screen.dart';
 import 'features/login/login_screen.dart';
 import 'features/person/person_screen.dart';
 import 'features/player/player_screen.dart';
+import 'features/roulette/roulette_screen.dart';
 import 'features/search/search_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/splash_screen.dart';
@@ -47,6 +48,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
       GoRoute(path: '/search', builder: (_, _) => const SearchScreen()),
       GoRoute(path: '/downloads', builder: (_, _) => const DownloadsScreen()),
+      GoRoute(path: '/roulette', builder: (_, _) => const RouletteScreen()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(
         path: '/library/:id',

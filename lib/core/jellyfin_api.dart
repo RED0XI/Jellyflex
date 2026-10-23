@@ -335,6 +335,23 @@ class JellyfinApi {
     'limit': limit,
   });
 
+  /// Zufällige Titel für "Überrasch mich" – optional nur Ungesehenes bzw. ein Genre.
+  Future<List<BaseItem>> getRandomPicks({
+    String includeItemTypes = 'Movie,Series',
+    bool unplayedOnly = false,
+    String? genre,
+    int limit = 60,
+  }) => _getItems('/Items', {
+    ..._common,
+    'includeItemTypes': includeItemTypes,
+    'recursive': true,
+    'sortBy': 'Random',
+    'imageTypes': 'Primary',
+    if (unplayedOnly) 'filters': 'IsUnplayed',
+    'genres': ?genre,
+    'limit': limit,
+  });
+
   /// Empfehlungen wie "Weil du X angesehen hast".
   Future<List<Recommendation>> getRecommendations({int categories = 3, int perCategory = 16}) async {
     final res = await dio.get(

@@ -622,6 +622,7 @@ Object? _handle(HttpRequest req) {
     final term = q['searchTerm']?.toLowerCase();
     if (term != null) list = list.where((i) => (i['Name'] as String).toLowerCase().contains(term)).toList();
     if (q['filters'] == 'IsFavorite') list = list.where((i) => i['UserData']['IsFavorite'] == true).toList();
+    if (q['filters'] == 'IsUnplayed') list = list.where((i) => i['UserData']['Played'] != true).toList();
     if (q['sortBy'] == 'Random') list.shuffle(_rand);
     if (q['sortBy']?.startsWith('SortName') ?? false) {
       list.sort((a, b) => (a['Name'] as String).compareTo(b['Name'] as String));
