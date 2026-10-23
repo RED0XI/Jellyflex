@@ -1,183 +1,172 @@
 # Jellyflex
 
-Ein moderner, flüssiger Jellyfin-Client für Windows – gebaut mit Flutter und
-[media_kit](https://github.com/media-kit/media-kit) (mpv). Inspiriert von Wholphin.
+A modern, smooth [Jellyfin](https://jellyfin.org) client for Windows – built with Flutter and
+[media_kit](https://github.com/media-kit/media-kit) (mpv). Inspired by Wholphin.
 
-**Datenschutz zuerst:** Jellyflex spricht nur mit deinem eigenen Jellyfin-Server – keine
-Statistik, keine Schriften oder Bilder von fremden Diensten. Details in [SECURITY.md](SECURITY.md).
+> **Made with Claude.** Jellyflex was written with [Claude Code](https://claude.com/claude-code),
+> Anthropic's AI coding assistant. The project owner decided what to build, tested every
+> version and gave feedback; Claude wrote the code, the tests and this README.
 
-## Starten
+## Quick start
 
-**Fertige App:** `build\windows\x64\runner\Release\jellyflex.exe`
-(der ganze Ordner `Release` gehört dazu – zum Weitergeben komplett kopieren).
+**You need:** Windows 10 or 11 (64-bit) and a Jellyfin server you can sign in to.
 
-**Aus dem Quellcode:**
+1. Open the [latest release](https://github.com/RED0XI/Jellyflex/releases/latest) and download
+   **`Jellyflex-Setup-<version>.exe`** (the `.sig` file next to it is only for the app's update check).
+2. Run the installer. No admin rights needed.
+   If Windows shows *"Windows protected your PC"*, click **More info → Run anyway**
+   (the installer isn't signed with a paid Microsoft certificate).
+3. Start Jellyflex, enter your server address (for example `https://jellyfin.example.com`)
+   and sign in – with your password or **Quick Connect**.
+
+That's it. To get new versions automatically offered, turn on
+**Settings → About Jellyflex → Look for updates**.
+To uninstall: Windows Settings → Apps → Jellyflex.
+
+---
+
+## In detail
+
+### Features
+
+**Watching**
+- **Direct Play** of practically every format through mpv (HEVC, AV1, HDR, DTS/TrueHD, ASS/PGS subtitles)
+- Audio/subtitle choice from your Jellyfin settings; the language you pick is **remembered per series**
+- **Skip intro/recap** (Media Segments, e.g. from the Intro Skipper plugin), **next episode** countdown
+- **Trickplay** previews while seeking, **chapters** with pictures (`C`) and a **Scenes** row on the details page
+- Quality limit (the server converts on the fly), playback speed, audio/subtitle delay
+- Volume is remembered; progress is reported to the server continuously
+- Windows media overlay and media keys, **mini player** (`P`), **sleep timer**, **Ambilight**
+
+**Browsing**
+- Home with rotating banner, Continue watching, Next up, New in …, Favorites – rows can be
+  reordered and hidden
+- Details pages with backdrop slideshow, logo, ratings, seasons & episodes, cast, similar titles
+- **People pages**: photo, biography and everything with that person on your server
+- **Versions**: if a movie exists twice (e.g. 4K and 1080p), pick the version; badges show 4K, HDR/Dolby Vision, Atmos
+- Library grid with sorting and filters, **multi-select**, smart search (titles, episodes, people)
+- **Watchlist and your own lists** – stored as private playlists on your server
+- New titles show up **automatically** – no reloading
+
+**Downloads (watch offline)**
+- Movies, episodes or whole seasons; pause, resume (also after a restart or crash), cancel right on the details page
+- **Choose the folder** (asked on the first download), **only on Wi-Fi/LAN** (no downloads over mobile
+  data or phone hotspots), **speed limit**, free-space check
+- **Original or smaller version** – for smaller versions you choose the audio track and subtitles
+- **Smart downloads**: watched episodes are deleted and the next ones downloaded, with a space limit
+- Offline progress is remembered and reported to the server later
+
+**Profiles & personalization**
+- Several accounts/profiles, optional **profile PIN** and **lock when away**
+- 6 **layouts** (Cinema, Couch, Library, Magazine, Minimal, Retro VHS) and 8 color **themes**
+- Your own app name and logo
+- Languages: English, German, French, Spanish, Turkish
+- Extras: "Surprise me" slot machine, movie quiz, screensaver, seasonal touches, year in review, theme music
+
+### Privacy & security
+
+Jellyflex talks **only to your own Jellyfin server** – no telemetry, no ads, no fonts or images from
+other services. Highlights (full list in [SECURITY.md](SECURITY.md)):
+
+- Your login token is stored encrypted with Windows DPAPI and removed from logs and error reports.
+- HTTPS certificates are checked, also for video streams; plain http only in your home network and with a warning.
+- Downloads can't be placed in system folders, and the app only ever deletes its own download folders.
+- **Updates:** the update check (off by default) only asks GitHub for the newest version number. When you
+  click *Download & install*, the installer's **digital signature (Ed25519)** is checked before it runs –
+  a modified or damaged file is never started.
+
+### Keyboard & controller
+
+| Where | Key | Action |
+|---|---|---|
+| Everywhere | `Ctrl+F` | Search |
+| Everywhere | `Alt+←` / mouse back | Back |
+| Everywhere | `F11` | Fullscreen on/off (`Esc` leaves) |
+| Everywhere | `?` | All shortcuts |
+| Everywhere | `Ctrl+,` | Settings |
+| Cards | Right-click | Play, mark watched, add to list, download … |
+| Player | `Space` / `K` | Play / pause |
+| Player | `←` / `→` (`J` / `L`) | 10 s back / forward |
+| Player | `↑` / `↓` | Volume |
+| Player | `F` / double-click | Fullscreen |
+| Player | `M` | Mute |
+| Player | `P` | Mini player |
+| Player | `C` | Chapters |
+| Player | `I` | Playback info (codec, bitrate, buffer …) |
+| Player | `S` | Screenshot to Pictures\Jellyflex |
+| Player | `Esc` | Leave mini player/fullscreen, otherwise close |
+
+Without a mouse, the arrow keys move the selection like on a TV, Enter opens, and the menu key
+(or Shift+F10) opens the context menu.
+
+| Controller (Xbox, PlayStation …) | Outside the player | In the player |
+|---|---|---|
+| D-pad / left stick | Move selection | ←/→ seek 10 s |
+| A | Select | Play / pause |
+| B | Back | Close player |
+| X | Context menu | Audio & subtitles |
+| Y | Search | – |
+
+### Build from source
+
+You need the [Flutter SDK](https://docs.flutter.dev/get-started/install/windows) and Visual Studio
+2022 Build Tools ("Desktop development with C++").
 
 ```bash
-flutter run -d windows
+flutter run -d windows                 # run in debug mode
+flutter build windows --release        # build → build\windows\x64\runner\Release\
 ```
 
-**Installer bauen** (ergibt `dist\Jellyflex-Setup-<Version>.exe`, installiert ohne Admin-Rechte,
-Sprachen EN/DE/FR/ES/TR, die Deinstallation fragt, ob auch Einstellungen/Anmeldungen weg sollen –
-heruntergeladene Videos bleiben immer):
+**Installer** (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)): creates
+`dist\Jellyflex-Setup-<version>.exe` and, if a signing key exists, its `.sig` signature:
 
 ```bash
 powershell -ExecutionPolicy Bypass -File tool/build_installer.ps1
 ```
 
-**Neu bauen:**
+### Try it without a real server
 
-```bash
-flutter build windows --release
-```
-
-## Ausprobieren ohne echten Server
-
-Ein kleiner Demo-Server mit fiktiven Filmen und Serien (als Video dient für alle Titel das
-Testvideo `%TEMP%\jellyflex_test.mkv`, falls vorhanden):
+A small demo server with made-up movies and series:
 
 ```bash
 dart run tool/mock_server.dart
 ```
 
-In der App als Adresse `http://localhost:8097` eingeben, beliebiger Benutzername/Passwort.
+Enter `http://localhost:8097` in the app, any user name and password. As video for all titles it
+uses `%TEMP%\jellyflex_test.mkv` (any video file with two audio and two subtitle tracks, see
+`lib/dev/player_harness.dart`).
 
-**Player-Test ohne Server** (braucht ein Testvideo `%TEMP%\jellyflex_test.mkv` mit zwei Ton- und
-zwei Untertitelspuren, siehe `lib/dev/player_harness.dart`):
-
-```bash
-flutter test integration_test/player_tracks_test.dart -d windows
-```
-
-**Weitere App-Tests** (brauchen den laufenden Demo-Server, die meisten auch das Testvideo), z. B.:
+### Tests
 
 ```bash
-flutter test integration_test/downloads_test.dart -d windows
+flutter test                                                   # fast tests
+flutter test integration_test/downloads_test.dart -d windows   # one app test (needs the demo server)
+powershell -ExecutionPolicy Bypass -File tool/run_all_tests.ps1  # everything, with a summary
 ```
 
-Je Datei ein eigener Aufruf – mehrere Dateien in einem Lauf scheitern unter Windows.
+Run app tests one file at a time – several files in one run fail on Windows.
+Screenshots end up in `build/screenshots/`.
 
-**Alle Tests auf einmal** (startet den Demo-Server bei Bedarf selbst, Zusammenfassung am Ende):
+### Publishing a release (maintainers)
 
-```bash
-powershell -ExecutionPolicy Bypass -File tool/run_all_tests.ps1
-```
-Bildschirmfotos landen in `build/screenshots/`.
+1. Raise the version in `pubspec.yaml` and `lib/core/version.dart`.
+2. Build the installer (see above) – it is signed automatically. The secret key lives only on the
+   maintainer's PC (`%APPDATA%\JellyflexRelease`, created once with `dart run tool/sign_update.dart --new-key`)
+   and must never be committed.
+3. Create a GitHub release with tag `v<version>` and attach **both** `Jellyflex-Setup-<version>.exe`
+   and `Jellyflex-Setup-<version>.exe.sig`.
 
-## Funktionen
-
-- Anmeldung mit Passwort oder **Quick Connect**; Login wird mit Windows-DPAPI verschlüsselt gespeichert
-- Startseite mit wechselndem Banner, Weiterschauen, Als Nächstes, Neu in …, Favoriten, Bibliotheken
-- Detailseiten mit Hintergrund-Diashow, Logo, Bewertungen, Staffeln & Episoden, Besetzung, Ähnliches
-- **Personenseiten**: Klick auf jemanden aus der Besetzung zeigt Foto, Lebensdaten, Biografie und
-  alle Filme, Serien und Gastauftritte dieser Person auf deinem Server
-- Bibliotheksraster mit Nachladen und Sortierung, Live-Suche
-- **Fassungen**: Gibt es einen Film mehrfach (z. B. 4K und 1080p), wählst du auf der Detailseite
-  die Fassung zum Abspielen und Herunterladen; Abzeichen zeigen 4K, HDR/Dolby Vision, Atmos
-- **Medieninfo** (ⓘ auf der Detailseite): Auflösung, Codec, HDR, Farbtiefe, Bildrate, Tonspuren,
-  Untertitel, Dateigröße und Bitrate
-- **Direct Play** aller Formate über mpv (HEVC, AV1, HDR, DTS/TrueHD, ASS/PGS-Untertitel)
-- Ton-/Untertitelauswahl nach deinen Jellyfin-Einstellungen, externe Untertiteldateien (.srt/.ass)
-- **Intro/Rückblick überspringen** (Media Segments, z. B. vom Intro-Skipper-Plugin)
-- **Nächste Folge** mit Countdown, **Trickplay**-Vorschaubilder beim Spulen
-- Fortschritt wird laufend an den Server gemeldet
-- **Downloads zum Offline-Schauen** (Filme, Folgen, ganze Staffeln) mit Pause/Fortsetzen –
-  samt Untertiteldateien; offline Geschautes wird gemerkt und später an den Server gemeldet
-- Windows-Medienanzeige (Titel/Bild im Lautstärke-Overlay) und Medientasten
-- Einstellungen: bevorzugte Sprachen, Intro automatisch überspringen, Untertitelgröße …
-- **Sprache**: Englisch (Standard), Deutsch, Französisch, Spanisch oder Türkisch –
-  Einstellungen → Sprache, wirkt sofort. Englisch/Deutsch stehen in `lib/l10n/strings.dart`,
-  die anderen in `strings_fr/es/tr.dart` (ein Test prüft, dass nichts fehlt)
-- **Schlaue Suche**: Titel, Folgen und **Personen** (nach Schauspielern suchen), Filter
-  (Filme/Serien/Folgen/Personen, nur Ungesehenes), letzte Suchen je Profil verschlüsselt gespeichert
-- **Merkliste und eigene Listen**: Lesezeichen auf der Detailseite, „Zu Liste hinzufügen …“ im
-  Rechtsklick-Menü, „Meine Listen“ – gespeichert als **private** Wiedergabelisten auf deinem Server
-- **Startseite anpassen**: Reihen umsortieren und ausblenden (Einstellungen → Startseite)
-- **Mehrfachauswahl** in Bibliotheken: mehrere Titel auf einmal als gesehen/ungesehen markieren,
-  zu Favoriten, herunterladen
-- **Staffel-Werkzeuge**: „x von y gesehen“, ganze Staffel markieren, Staffel herunterladen mit Fortschritt
-- **Profil-PIN** (optional, je Profil): schützt ein Profil auf diesem Computer (z. B. vor Kindern);
-  nur als gesalzener Hash im verschlüsselten Speicher, Sperre nach 5 Fehlversuchen
-- **Taskleiste**: Sprungliste „Weiterschauen“ (Rechtsklick aufs Symbol), Download-Fortschritt am
-  Symbol, blinkt, wenn ein Download im Hintergrund fertig wird
-- **Offline-Hinweis**: Ist der Server weg, zeigt die App das und führt zu den Downloads
-- **Bild-Zwischenspeicher** mit fester Obergrenze (Standard 300 MB, Einstellungen → Speicher)
-- **Fehlerbericht** (Einstellungen → Über Jellyflex): lokal, bereinigt, wird nie verschickt
-- **Update-Hinweis** (Standard: aus): fragt nur nach der neuesten Versionsnummer
-
-**Extras**
-
-- **Layouts** (Einstellungen → Personalisieren): ganze Oberflächen zur Wahl – Kino, Sofa (große
-  Kacheln für TV/Controller), Bibliothek (Seitenleiste), Magazin, Minimal, Retro VHS
-- **Themes** (Einstellungen → Personalisieren): Midnight, OLED Black, Cinema Red, Nordic Frost,
-  Sunset, Synthwave, Emerald, Noir Gold – Farben der ganzen App, live umschaltbar, frei mit jedem
-  Layout kombinierbar
-- **Titelmusik** auf Detailseiten (abschaltbar, Standard: aus)
-- **Player-Extras**: Kapitel mit Bildern (`C`), Wiedergabe-Infos (`I`), Bildschirmfoto (`S`)
-- **Eigener Name und eigenes Logo** (Einstellungen → Personalisieren): erscheinen in der
-  Titelleiste, beim Start, bei der Anmeldung, im Fenstertitel und als Taskleisten-Symbol
-- **Überrasch mich** (🎲 oben): Poster-Rad wie ein Spielautomat mit Ticken und Melodie,
-  mit Filtern (Filme/Serien, nur Ungesehenes, Genre, „fertig bis“ Uhrzeit)
-- **Bildschirmschoner**: nach einer Weile ohne Eingabe gleiten Bilder deiner Titel vorbei, mit Uhr
-- **Schlaf-Timer** (🌙 im Player): am Ende der Folge oder nach 15–90 Minuten, wird langsam leiser
-- **Saisonale Akzente**: Halloween, Weihnachten, Silvester, Valentinstag – Effekte und passende Reihe
-- **Ambilight**: die Farben des Bildes leuchten in den schwarzen Balken neben/über dem Video
-- **Mini-Player** (`P` im Player): kleines Fenster unten rechts, immer im Vordergrund
-- **Film-Quiz** (❓ oben): Welcher Film ist das? Unscharfes Bild wird immer deutlicher, mit Rekord
-- **Klänge** bei „Überrasch mich“ und im Quiz – selbst erzeugt (`dart run tool/generate_sounds.dart`),
-  zusammen ca. 125 KB, in den Einstellungen abschaltbar
-- **Jahresrückblick** (Profilmenü): Stunden, Lieblingsgenre, Serie des Jahres … als Karten, als Bild speicherbar
-
-Bilder werden genauso ausgewählt wie in der offiziellen Jellyfin-Weboberfläche
-(`poster`/`folder`/`cover` → Primary, `backdrop`/`fanart` → Backdrop, `landscape`/`thumb` → Thumb,
-`logo`/`clearlogo` → Logo – inkl. Rückfall auf Staffel- bzw. Serienbilder), siehe `lib/core/images.dart`.
-
-## Tastenkürzel
-
-| Wo | Taste | Aktion |
-|---|---|---|
-| Überall | `Strg+F` | Suche |
-| Überall | `Alt+←` / Maus-Zurück | Zurück |
-| Überall | `F11` | Vollbild an/aus (`Esc` beendet) |
-| Überall | `?` | Übersicht aller Tastenkürzel |
-| Überall | `Strg+,` | Einstellungen |
-| Karten | Rechtsklick | Abspielen, Bereits angeschaut, Vergessen, Favorit … |
-| Player | Untertitel-Symbol | Panel „Audio & Untertitel“ |
-| Player | `Leertaste` / `K` | Abspielen / Pause |
-| Player | `←` / `→` (`J` / `L`) | 10 s zurück / vor |
-| Player | `↑` / `↓` | Lautstärke |
-| Player | `F` / `F11` / Doppelklick | Vollbild |
-| Player | `M` | Stumm |
-| Player | `P` | Mini-Player an/aus |
-| Player | `C` | Kapitel (mit Bildern) |
-| Player | `I` | Wiedergabe-Infos (Codec, Bitrate, Puffer …) |
-| Player | `S` | Bildschirmfoto nach Bilder\Jellyflex |
-| Bibliothek | `Esc` | Mehrfachauswahl beenden |
-| Player | `Esc` | Mini-Player bzw. Vollbild verlassen, sonst Player schließen |
-| Quiz | `1`–`4`, `Enter` | Antworten, weiter |
-| Jahresrückblick | `←` / `→` | Karte zurück / weiter |
-
-**Ohne Maus:** Pfeiltasten bewegen die Auswahl (wie bei TV-Apps), Enter öffnet,
-Menütaste bzw. Umschalt+F10 öffnet das Kontextmenü.
-
-### Controller (Xbox, PlayStation …)
-
-| Taste | Außerhalb des Players | Im Player |
-|---|---|---|
-| Steuerkreuz / linker Stick | Auswahl bewegen | ←/→ spulen (10 s) |
-| A | Auswählen | Abspielen / Pause |
-| B | Zurück | Player schließen |
-| X | Kontextmenü | Panel „Audio & Untertitel“ |
-| Y | Suche | – |
-| Start | – | Abspielen / Pause |
-
-## Projektaufbau
+### Project structure
 
 ```
 lib/
-  core/        Server-Anbindung, Datenmodelle, Bildauswahl, Anmeldung, Speicher
-  features/    Seiten: login, home, details, library, search, player
-  widgets/     Bausteine: Karten, Reihen, Buttons, Titelleiste, Bilder, Scrollen
-tool/          Demo-Server
-test/          Tests (flutter test)
+  core/        Server connection, data models, downloads, settings, storage
+  features/    Screens: login, home, details, library, search, player, downloads, settings …
+  widgets/     Building blocks: cards, rows, buttons, title bar, images, scrolling
+  l10n/        All UI texts (English/German in strings.dart, others in strings_fr/es/tr.dart)
+windows/       Windows runner (native taskbar, media overlay, network checks)
+tool/          Demo server, installer build, update signing
+test/          Fast tests · integration_test/  App tests in a real window
 ```
+
+Images are chosen the same way as in the official Jellyfin web UI (`lib/core/images.dart`).
