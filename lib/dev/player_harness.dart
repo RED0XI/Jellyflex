@@ -14,7 +14,9 @@ import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../core/downloads.dart';
 import '../core/jellyfin_api.dart';
+import '../core/series_tracks.dart';
 import '../core/models.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
@@ -69,6 +71,7 @@ class _FakeApi extends JellyfinApi {
     'Name': 'Testfolge',
     'Type': 'Episode',
     'SeriesName': 'Test-Serie',
+    'SeriesId': 'testseries',
     'IndexNumber': 1,
     'ParentIndexNumber': 1,
     'MediaSources': [_source],
@@ -126,8 +129,24 @@ Future<void> prepareHarness({void Function(Player player)? onPlayer}) async {
   PlayerScreen.debugBeforeOpen = (player) async => onPlayer?.call(player);
 }
 
+/// Anmeldung nur im Speicher (der Test-Player liest nie die echten Konten).
+class _HarnessSession extends SessionController {
+  @override
+  Future<AuthSession?> build() async => const AuthSession(
+    serverUrl: 'http://127.0.0.1:9',
+    serverName: 'Test',
+    userId: 'harness',
+    userName: 'Test',
+    token: 't',
+    deviceId: 'harness',
+  );
+}
+
 /// [settings]: feste App-Einstellungen für den Test (werden in eine Temp-Datei geschrieben).
+/// Auch Downloads und die je Serie gemerkten Sprachen liegen in einem Temp-Ordner.
 Widget buildHarnessApp({AppSettings? settings}) {
+  final temp = Directory.systemTemp.createTempSync('jellyflex_harness_');
+  SeriesTracks.instance = SeriesTracks.forFile(File('${temp.path}\\series_tracks.json'));
   final router = GoRouter(
     routes: [
       GoRoute(
@@ -148,6 +167,8 @@ Widget buildHarnessApp({AppSettings? settings}) {
   return ProviderScope(
     overrides: [
       apiProvider.overrideWithValue(_FakeApi()),
+      sessionProvider.overrideWith(_HarnessSession.new),
+      downloadsProvider.overrideWith(() => DownloadManager(Directory('${temp.path}\\downloads'), () async => false)),
       // Immer eigene Einstellungen (nie die echte Datei); Tests prüfen deutsche Texte.
       settingsProvider.overrideWith(() {
         final file = File(

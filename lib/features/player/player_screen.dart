@@ -19,6 +19,7 @@ import '../../core/live_connection.dart';
 import '../../core/media_session.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
+import '../../core/series_tracks.dart';
 import '../../core/settings.dart';
 import '../../core/sleep_timer.dart';
 import '../../theme.dart';
@@ -101,6 +102,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// Gewählte Spuren als Jellyfin-Streamindex (-1 = Untertitel aus).
   int? _audioIndex;
   int? _subtitleIndex;
+
+  /// Für diese Serie gemerkte Sprachen (nur bei Folgen) und das Konto dazu.
+  ({String? audio, String? subtitle})? _remembered;
+  String? _trackAccount;
 
   List<Chapter> _chapters = const [];
   double _audioDelay = 0;
@@ -454,6 +459,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       }
       if (!mounted) return;
       final settings = ref.read(settingsProvider);
+      // Für diese Serie zuletzt gewählte Sprachen (gehen den Einstellungen vor).
+      final account = ref.read(sessionProvider).value?.accountKey;
+      if (item.isEpisode && item.seriesId != null && account != null) {
+        _trackAccount = account;
+        _remembered = SeriesTracks.instance.get(account, item.seriesId!);
+      }
       var maxBitrate = settings.maxBitrate;
       // Ist die Datei ohnehin kleiner als die Grenze, lohnt Umrechnen nicht.
       if (maxBitrate != null && (source.bitrate ?? 0) > 0 && source.bitrate! <= maxBitrate) maxBitrate = null;
@@ -673,32 +684,66 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
   }
 
-  /// Tonspur nach App-Einstellung (bevorzugte Sprache), sonst wie in Jellyfin.
+  /// Tonspur: für diese Serie zuletzt gewählt, sonst nach App-Einstellung
+  /// (bevorzugte Sprache), sonst wie in Jellyfin.
   int? _preferredAudioIndex(MediaSource source) {
-    final pref = ref.read(settingsProvider).audioLanguage;
-    if (pref != null) {
+    for (final pref in [_remembered?.audio, ref.read(settingsProvider).audioLanguage]) {
+      if (pref == null) continue;
       final match = source.embeddedStreams('Audio').where((s) => sameLanguage(s.language, pref)).firstOrNull;
       if (match != null) return match.index;
     }
     return source.defaultAudioStreamIndex;
   }
 
-  /// Untertitel nach App-Einstellung, sonst wie in Jellyfin (-1 = aus).
+  /// Untertitel: für diese Serie zuletzt gewählt, sonst nach App-Einstellung,
+  /// sonst wie in Jellyfin (-1 = aus).
   int? _preferredSubtitleIndex(MediaSource source) {
+    final remembered = _remembered?.subtitle;
+    if (remembered != null) {
+      if (remembered == subtitlesOff) return -1;
+      final index = _subtitleIndexFor(source, remembered);
+      if (index != null) return index;
+    }
     final pref = ref.read(settingsProvider).subtitleLanguage;
     if (pref == subtitlesOff) return -1;
     if (pref != null) {
-      // Vollständige Untertitel vor erzwungenen, eingebettete vor Dateien.
-      final candidates =
-          source.mediaStreams.where((s) => s.type == 'Subtitle' && sameLanguage(s.language, pref)).toList()
-            ..sort((a, b) {
-              final forced = (a.isForced ? 1 : 0) - (b.isForced ? 1 : 0);
-              if (forced != 0) return forced;
-              return (a.isExternal ? 1 : 0) - (b.isExternal ? 1 : 0);
-            });
-      if (candidates.isNotEmpty) return candidates.first.index;
+      final index = _subtitleIndexFor(source, pref);
+      if (index != null) return index;
     }
     return source.defaultSubtitleStreamIndex;
+  }
+
+  /// Beste Untertitelspur einer Sprache (oder `null`).
+  int? _subtitleIndexFor(MediaSource source, String pref) {
+    // Vollständige Untertitel vor erzwungenen, eingebettete vor Dateien.
+    final candidates = source.mediaStreams.where((s) => s.type == 'Subtitle' && sameLanguage(s.language, pref)).toList()
+      ..sort((a, b) {
+        final forced = (a.isForced ? 1 : 0) - (b.isForced ? 1 : 0);
+        if (forced != 0) return forced;
+        return (a.isExternal ? 1 : 0) - (b.isExternal ? 1 : 0);
+      });
+    return candidates.firstOrNull?.index;
+  }
+
+  /// Gewählte Spur für diese Serie merken (nächste Folge startet genauso).
+  void _rememberAudio(int? index) {
+    final account = _trackAccount;
+    final seriesId = _item?.seriesId;
+    if (account == null || seriesId == null || index == null) return;
+    final language = _source?.mediaStreams.where((s) => s.type == 'Audio' && s.index == index).firstOrNull?.language;
+    if (language != null && language.isNotEmpty) SeriesTracks.instance.setAudio(account, seriesId, language);
+  }
+
+  void _rememberSubtitle(int? index) {
+    final account = _trackAccount;
+    final seriesId = _item?.seriesId;
+    if (account == null || seriesId == null || index == null) return;
+    if (index < 0) {
+      SeriesTracks.instance.setSubtitle(account, seriesId, subtitlesOff);
+      return;
+    }
+    final language = _source?.mediaStreams.where((s) => s.type == 'Subtitle' && s.index == index).firstOrNull?.language;
+    if (language != null && language.isNotEmpty) SeriesTracks.instance.setSubtitle(account, seriesId, language);
   }
 
   /// Bei Direct Play: die gewählten Spuren ([_audioIndex], [_subtitleIndex])
@@ -1521,6 +1566,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _selectAudio(String id) {
     if (id.startsWith('jf:')) {
       final index = int.parse(id.substring(3));
+      _rememberAudio(index);
       if (index != _audioIndex) _switchStream(() => _audioIndex = index);
       return;
     }
@@ -1528,29 +1574,34 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (t == null) return;
     _player.setAudioTrack(t);
     _audioIndex = _jellyfinStreamFor('Audio', id)?.index ?? _audioIndex;
+    _rememberAudio(_audioIndex);
   }
 
   void _selectSubtitle(String id) {
     if (_transcoding) {
       final index = id == 'no' ? -1 : int.parse(id.substring(3));
+      _rememberSubtitle(index);
       if (index != _subtitleIndex) _switchStream(() => _subtitleIndex = index);
       return;
     }
     if (id == 'no') {
       _player.setSubtitleTrack(SubtitleTrack.no());
       _subtitleIndex = -1;
+      _rememberSubtitle(-1);
       return;
     }
     final ext = _externalSubtitles.where((s) => _subtitleUri(s) == id).firstOrNull;
     if (ext != null) {
       _player.setSubtitleTrack(_externalTrack(ext));
       _subtitleIndex = ext.index;
+      _rememberSubtitle(ext.index);
       return;
     }
     final t = _player.state.tracks.subtitle.where((t) => t.id == id).firstOrNull;
     if (t == null) return;
     _player.setSubtitleTrack(t);
     _subtitleIndex = _jellyfinStreamFor('Subtitle', id)?.index ?? _subtitleIndex;
+    _rememberSubtitle(_subtitleIndex);
   }
 
   void _setTrackPanel(bool open) {

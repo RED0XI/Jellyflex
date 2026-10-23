@@ -145,6 +145,49 @@ void main() {
     expect(p.state.position.inSeconds, greaterThanOrEqualTo(24));
   });
 
+  testWidgets('Player: Sprachen je Serie gemerkt', (tester) async {
+    await windowManager.ensureInitialized();
+    Player? player;
+    await prepareHarness(onPlayer: (p) => player = p);
+    await tester.pumpWidget(buildHarnessApp());
+    await tester.pump();
+
+    Future<Player> open() async {
+      player = null;
+      await tester.tap(find.text('Test-Player öffnen'));
+      for (var i = 0; i < 100; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+        final p = player;
+        if (p != null && p.state.tracks.audio.length >= 4 && p.state.duration > Duration.zero) break;
+      }
+      await pumpFor(tester, const Duration(seconds: 1));
+      return player!;
+    }
+
+    var p = await open();
+    expect(p.state.track.audio.id, '1', reason: 'Ohne Vorgabe: Standardspur (Deutsch)');
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: const Offset(400, 300));
+    await mouse.moveTo(const Offset(420, 320));
+    await pumpFor(tester, const Duration(milliseconds: 400));
+    await tester.tap(find.byIcon(Icons.subtitles_rounded));
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    await tester.tap(find.text('Englisch - AAC - Stereo'));
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    await tester.tap(find.text('Englisch - SRT'));
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape); // Panel schließen
+    await pumpFor(tester, const Duration(milliseconds: 300));
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape); // Player schließen
+    await pumpFor(tester, const Duration(seconds: 2));
+    expect(find.text('Test-Player öffnen'), findsOneWidget);
+
+    // Nächste Folge derselben Serie: startet mit Englisch.
+    p = await open();
+    expect(p.state.track.audio.id, '2', reason: 'Gemerkte Tonspur');
+    expect(p.state.track.subtitle.id, '2', reason: 'Gemerkte Untertitel');
+  });
+
   testWidgets('Player: Geschwindigkeit, Versatz, Kapitel, Qualität', (tester) async {
     await windowManager.ensureInitialized();
     Player? player;
