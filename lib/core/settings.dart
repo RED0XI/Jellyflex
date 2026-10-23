@@ -44,6 +44,9 @@ bool sameLanguage(String? a, String? b) {
   return na != 'Unbekannt' && na == languageName(b);
 }
 
+/// Ambilight: aus, nur im Fenster oder auch im Vollbild.
+enum AmbilightMode { off, window, always }
+
 class AppSettings {
   const AppSettings({
     this.audioLanguage,
@@ -59,7 +62,11 @@ class AppSettings {
     this.logoPath,
     this.screensaverMinutes = 5,
     this.seasonalThemes = true,
+    this.ambilight = AmbilightMode.window,
   });
+
+  /// Farbiges Leuchten aus dem Bild in den schwarzen Balken neben/über dem Video.
+  final AmbilightMode ambilight;
 
   /// Halloween, Weihnachten … mit passender Reihe und kleinen Effekten.
   final bool seasonalThemes;
@@ -114,6 +121,7 @@ class AppSettings {
     String? Function()? logoPath,
     int? screensaverMinutes,
     bool? seasonalThemes,
+    AmbilightMode? ambilight,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -128,6 +136,7 @@ class AppSettings {
     logoPath: logoPath != null ? logoPath() : this.logoPath,
     screensaverMinutes: screensaverMinutes ?? this.screensaverMinutes,
     seasonalThemes: seasonalThemes ?? this.seasonalThemes,
+    ambilight: ambilight ?? this.ambilight,
   );
 
   Map<String, dynamic> toJson() => {
@@ -144,6 +153,7 @@ class AppSettings {
     'logoPath': logoPath,
     'screensaverMinutes': screensaverMinutes,
     'seasonalThemes': seasonalThemes,
+    'ambilight': ambilight.name,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -160,6 +170,7 @@ class AppSettings {
     logoPath: json['logoPath'] as String?,
     screensaverMinutes: (json['screensaverMinutes'] as num?)?.toInt() ?? 5,
     seasonalThemes: json['seasonalThemes'] as bool? ?? true,
+    ambilight: AmbilightMode.values.asNameMap()[json['ambilight']] ?? AmbilightMode.window,
   );
 }
 

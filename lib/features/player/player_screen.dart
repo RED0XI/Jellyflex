@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -894,8 +895,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           onHover: (_) => _showControls(autoHide: _player.state.playing),
           child: Stack(
             children: [
+              // Ambilight: unscharfe, vergrößerte Kopie des Bildes hinter dem Video – leuchtet in
+              // den Balken. Platz bleibt immer bestehen (sonst verlieren Elemente den Fokus).
               Positioned.fill(
-                child: Video(controller: _video, controls: NoVideoControls, fill: Colors.black),
+                child: switch (settings.ambilight) {
+                  AmbilightMode.always => _Ambilight(controller: _video),
+                  AmbilightMode.window when !_fullscreen => _Ambilight(controller: _video),
+                  _ => const SizedBox.shrink(),
+                },
+              ),
+              Positioned.fill(
+                child: Video(controller: _video, controls: NoVideoControls, fill: Colors.transparent),
               ),
               Positioned.fill(
                 child: GestureDetector(
@@ -1424,6 +1434,49 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 }
 
 // --- Bausteine ---------------------------------------------------------------
+
+/// Leuchten aus den Farben des Bildes: dieselbe Videotextur, stark weichgezeichnet
+/// und etwas vergrößert, gedämpft hinter dem eigentlichen Video.
+class _Ambilight extends StatelessWidget {
+  const _Ambilight({required this.controller});
+
+  final VideoController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: ValueListenableBuilder<int?>(
+        valueListenable: controller.id,
+        builder: (context, id, _) {
+          if (id == null) return const SizedBox.shrink();
+          return RepaintBoundary(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Opacity(
+                  opacity: 0.6,
+                  child: ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60, tileMode: TileMode.mirror),
+                    child: Transform.scale(
+                      scale: 1.15,
+                      child: Texture(textureId: id, filterQuality: FilterQuality.low),
+                    ),
+                  ),
+                ),
+                // Ränder etwas abdunkeln, damit es nicht blendet.
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(radius: 0.95, colors: [Color(0x00000000), Color(0x99000000)]),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
 
 /// "Gute Nacht": erscheint, wenn der Schlaf-Timer die Wiedergabe angehalten hat.
 class _SleepOverlay extends StatefulWidget {

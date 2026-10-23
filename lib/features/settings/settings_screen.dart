@@ -138,6 +138,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ),
                             _Row(
+                              title: 'Ambilight-Leuchten',
+                              subtitle:
+                                  'Die Farben des Bildes leuchten sanft in den schwarzen Balken neben bzw. '
+                                  'über dem Video.',
+                              trailing: _Choice<AmbilightMode>(
+                                value: s.ambilight,
+                                label: switch (s.ambilight) {
+                                  AmbilightMode.off => 'Aus',
+                                  AmbilightMode.window => 'Nur im Fenster',
+                                  AmbilightMode.always => 'Immer',
+                                },
+                                options: const [
+                                  (AmbilightMode.off, 'Aus'),
+                                  (AmbilightMode.window, 'Nur im Fenster'),
+                                  (AmbilightMode.always, 'Immer (auch Vollbild)'),
+                                ],
+                                onChanged: (v) => ctrl.update((s) => s.copyWith(ambilight: v)),
+                              ),
+                            ),
+                            _Row(
                               title: 'Intro & Rückblick automatisch überspringen',
                               subtitle: 'Aus: Es erscheint nur der Knopf „Intro überspringen“.',
                               trailing: _Toggle(
