@@ -41,6 +41,14 @@ class S {
   String get resume => _t('Resume', 'Fortsetzen');
   String get pause => _t('Pause', 'Pause');
   String get off => _t('Off', 'Aus');
+  String get storage => _t('Storage', 'Speicher');
+  String get imageCache => _t('Image cache', 'Bild-Zwischenspeicher');
+  String imageCacheHint(String used) => _t(
+    'Posters and backgrounds are kept on disk so they appear instantly. In use: $used',
+    'Poster und Hintergründe bleiben auf der Festplatte und erscheinen sofort. Belegt: $used',
+  );
+  String get clearCache => _t('Clear', 'Leeren');
+  String get cacheCleared => _t('Image cache cleared', 'Bild-Zwischenspeicher geleert');
   String get unknown => _t('Unknown', 'Unbekannt');
   String get library => _t('Library', 'Bibliothek');
   String get serverUnreachable =>

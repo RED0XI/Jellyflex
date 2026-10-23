@@ -20,6 +20,7 @@ import 'hero_banner.dart';
 import 'home_providers.dart';
 import '../../widgets/focusable.dart';
 import '../../l10n/strings.dart';
+import '../../core/image_cache.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -367,8 +368,8 @@ class _TopNav extends ConsumerWidget {
                     ),
                     // Profilbild aus Jellyfin, sobald geladen (sonst bleibt der Buchstabe).
                     if (ref.watch(userImageProvider).value case final url?)
-                      Image.network(
-                        url,
+                      Image(
+                        image: CachedNetworkImage(url),
                         fit: BoxFit.cover,
                         filterQuality: FilterQuality.medium,
                         errorBuilder: (_, _, _) => const SizedBox.shrink(),

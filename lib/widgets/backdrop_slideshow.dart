@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/images.dart';
 import '../core/session.dart';
 import 'jf_image.dart';
+import '../core/image_cache.dart';
 
 /// Zeigt die Hintergrundbilder eines Eintrags. Gibt es mehrere
 /// (backdrop, backdrop1, extrafanart/ …), wird langsam durchgeblendet.
@@ -62,7 +63,7 @@ class _BackdropSlideshowState extends ConsumerState<BackdropSlideshow> {
     // Das nächste Bild schon vorladen, damit die Überblendung nicht ruckelt.
     if (widget.images.length > 1) {
       final next = widget.images[(_index + 1) % widget.images.length];
-      precacheImage(NetworkImage(api.imageUrl(next, maxWidth: width)), context).ignore();
+      precacheImage(CachedNetworkImage(api.imageUrl(next, maxWidth: width)), context).ignore();
     }
 
     return AnimatedSwitcher(

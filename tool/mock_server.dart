@@ -13,6 +13,7 @@
 //   POST /debug/offline?on=1          Server "nicht erreichbar" spielen (503)
 //   GET  /debug/userdata/{id}         Benutzerdaten eines Titels ansehen
 //   GET  /debug/laststream            zuletzt angefragter Video-Stream (Fassung)
+//   GET  /debug/images?delay=150&reset=1   Bilder verzögern (langsames Netz) / Zähler
 
 import 'dart:async';
 import 'dart:convert';
@@ -27,6 +28,10 @@ final _sockets = <WebSocket>{};
 
 /// Bytes pro Sekunde beim Ausliefern von Videos (0 = so schnell wie möglich).
 var _throttleBps = 0;
+
+/// Verzögerung je Bild (simuliert ein langsames Netz) und Anzahl ausgelieferter Bilder.
+var _imageDelayMs = 0;
+var _imageRequests = 0;
 
 /// Simuliert einen nicht erreichbaren Server.
 var _offline = false;
@@ -724,6 +729,15 @@ Future<void> main() async {
         await res.close();
         continue;
       }
+      if (req.uri.path == '/debug/images') {
+        final q = req.uri.queryParameters;
+        if (q['delay'] != null) _imageDelayMs = int.tryParse(q['delay']!) ?? 0;
+        if (q['reset'] == '1') _imageRequests = 0;
+        res.headers.contentType = ContentType.json;
+        res.write(jsonEncode({'delay': _imageDelayMs, 'requests': _imageRequests}));
+        await res.close();
+        continue;
+      }
       if (req.uri.path == '/debug/laststream') {
         res.headers.contentType = ContentType.json;
         res.write(jsonEncode(_lastStream));
@@ -796,6 +810,18 @@ Future<void> main() async {
         h = math.max(8, (h * scale).round());
         final key = '${seg.join('/')}-$w-$h';
         final bytes = _imageCache.putIfAbsent(key, () => _png(w, h, key.hashCode, logo: isLogo));
+        _imageRequests++;
+        if (_imageDelayMs > 0) {
+          // Nicht den ganzen Server blockieren: verzögert parallel ausliefern.
+          unawaited(
+            Future<void>.delayed(Duration(milliseconds: _imageDelayMs), () async {
+              res.headers.contentType = ContentType('image', 'png');
+              res.add(bytes);
+              await res.close();
+            }),
+          );
+          continue;
+        }
         res.headers.contentType = ContentType('image', 'png');
         res.add(bytes);
       } else {

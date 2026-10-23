@@ -15,6 +15,7 @@ import '../../core/session.dart';
 import '../../core/settings.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/jf_image.dart';
+import '../../core/image_cache.dart';
 
 /// Startet den Bildschirmschoner sofort (z. B. Vorschau in den Einstellungen).
 final screensaverPreview = ValueNotifier<int>(0);
@@ -260,7 +261,7 @@ class _ScreensaverViewState extends ConsumerState<_ScreensaverView> with TickerP
     if (_items.length < 2) return;
     final next = _items[(_index + 1) % _items.length];
     final url = ref.read(apiProvider).imageUrlOrNull(Images.backdrop(next), maxWidth: screenImageWidth(context));
-    if (url != null) precacheImage(NetworkImage(url), context).ignore();
+    if (url != null) precacheImage(CachedNetworkImage(url), context).ignore();
   }
 
   @override
@@ -428,8 +429,8 @@ class _TitleBlock extends ConsumerWidget {
         if (logo != null)
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420, maxHeight: 120),
-            child: Image.network(
-              logo,
+            child: Image(
+              image: CachedNetworkImage(logo),
               fit: BoxFit.contain,
               alignment: Alignment.bottomLeft,
               errorBuilder: (_, _, _) => title,

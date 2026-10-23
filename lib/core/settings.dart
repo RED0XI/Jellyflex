@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/strings.dart';
 import 'format.dart';
+import 'image_cache.dart';
 import '../theme.dart';
 import 'themes.dart';
 import 'ui_sounds.dart';
@@ -53,6 +54,7 @@ class AppSettings {
     this.appName,
     this.logoPath,
     this.screensaverMinutes = 5,
+    this.imageCacheMb = 300,
     this.seasonalThemes = true,
     this.ambilight = AmbilightMode.window,
     this.quizHighscore = 0,
@@ -81,6 +83,9 @@ class AppSettings {
 
   /// Bildschirmschoner nach so vielen Minuten ohne Eingabe; 0 = aus.
   final int screensaverMinutes;
+
+  /// Obergrenze des Bild-Zwischenspeichers auf der Festplatte (MB, 0 = aus).
+  final int imageCacheMb;
 
   /// Eigener App-Name (Titelleiste, Fenstertitel, Anmeldung …); `null` = "Jellyflex".
   final String? appName;
@@ -128,6 +133,7 @@ class AppSettings {
     String? Function()? appName,
     String? Function()? logoPath,
     int? screensaverMinutes,
+    int? imageCacheMb,
     bool? seasonalThemes,
     AmbilightMode? ambilight,
     int? quizHighscore,
@@ -147,6 +153,7 @@ class AppSettings {
     appName: appName != null ? appName() : this.appName,
     logoPath: logoPath != null ? logoPath() : this.logoPath,
     screensaverMinutes: screensaverMinutes ?? this.screensaverMinutes,
+    imageCacheMb: imageCacheMb ?? this.imageCacheMb,
     seasonalThemes: seasonalThemes ?? this.seasonalThemes,
     ambilight: ambilight ?? this.ambilight,
     quizHighscore: quizHighscore ?? this.quizHighscore,
@@ -168,6 +175,7 @@ class AppSettings {
     'appName': appName,
     'logoPath': logoPath,
     'screensaverMinutes': screensaverMinutes,
+    'imageCacheMb': imageCacheMb,
     'seasonalThemes': seasonalThemes,
     'ambilight': ambilight.name,
     'quizHighscore': quizHighscore,
@@ -189,6 +197,7 @@ class AppSettings {
     appName: json['appName'] as String?,
     logoPath: json['logoPath'] as String?,
     screensaverMinutes: (json['screensaverMinutes'] as num?)?.toInt() ?? 5,
+    imageCacheMb: ((json['imageCacheMb'] as num?)?.toInt() ?? 300).clamp(0, 5000),
     seasonalThemes: json['seasonalThemes'] as bool? ?? true,
     ambilight: AmbilightMode.values.asNameMap()[json['ambilight']] ?? AmbilightMode.window,
     quizHighscore: (json['quizHighscore'] as num?)?.toInt() ?? 0,
@@ -211,25 +220,33 @@ class SettingsController extends Notifier<AppSettings> {
 
   @override
   AppSettings build() {
+    // Tests mit eigener Einstellungsdatei bekommen auch einen eigenen Bild-Zwischenspeicher.
+    if (_fileOverride case final file?) ImageDiskCache.instance.directory = Directory('${file.parent.path}\\images');
     try {
       if (_file.existsSync()) {
         final loaded = AppSettings.fromJson(jsonDecode(_file.readAsStringSync()) as Map<String, dynamic>);
-        appLanguage = loaded.language;
-        appPalette = paletteById(loaded.themeId);
-        UiSounds.enabled = loaded.soundEffects;
+        _apply(loaded);
         return loaded;
       }
     } catch (_) {
       // Kaputte Datei → Standardwerte.
     }
+    _apply(const AppSettings());
     return const AppSettings();
+  }
+
+  /// Einstellungen, die außerhalb von Widgets gelten (globale Werte).
+  void _apply(AppSettings s) {
+    appLanguage = s.language;
+    appPalette = paletteById(s.themeId);
+    UiSounds.enabled = s.soundEffects;
+    ImageDiskCache.instance.maxBytes = s.imageCacheMb * 1024 * 1024;
   }
 
   void update(AppSettings Function(AppSettings s) change) {
     final next = change(state);
-    appLanguage = next.language;
-    appPalette = paletteById(next.themeId);
-    UiSounds.enabled = next.soundEffects;
+    _apply(next);
+    if (next.imageCacheMb < state.imageCacheMb) ImageDiskCache.instance.trim();
     state = next;
     try {
       _file.parent.createSync(recursive: true);

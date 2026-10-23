@@ -16,6 +16,8 @@ import '../home/home_providers.dart';
 import '../../l10n/strings.dart';
 import '../../core/format.dart';
 import '../../widgets/theme_picker.dart';
+import '../../core/image_cache.dart';
+import '../../core/downloads.dart' show formatBytes;
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -367,6 +369,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
 
                         _Section(
+                          title: tr.storage,
+                          icon: Icons.storage_rounded,
+                          children: [
+                            _ImageCacheRow(
+                              limitMb: s.imageCacheMb,
+                              onLimit: (mb) => ctrl.update((s) => s.copyWith(imageCacheMb: mb)),
+                            ),
+                          ],
+                        ),
+
+                        _Section(
                           title: tr.account,
                           icon: Icons.person_outline_rounded,
                           children: [
@@ -384,7 +397,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       gradient: AppColors.accentGradient,
                                     ),
                                     child: userImage != null
-                                        ? Image.network(userImage, fit: BoxFit.cover, width: 56, height: 56)
+                                        ? Image(
+                                            image: CachedNetworkImage(userImage),
+                                            fit: BoxFit.cover,
+                                            width: 56,
+                                            height: 56,
+                                          )
                                         : Text(
                                             (session?.userName.isNotEmpty ?? false)
                                                 ? session!.userName[0].toUpperCase()
@@ -534,6 +552,69 @@ class _Toggle extends StatelessWidget {
       onChanged: onChanged,
       activeThumbColor: Colors.white,
       activeTrackColor: AppColors.accent,
+    );
+  }
+}
+
+/// Bild-Zwischenspeicher: Obergrenze wählen, belegten Platz sehen, leeren.
+class _ImageCacheRow extends StatefulWidget {
+  const _ImageCacheRow({required this.limitMb, required this.onLimit});
+
+  final int limitMb;
+  final ValueChanged<int> onLimit;
+
+  @override
+  State<_ImageCacheRow> createState() => _ImageCacheRowState();
+}
+
+class _ImageCacheRowState extends State<_ImageCacheRow> {
+  late Future<int> _used = ImageDiskCache.instance.sizeBytes();
+
+  @override
+  void didUpdateWidget(_ImageCacheRow old) {
+    super.didUpdateWidget(old);
+    // Nach dem Verkleinern der Grenze räumt der Speicher auf – kurz danach neu zählen.
+    if (old.limitMb != widget.limitMb) {
+      _used = Future<void>.delayed(const Duration(milliseconds: 500)).then((_) => ImageDiskCache.instance.sizeBytes());
+    }
+  }
+
+  Future<void> _clear() async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    await ImageDiskCache.instance.clear();
+    if (!mounted) return;
+    setState(() => _used = ImageDiskCache.instance.sizeBytes());
+    messenger?.showSnackBar(SnackBar(content: Text(tr.cacheCleared), behavior: SnackBarBehavior.floating, width: 420));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<int>(
+      future: _used,
+      builder: (context, snapshot) => _Row(
+        title: tr.imageCache,
+        subtitle: tr.imageCacheHint(snapshot.hasData ? formatBytes(snapshot.data!) : '…'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton.icon(
+              onPressed: _clear,
+              icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+              label: Text(tr.clearCache),
+            ),
+            const SizedBox(width: 6),
+            _Choice<int>(
+              value: widget.limitMb,
+              label: widget.limitMb == 0 ? tr.off : formatBytes(widget.limitMb * 1024 * 1024),
+              options: [
+                (0, tr.off),
+                for (final mb in const [100, 300, 1000, 3000]) (mb, formatBytes(mb * 1024 * 1024)),
+              ],
+              onChanged: widget.onLimit,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

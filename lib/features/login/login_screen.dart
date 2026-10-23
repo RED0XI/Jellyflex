@@ -12,6 +12,7 @@ import '../../widgets/brand_logo.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/focusable.dart';
 import '../../l10n/strings.dart';
+import '../../core/image_cache.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -552,8 +553,8 @@ class _ProfileTileState extends State<_ProfileTile> {
                           ),
                         ),
                         if (widget.imageUrl != null)
-                          Image.network(
-                            widget.imageUrl!,
+                          Image(
+                            image: CachedNetworkImage(widget.imageUrl!),
                             fit: BoxFit.cover,
                             errorBuilder: (_, _, _) => const SizedBox.shrink(),
                           ),

@@ -15,6 +15,7 @@ import '../../widgets/focusable.dart';
 import '../../widgets/jf_image.dart';
 import '../../l10n/strings.dart';
 import '../../core/ui_sounds.dart';
+import '../../core/image_cache.dart';
 
 /// Eine Quizrunde: richtiger Titel, vier Antworten (in zufälliger Reihenfolge),
 /// Bildausschnitt, an dem gezoomt wird.
@@ -127,7 +128,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> with TickerProviderStat
     for (final i in [index, index + 1]) {
       if (i >= _rounds.length) continue;
       final url = ref.read(apiProvider).imageUrlOrNull(Images.backdrop(_rounds[i].answer), maxWidth: 1280);
-      if (url != null) precacheImage(NetworkImage(url), context).ignore();
+      if (url != null) precacheImage(CachedNetworkImage(url), context).ignore();
     }
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blurhash/flutter_blurhash.dart';
 
 import '../theme.dart';
+import '../core/image_cache.dart';
 
 /// Breite für bildschirmfüllende Bilder in festen Stufen (für den Server-Cache).
 int screenImageWidth(BuildContext context) {
@@ -48,8 +49,8 @@ class JfImage extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         placeholder,
-        Image.network(
-          url!,
+        Image(
+          image: CachedNetworkImage(url!),
           fit: fit,
           alignment: alignment,
           gaplessPlayback: true,

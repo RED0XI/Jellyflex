@@ -19,6 +19,7 @@ import '../../widgets/media_cards.dart';
 import 'home_providers.dart';
 import '../../l10n/strings.dart';
 import '../../core/system_certs.dart';
+import '../../core/image_cache.dart';
 
 /// Großes Banner oben auf der Startseite. Wechselt alle paar Sekunden
 /// mit Überblendung und langsamem Zoom ("Ken-Burns-Effekt").
@@ -476,8 +477,8 @@ class TitleLogo extends StatelessWidget {
     if (logoUrl == null) return text;
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight, maxWidth: 460),
-      child: Image.network(
-        logoUrl!,
+      child: Image(
+        image: CachedNetworkImage(logoUrl!),
         fit: BoxFit.contain,
         alignment: Alignment.bottomLeft,
         filterQuality: FilterQuality.medium,
