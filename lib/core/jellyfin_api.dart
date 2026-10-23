@@ -314,6 +314,27 @@ class JellyfinApi {
     'limit': limit,
   });
 
+  /// Personen (Schauspieler, Regie …) nach Namen suchen.
+  Future<List<Person>> searchPeople(String term, {int limit = 20}) async {
+    final items = await _getItems('/Persons', {
+      'userId': userId,
+      'searchTerm': term,
+      'limit': limit,
+      'enableImageTypes': 'Primary',
+      'imageTypeLimit': 1,
+    });
+    return [
+      for (final p in items)
+        Person({
+          'Id': p.id,
+          'Name': p.name,
+          'Type': 'Actor',
+          'PrimaryImageTag': ?p.imageTags['Primary'],
+          'ImageBlurHashes': ?p.raw['ImageBlurHashes'],
+        }),
+    ];
+  }
+
   Future<List<BaseItem>> getFavorites({int limit = 30}) => _getItems('/Items', {
     ..._common,
     'filters': 'IsFavorite',

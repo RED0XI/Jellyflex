@@ -547,6 +547,13 @@ Object? _handle(HttpRequest req) {
   final seg = path.split('/').where((s) => s.isNotEmpty).toList();
 
   if (path == '/System/Ping') return 'Jellyfin Server';
+  if (path == '/Persons') {
+    final term = (q['searchTerm'] ?? '').toLowerCase();
+    return _page([
+      for (final p in byId.values)
+        if (p['Type'] == 'Person' && (p['Name'] as String).toLowerCase().contains(term)) p,
+    ], q);
+  }
   if (path == '/System/Info/Public') {
     return {'ServerName': 'Demo-Server', 'Version': '12.2.0', 'Id': 'mock-server', 'ProductName': 'Jellyfin Server'};
   }

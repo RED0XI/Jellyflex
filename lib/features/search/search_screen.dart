@@ -5,14 +5,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models.dart';
 import '../../core/session.dart';
+import '../../core/settings.dart';
 import '../../theme.dart';
+import '../../widgets/focusable.dart';
 import '../../widgets/media_cards.dart';
 import '../../widgets/media_row.dart';
+import '../../widgets/people_row.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/top_scrim.dart';
 import '../../l10n/strings.dart';
 
-/// Suche mit Live-Ergebnissen, gruppiert nach Filmen, Serien und Folgen.
+/// Was die Suche zeigt.
+enum _Filter { all, movies, shows, episodes, people }
+
+/// Suche mit Live-Ergebnissen: Filme, Serien, Folgen und Personen (z. B. nach
+/// Schauspielern suchen), mit Filtern und den letzten Suchen (nur auf diesem Gerät).
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
@@ -24,15 +31,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
   Timer? _debounce;
+  Timer? _remember;
   String _term = '';
   bool _loading = false;
   List<BaseItem> _results = const [];
+  List<Person> _people = const [];
   Object? _error;
   int _requestId = 0;
+  _Filter _filter = _Filter.all;
+  bool _onlyUnwatched = false;
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _remember?.cancel();
     _controller.dispose();
     _scroll.dispose();
     super.dispose();
@@ -43,20 +55,55 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _debounce = Timer(const Duration(milliseconds: 280), () => _search(value.trim()));
   }
 
+  /// Suchbegriff merken (vorne, ohne Doppelte, höchstens 8).
+  void _rememberTerm(String term) {
+    if (term.length < 2) return;
+    ref.read(settingsProvider.notifier).update((s) {
+      final list = [term, ...s.recentSearches.where((t) => t.toLowerCase() != term.toLowerCase())];
+      return s.copyWith(recentSearches: list.take(8).toList());
+    });
+  }
+
+  void _forget(String term) => ref
+      .read(settingsProvider.notifier)
+      .update((s) => s.copyWith(recentSearches: s.recentSearches.where((t) => t != term).toList()));
+
+  void _useRecent(String term) {
+    _controller.text = term;
+    _controller.selection = TextSelection.collapsed(offset: term.length);
+    _search(term);
+  }
+
   Future<void> _search(String term) async {
     if (term == _term) return;
     final id = ++_requestId;
+    _remember?.cancel();
     setState(() {
       _term = term;
       _error = null;
       _loading = term.isNotEmpty;
-      if (term.isEmpty) _results = const [];
+      if (term.isEmpty) {
+        _results = const [];
+        _people = const [];
+      }
     });
     if (term.isEmpty) return;
+    final api = ref.read(apiProvider);
     try {
-      final results = await ref.read(apiProvider).search(term);
+      final (results, people) = await (
+        api.search(term),
+        // Personen sind ein Zusatz – ohne sie geht die Suche trotzdem.
+        api.searchPeople(term).catchError((_) => const <Person>[]),
+      ).wait;
       if (!mounted || id != _requestId) return;
-      setState(() => _results = results);
+      setState(() {
+        _results = results;
+        _people = people;
+      });
+      // Erst merken, wenn der Begriff eine Weile stehen bleibt (nicht jeden Tippschritt).
+      if (results.isNotEmpty || people.isNotEmpty) {
+        _remember = Timer(const Duration(seconds: 2), () => _rememberTerm(term));
+      }
     } catch (e) {
       if (mounted && id == _requestId) setState(() => _error = e);
     } finally {
@@ -66,11 +113,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final movies = _results.where((i) => i.isMovie).toList();
-    final series = _results.where((i) => i.isSeries).toList();
-    final episodes = _results.where((i) => i.isEpisode).toList();
+    bool show(_Filter f) => _filter == _Filter.all || _filter == f;
+    final visible = _onlyUnwatched ? _results.where((i) => !i.userData.played).toList() : _results;
+    final movies = show(_Filter.movies) ? visible.where((i) => i.isMovie).toList() : const <BaseItem>[];
+    final series = show(_Filter.shows) ? visible.where((i) => i.isSeries).toList() : const <BaseItem>[];
+    final episodes = show(_Filter.episodes) ? visible.where((i) => i.isEpisode).toList() : const <BaseItem>[];
+    final people = show(_Filter.people) ? _people : const <Person>[];
+    final nothing = movies.isEmpty && series.isEmpty && episodes.isEmpty && people.isEmpty;
     final posterHeight = kPosterWidth * 1.5 + kCardTextHeight;
     final landscapeHeight = kLandscapeWidth * 9 / 16 + kCardTextHeight;
+    final recent = ref.watch(settingsProvider.select((s) => s.recentSearches));
 
     return Scaffold(
       body: Stack(
@@ -83,12 +135,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 28, kPageGutter, 28),
+                    padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 28, kPageGutter, 16),
                     child: TextField(
                       controller: _controller,
                       autofocus: true,
                       onChanged: _onChanged,
-                      onSubmitted: (v) => _search(v.trim()),
+                      onSubmitted: (v) {
+                        _search(v.trim());
+                        _rememberTerm(v.trim());
+                      },
                       style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
                       decoration: InputDecoration(
                         hintText: tr.searchHint,
@@ -120,21 +175,52 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     ),
                   ),
                 ),
+                if (_term.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 20),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          for (final (f, label) in [
+                            (_Filter.all, tr.filterAll),
+                            (_Filter.movies, tr.movies),
+                            (_Filter.shows, tr.shows),
+                            (_Filter.episodes, tr.episodes),
+                            (_Filter.people, tr.people),
+                          ])
+                            _Chip(label: label, selected: _filter == f, onTap: () => setState(() => _filter = f)),
+                          const SizedBox(width: 12),
+                          _Chip(
+                            label: tr.onlyUnwatched,
+                            icon: _onlyUnwatched ? Icons.check_rounded : Icons.visibility_off_outlined,
+                            selected: _onlyUnwatched,
+                            onTap: () => setState(() => _onlyUnwatched = !_onlyUnwatched),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 if (_error != null)
                   SliverToBoxAdapter(
                     child: _Hint(icon: Icons.cloud_off_rounded, text: tr.searchFailed(_error!)),
                   )
                 else if (_term.isEmpty)
                   SliverToBoxAdapter(
-                    child: _Hint(icon: Icons.movie_filter_rounded, text: tr.whatDoYouFeelLike),
+                    child: recent.isEmpty
+                        ? _Hint(icon: Icons.movie_filter_rounded, text: tr.whatDoYouFeelLike)
+                        : _RecentSearches(terms: recent, onUse: _useRecent, onRemove: _forget),
                   )
-                else if (!_loading && _results.isEmpty)
+                else if (!_loading && nothing)
                   SliverToBoxAdapter(
                     child: _Hint(icon: Icons.search_off_rounded, text: tr.nothingFoundFor(_term)),
                   )
                 else
                   SliverList.list(
                     children: [
+                      if (people.isNotEmpty) PeopleRow(title: tr.people, people: people),
                       if (movies.isNotEmpty)
                         MediaRow(
                           title: tr.movies,
@@ -168,6 +254,105 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
           TopScrim(scroll: _scroll),
         ],
+      ),
+    );
+  }
+}
+
+/// Letzte Suchen als Chips – Klick sucht erneut, × entfernt; "Verlauf löschen".
+class _RecentSearches extends ConsumerWidget {
+  const _RecentSearches({required this.terms, required this.onUse, required this.onRemove});
+
+  final List<String> terms;
+  final ValueChanged<String> onUse;
+  final ValueChanged<String> onRemove;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.history_rounded, size: 20, color: AppColors.textSecondary),
+              const SizedBox(width: 8),
+              Text(tr.recentSearches, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+              const Spacer(),
+              TextButton(
+                onPressed: () =>
+                    ref.read(settingsProvider.notifier).update((s) => s.copyWith(recentSearches: const [])),
+                child: Text(tr.clearHistory),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final term in terms)
+                _Chip(
+                  label: term,
+                  selected: false,
+                  onTap: () => onUse(term),
+                  trailing: IconButton(
+                    tooltip: tr.removeSearch(term),
+                    visualDensity: VisualDensity.compact,
+                    iconSize: 16,
+                    onPressed: () => onRemove(term),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({required this.label, required this.selected, required this.onTap, this.icon, this.trailing});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focusable(
+      onTap: onTap,
+      semanticLabel: label,
+      builder: (context, hovered) => AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        height: 38,
+        padding: EdgeInsets.only(left: 16, right: trailing == null ? 16 : 4),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.textPrimary : Colors.white.withValues(alpha: hovered ? 0.14 : 0.07),
+          borderRadius: BorderRadius.circular(19),
+          border: Border.all(color: hovered && !selected ? AppColors.accent : Colors.transparent),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: selected ? AppColors.background : AppColors.textSecondary),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: selected ? AppColors.background : AppColors.textPrimary,
+              ),
+            ),
+            ?trailing,
+          ],
+        ),
       ),
     );
   }

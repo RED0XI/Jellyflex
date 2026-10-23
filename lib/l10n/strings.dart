@@ -236,6 +236,12 @@ class S {
   String get goodEvening => _t('Good evening', 'Guten Abend');
   String get coverStory => _t('Cover story', 'Titelgeschichte');
   String get layout => _t('Layout', 'Layout');
+  String get recentSearches => _t('Recent searches', 'Letzte Suchen');
+  String get clearHistory => _t('Clear history', 'Verlauf löschen');
+  String get filterAll => _t('All', 'Alle');
+  String get people => _t('People', 'Personen');
+  String get onlyUnwatched => _t('Only unwatched', 'Nur ungesehene');
+  String removeSearch(String term) => _t('Remove “$term”', '„$term“ entfernen');
   String get recapOnlyYou => _t('Only your profile counts', 'Gezählt wird nur dein Profil');
   String get watched => _t('Watched', 'Gesehen');
   String get chapters => _t('Chapters', 'Kapitel');
@@ -515,7 +521,7 @@ class S {
 
   // --- Suche ---------------------------------------------------------------------------
 
-  String get searchHint => _t('Search movies, shows and episodes …', 'Filme, Serien und Folgen suchen …');
+  String get searchHint => _t('Search titles, episodes or actors …', 'Titel, Folgen oder Schauspieler suchen …');
   String get clear => _t('Clear', 'Leeren');
   String searchFailed(Object e) => _t('Search failed: $e', 'Suche fehlgeschlagen: $e');
   String get whatDoYouFeelLike => _t('What are you in the mood for?', 'Wonach ist dir heute?');
