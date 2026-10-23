@@ -20,8 +20,14 @@ double get kLandscapeWidth => 320 * appLayout.cardScale;
 /// Platz für Titel unter den Karten (0, wenn das Layout sie im Bild zeigt).
 double get kCardTextHeight => appLayout.cardTitles ? 52 : 0;
 
-/// Öffnet die Detailseite eines Eintrags.
-void openItem(BuildContext context, BaseItem item) => context.push('/item/${item.id}');
+/// Öffnet die Detailseite eines Eintrags – sie wächst aus der angeklickten Karte heraus.
+void openItem(BuildContext context, BaseItem item) {
+  final box = context.findRenderObject();
+  if (box is RenderBox && box.hasSize && box.attached) {
+    expandFrom(box.localToGlobal(Offset.zero) & box.size);
+  }
+  context.push('/item/${item.id}');
+}
 
 /// Startet die Wiedergabe (ggf. an der gespeicherten Stelle) – optional eine
 /// bestimmte Fassung ([mediaSourceId]), wenn es mehrere gibt.

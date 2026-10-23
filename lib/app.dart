@@ -31,6 +31,13 @@ import 'features/home/home_providers.dart';
 import 'widgets/offline_banner.dart';
 import 'widgets/layout_shell.dart';
 
+/// Seite mit Material-Übergang (siehe buildTheme). go_router erkennt die App
+/// sonst nicht zuverlässig als MaterialApp und blendet Seiten ohne Übergang ein.
+GoRoute _route(String path, Widget Function(GoRouterState state) build) => GoRoute(
+  path: path,
+  pageBuilder: (_, state) => MaterialPage<void>(key: state.pageKey, name: state.uri.path, child: build(state)),
+);
+
 final routerProvider = Provider<GoRouter>((ref) {
   // Bei jeder An-/Abmeldung die Weiterleitungen neu prüfen.
   final refresh = ValueNotifier<int>(0);
@@ -53,18 +60,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
-      GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
-      GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
-      GoRoute(path: '/search', builder: (_, _) => const SearchScreen()),
-      GoRoute(path: '/downloads', builder: (_, _) => const DownloadsScreen()),
-      GoRoute(path: '/roulette', builder: (_, _) => const RouletteScreen()),
-      GoRoute(path: '/quiz', builder: (_, _) => const QuizScreen()),
-      GoRoute(path: '/wrapped', builder: (_, _) => const WrappedScreen()),
-      GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
-      GoRoute(
-        path: '/library/:id',
-        builder: (_, state) => LibraryScreen(
+      _route('/splash', (_) => const SplashScreen()),
+      _route('/login', (_) => const LoginScreen()),
+      _route('/', (_) => const HomeScreen()),
+      _route('/search', (_) => const SearchScreen()),
+      _route('/downloads', (_) => const DownloadsScreen()),
+      _route('/roulette', (_) => const RouletteScreen()),
+      _route('/quiz', (_) => const QuizScreen()),
+      _route('/wrapped', (_) => const WrappedScreen()),
+      _route('/settings', (_) => const SettingsScreen()),
+      _route(
+        '/library/:id',
+        (state) => LibraryScreen(
           // Eigener Schlüssel je Bibliothek – sonst blieben beim Wechsel die alten Titel stehen.
           key: ValueKey('library-${state.pathParameters['id']}'),
           libraryId: state.pathParameters['id']!,
@@ -72,17 +79,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           collectionType: state.uri.queryParameters['type'],
         ),
       ),
-      GoRoute(
-        path: '/item/:id',
-        builder: (_, state) => DetailsScreen(itemId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/person/:id',
-        builder: (_, state) => PersonScreen(personId: state.pathParameters['id']!),
-      ),
-      GoRoute(
-        path: '/play/:id',
-        builder: (_, state) => PlayerScreen(
+      _route('/item/:id', (state) => DetailsScreen(itemId: state.pathParameters['id']!)),
+      _route('/person/:id', (state) => PersonScreen(personId: state.pathParameters['id']!)),
+      _route(
+        '/play/:id',
+        (state) => PlayerScreen(
           itemId: state.pathParameters['id']!,
           startTicks: int.tryParse(state.uri.queryParameters['start'] ?? ''),
           mediaSourceId: state.uri.queryParameters['source'],
