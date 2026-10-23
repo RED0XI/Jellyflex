@@ -291,6 +291,12 @@ class _TopNav extends ConsumerWidget {
             _NavLink(label: 'Downloads', onTap: () => context.push('/downloads')),
             const Spacer(),
             IconButton(
+              tooltip: 'Film-Quiz',
+              icon: const Icon(Icons.quiz_outlined, size: 24),
+              onPressed: () => context.push('/quiz'),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
               tooltip: 'Überrasch mich',
               icon: const Icon(Icons.casino_outlined, size: 25),
               onPressed: () => context.push('/roulette'),

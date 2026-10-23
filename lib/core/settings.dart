@@ -63,7 +63,11 @@ class AppSettings {
     this.screensaverMinutes = 5,
     this.seasonalThemes = true,
     this.ambilight = AmbilightMode.window,
+    this.quizHighscore = 0,
   });
+
+  /// Bester Punktestand im Film-Quiz.
+  final int quizHighscore;
 
   /// Farbiges Leuchten aus dem Bild in den schwarzen Balken neben/über dem Video.
   final AmbilightMode ambilight;
@@ -122,6 +126,7 @@ class AppSettings {
     int? screensaverMinutes,
     bool? seasonalThemes,
     AmbilightMode? ambilight,
+    int? quizHighscore,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -137,6 +142,7 @@ class AppSettings {
     screensaverMinutes: screensaverMinutes ?? this.screensaverMinutes,
     seasonalThemes: seasonalThemes ?? this.seasonalThemes,
     ambilight: ambilight ?? this.ambilight,
+    quizHighscore: quizHighscore ?? this.quizHighscore,
   );
 
   Map<String, dynamic> toJson() => {
@@ -154,6 +160,7 @@ class AppSettings {
     'screensaverMinutes': screensaverMinutes,
     'seasonalThemes': seasonalThemes,
     'ambilight': ambilight.name,
+    'quizHighscore': quizHighscore,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -171,6 +178,7 @@ class AppSettings {
     screensaverMinutes: (json['screensaverMinutes'] as num?)?.toInt() ?? 5,
     seasonalThemes: json['seasonalThemes'] as bool? ?? true,
     ambilight: AmbilightMode.values.asNameMap()[json['ambilight']] ?? AmbilightMode.window,
+    quizHighscore: (json['quizHighscore'] as num?)?.toInt() ?? 0,
   );
 }
 
