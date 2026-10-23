@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../core/gamepad_input.dart';
@@ -22,6 +23,59 @@ Future<void> setWindowFullscreen(bool value) async {
 }
 
 Future<void> toggleWindowFullscreen() => setWindowFullscreen(!windowFullscreen.value);
+
+/// Mini-Player: kleines Fenster unten rechts, immer im Vordergrund.
+final windowMiniPlayer = ValueNotifier<bool>(false);
+Rect? _boundsBeforeMini;
+bool _maximizedBeforeMini = false;
+
+Future<void> setWindowMiniPlayer(bool value) async {
+  if (value == windowMiniPlayer.value) return;
+  if (value) {
+    if (windowFullscreen.value) await setWindowFullscreen(false);
+    _maximizedBeforeMini = await windowManager.isMaximized();
+    if (_maximizedBeforeMini) await windowManager.unmaximize();
+    _boundsBeforeMini = await windowManager.getBounds();
+    final area = await _workAreaAround(_boundsBeforeMini!.center);
+    // Erst auf die kleine Bedienung umschalten, dann verkleinern (sonst ist die
+    // große Steuerleiste kurz zu breit für das Fenster).
+    windowMiniPlayer.value = true;
+    await WidgetsBinding.instance.endOfFrame;
+    const size = Size(480, 270);
+    await windowManager.setMinimumSize(const Size(320, 180));
+    await windowManager.setAspectRatio(16 / 9);
+    await windowManager.setBounds(
+      Rect.fromLTWH(area.right - size.width - 24, area.bottom - size.height - 24, size.width, size.height),
+    );
+    await windowManager.setAlwaysOnTop(true);
+  } else {
+    await windowManager.setAlwaysOnTop(false);
+    await windowManager.setAspectRatio(0);
+    await windowManager.setMinimumSize(const Size(1024, 640));
+    final bounds = _boundsBeforeMini;
+    if (bounds != null) await windowManager.setBounds(bounds);
+    if (_maximizedBeforeMini) await windowManager.maximize();
+    // Erst wieder groß, dann die normale Bedienung zeigen.
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    windowMiniPlayer.value = false;
+  }
+}
+
+/// Nutzbarer Bereich (ohne Taskleiste) des Bildschirms, auf dem [point] liegt.
+Future<Rect> _workAreaAround(Offset point) async {
+  try {
+    final displays = await screenRetriever.getAllDisplays();
+    for (final d in displays) {
+      final pos = d.visiblePosition ?? Offset.zero;
+      final area = pos & (d.visibleSize ?? d.size);
+      if (area.contains(point)) return area;
+    }
+    final primary = await screenRetriever.getPrimaryDisplay();
+    return (primary.visiblePosition ?? Offset.zero) & (primary.visibleSize ?? primary.size);
+  } catch (_) {
+    return const Rect.fromLTWH(0, 0, 1920, 1032);
+  }
+}
 
 /// Legt eine schlanke, transparente Titelleiste über jede Seite:
 /// links ein Zurück-Pfeil, rechts Minimieren/Maximieren/Schließen.
@@ -206,10 +260,10 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
           right: 0,
           height: kTitleBarHeight,
           child: ListenableBuilder(
-            listenable: Listenable.merge([windowChromeVisible, windowFullscreen]),
+            listenable: Listenable.merge([windowChromeVisible, windowFullscreen, windowMiniPlayer]),
             builder: (context, child) {
-              // Im Vollbild keine Fensterknöpfe.
-              final visible = windowChromeVisible.value && !windowFullscreen.value;
+              // Im Vollbild und im Mini-Player keine Fensterknöpfe.
+              final visible = windowChromeVisible.value && !windowFullscreen.value && !windowMiniPlayer.value;
               return AnimatedOpacity(
                 opacity: visible ? 1 : 0,
                 duration: const Duration(milliseconds: 250),

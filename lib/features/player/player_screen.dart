@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:window_manager/window_manager.dart' show DragToMoveArea;
 
 import '../../core/downloads.dart';
 import '../../core/format.dart';
@@ -110,6 +111,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// Vollbild ist ein gemeinsamer Zustand des Fensters (auch F11 außerhalb des Players).
   bool get _fullscreen => windowFullscreen.value;
 
+  /// Mini-Player: kleines Fenster immer im Vordergrund (gilt auch für die nächste Folge).
+  bool get _mini => windowMiniPlayer.value;
+
   /// Vollbild-Zustand, der beim Schließen wiederhergestellt wird.
   late final bool _restoreFullscreen = widget.restoreFullscreen ?? windowFullscreen.value;
 
@@ -120,6 +124,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _scheduleHide();
     _restoreFullscreen; // Zustand beim Öffnen merken.
     windowFullscreen.addListener(_onFullscreenChanged);
+    windowMiniPlayer.addListener(_onFullscreenChanged);
     MediaSession.onButton = _onMediaButton;
     RemoteControl.onPlaystate = _onRemotePlaystate;
     RemoteControl.onGeneral = _onRemoteGeneral;
@@ -357,6 +362,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
     if (!_closing) _saveLocalPlayback(synced: false);
     windowFullscreen.removeListener(_onFullscreenChanged);
+    windowMiniPlayer.removeListener(_onFullscreenChanged);
+    // Player weg (nicht nur nächste Folge) → normales Fenster zurück.
+    if (_mini && !_switchingToNext) setWindowMiniPlayer(false);
     if (RemoteControl.onPlaystate == _onRemotePlaystate) RemoteControl.onPlaystate = null;
     if (RemoteControl.onGeneral == _onRemoteGeneral) RemoteControl.onGeneral = null;
     if (GamepadInput.playerHandler == _onPad) GamepadInput.playerHandler = null;
@@ -733,6 +741,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       } catch (_) {}
     }
     _saveLocalPlayback(synced: reported);
+    if (_mini) await setWindowMiniPlayer(false);
     if (windowFullscreen.value != _restoreFullscreen) await setWindowFullscreen(_restoreFullscreen);
     if (!mounted) return;
     final item = _item;
@@ -788,9 +797,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     });
   }
 
-  void _syncWindowChrome() => windowChromeVisible.value = _controlsVisible && !_fullscreen;
+  void _syncWindowChrome() => windowChromeVisible.value = _controlsVisible && !_fullscreen && !_mini;
 
-  Future<void> _toggleFullscreen() => toggleWindowFullscreen();
+  Future<void> _toggleFullscreen() async {
+    if (_mini) await setWindowMiniPlayer(false);
+    await toggleWindowFullscreen();
+  }
+
+  Future<void> _toggleMini() async {
+    _closePanels();
+    await setWindowMiniPlayer(!_mini);
+    _focus.requestFocus();
+  }
 
   void _seekBy(Duration delta) {
     final state = _player.state;
@@ -857,8 +875,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _toggleFullscreen();
     } else if (key == LogicalKeyboardKey.keyM) {
       _toggleMute();
+    } else if (key == LogicalKeyboardKey.keyP) {
+      _toggleMini();
     } else if (key == LogicalKeyboardKey.escape) {
-      if (_anyPanelOpen) {
+      if (_mini) {
+        _toggleMini();
+      } else if (_anyPanelOpen) {
         _closePanels();
       } else if (_fullscreen) {
         _toggleFullscreen();
@@ -899,6 +921,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               // den Balken. Platz bleibt immer bestehen (sonst verlieren Elemente den Fokus).
               Positioned.fill(
                 child: switch (settings.ambilight) {
+                  _ when _mini => const SizedBox.shrink(),
                   AmbilightMode.always => _Ambilight(controller: _video),
                   AmbilightMode.window when !_fullscreen => _Ambilight(controller: _video),
                   _ => const SizedBox.shrink(),
@@ -918,7 +941,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       _player.playOrPause();
                     }
                   },
-                  onDoubleTap: _toggleFullscreen,
+                  // Im Mini-Player holt ein Doppelklick das große Fenster zurück.
+                  onDoubleTap: () => _mini ? _toggleMini() : _toggleFullscreen(),
                 ),
               ),
               if (_error == null)
@@ -944,11 +968,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   child: AnimatedOpacity(
                     opacity: _controlsVisible ? 1 : 0,
                     duration: const Duration(milliseconds: 250),
-                    child: _buildControls(),
+                    child: _mini ? _buildMiniControls() : _buildControls(),
                   ),
                 ),
               ),
-              if (_item != null)
+              if (_item != null && !_mini)
                 PlayerSkipOverlay(
                   player: _player,
                   segments: _segments,
@@ -1027,6 +1051,62 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     },
     child: child,
   );
+
+  /// Bedienung im Mini-Player: ziehen zum Verschieben, Mitte Pause, oben
+  /// "Groß" und "Schließen", unten eine dünne Fortschrittsleiste.
+  Widget _buildMiniControls() {
+    return Stack(
+      children: [
+        const Positioned.fill(child: ColoredBox(color: Color(0x66000000))),
+        // Fenster an jeder freien Stelle verschiebbar.
+        const Positioned.fill(child: DragToMoveArea(child: SizedBox.expand())),
+        Center(
+          child: StreamBuilder<bool>(
+            stream: _player.stream.playing,
+            initialData: _player.state.playing,
+            builder: (context, snap) => _PlayerIconButton(
+              icon: (snap.data ?? false) ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              tooltip: (snap.data ?? false) ? 'Pause' : 'Abspielen',
+              size: 44,
+              onPressed: _player.playOrPause,
+            ),
+          ),
+        ),
+        Positioned(
+          top: 6,
+          right: 6,
+          child: Row(
+            children: [
+              _PlayerIconButton(
+                icon: Icons.open_in_full_rounded,
+                tooltip: 'Großes Fenster (P)',
+                onPressed: _toggleMini,
+              ),
+              _PlayerIconButton(icon: Icons.close_rounded, tooltip: 'Schließen', onPressed: _close),
+            ],
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: StreamBuilder<Duration>(
+            stream: _player.stream.position,
+            builder: (context, _) {
+              final s = _player.state;
+              final value = s.duration > Duration.zero ? s.position.inMilliseconds / s.duration.inMilliseconds : 0.0;
+              return LinearProgressIndicator(
+                value: value.clamp(0.0, 1.0),
+                minHeight: 3,
+                backgroundColor: Colors.white24,
+                color: AppColors.accent,
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildControls() {
     final item = _item;
@@ -1219,6 +1299,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       icon: Icons.tune_rounded,
                       tooltip: 'Wiedergabe: Geschwindigkeit, Qualität, Synchronisation',
                       onPressed: () => _setPlaybackPanel(!_playbackPanelOpen),
+                    ),
+                    _PlayerIconButton(
+                      icon: Icons.picture_in_picture_alt_rounded,
+                      tooltip: 'Mini-Player (P)',
+                      onPressed: _toggleMini,
                     ),
                     _PlayerIconButton(
                       icon: _fullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
