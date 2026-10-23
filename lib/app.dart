@@ -20,6 +20,7 @@ import 'features/screensaver/screensaver.dart';
 import 'features/search/search_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/splash_screen.dart';
+import 'features/wrapped/wrapped_screen.dart';
 import 'theme.dart';
 import 'widgets/window_frame.dart';
 
@@ -52,6 +53,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/downloads', builder: (_, _) => const DownloadsScreen()),
       GoRoute(path: '/roulette', builder: (_, _) => const RouletteScreen()),
       GoRoute(path: '/quiz', builder: (_, _) => const QuizScreen()),
+      GoRoute(path: '/wrapped', builder: (_, _) => const WrappedScreen()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(
         path: '/library/:id',

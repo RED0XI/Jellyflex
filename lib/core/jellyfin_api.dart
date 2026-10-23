@@ -352,6 +352,24 @@ class JellyfinApi {
     'limit': limit,
   });
 
+  /// Gesehene Titel (zuletzt gesehene zuerst) – mit Besetzung, für den Jahresrückblick.
+  Future<List<BaseItem>> getPlayedItems(String includeItemTypes, {int limit = 3000}) => _getItems('/Items', {
+    ..._common,
+    'fields': '$_fields,People',
+    'filters': 'IsPlayed',
+    'includeItemTypes': includeItemTypes,
+    'recursive': true,
+    'sortBy': 'DatePlayed',
+    'sortOrder': 'Descending',
+    'limit': limit,
+  });
+
+  /// Mehrere Titel auf einmal (z. B. die Serien zu gesehenen Folgen).
+  Future<List<BaseItem>> getItemsByIds(List<String> ids) async {
+    if (ids.isEmpty) return const [];
+    return _getItems('/Items', {..._common, 'fields': '$_fields,People', 'ids': ids.join(',')});
+  }
+
   /// Empfehlungen wie "Weil du X angesehen hast".
   Future<List<Recommendation>> getRecommendations({int categories = 3, int perCategory = 16}) async {
     final res = await dio.get(

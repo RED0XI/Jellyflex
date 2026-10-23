@@ -245,11 +245,18 @@ final seasons = <String, List<Map<String, dynamic>>>{};
 final episodes = <String, List<Map<String, dynamic>>>{};
 final byId = <String, Map<String, dynamic>>{};
 
-Map<String, dynamic> _userData({int position = 0, bool played = false, bool favorite = false, int? unplayed}) => {
+Map<String, dynamic> _userData({
+  int position = 0,
+  bool played = false,
+  bool favorite = false,
+  int? unplayed,
+  String? lastPlayed,
+}) => {
   'PlaybackPositionTicks': position,
   'Played': played,
   'IsFavorite': favorite,
   'UnplayedItemCount': ?unplayed,
+  'LastPlayedDate': ?lastPlayed,
 };
 
 const _personNames = [
@@ -341,7 +348,9 @@ void _seed() {
       'People': _people(i),
       'UserData': _userData(
         position: i < 3 ? (runtime * (0.2 + i * 0.25)).round() : 0,
-        played: i == 5,
+        // Einige gesehene Filme mit Datum (für den Jahresrückblick).
+        played: const {3, 5, 6, 8, 9}.contains(i),
+        lastPlayed: const {3, 5, 6, 8, 9}.contains(i) ? '2026-0${i % 9 + 1}-1${i % 9}T21:${10 + i}:00Z' : null,
         favorite: i % 5 == 1,
       ),
       // "Das Echo der Sterne" gibt es in zwei Fassungen (4K + 1080p).
@@ -440,6 +449,8 @@ void _seed() {
             ],
           'UserData': _userData(
             played: s < 2 && n == 1 && e < 4,
+            // Serien-Abend am 14. Februar: Folgen 1–3 hintereinander.
+            lastPlayed: s < 2 && n == 1 && e < 4 ? '2026-02-14T${18 + e}:0$s:00Z' : null,
             position: s < 2 && n == 1 && e == 4 ? runtime ~/ 3 : 0,
           ),
         };
@@ -604,6 +615,9 @@ Object? _handle(HttpRequest req) {
     ];
   }
   if (path == '/Items' && q['parentId'] == 'boxset0') return _page(movies.take(3).toList(), q);
+  if (path == '/Items' && q['ids'] != null) {
+    return _page([for (final id in q['ids']!.split(',')) ?byId[id]], q);
+  }
   if (path == '/Items') {
     var list = <Map<String, dynamic>>[];
     final types = (q['includeItemTypes'] ?? 'Movie,Series').split(',');
@@ -625,6 +639,7 @@ Object? _handle(HttpRequest req) {
     if (term != null) list = list.where((i) => (i['Name'] as String).toLowerCase().contains(term)).toList();
     if (q['filters'] == 'IsFavorite') list = list.where((i) => i['UserData']['IsFavorite'] == true).toList();
     if (q['filters'] == 'IsUnplayed') list = list.where((i) => i['UserData']['Played'] != true).toList();
+    if (q['filters'] == 'IsPlayed') list = list.where((i) => i['UserData']['Played'] == true).toList();
     if (q['sortBy'] == 'Random') list.shuffle(_rand);
     if (q['sortBy']?.startsWith('SortName') ?? false) {
       list.sort((a, b) => (a['Name'] as String).compareTo(b['Name'] as String));

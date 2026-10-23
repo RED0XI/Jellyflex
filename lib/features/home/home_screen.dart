@@ -315,6 +315,7 @@ class _TopNav extends ConsumerWidget {
                 if (value == 'logout') ref.read(sessionProvider.notifier).logout();
                 if (value == 'settings') context.push('/settings');
                 if (value == 'switch') ref.read(sessionProvider.notifier).switchUser();
+                if (value == 'wrapped') context.push('/wrapped');
               },
               itemBuilder: (_) => [
                 PopupMenuItem(
@@ -333,6 +334,12 @@ class _TopNav extends ConsumerWidget {
                       SizedBox(width: 12),
                       Text('Benutzer wechseln'),
                     ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'wrapped',
+                  child: Row(
+                    children: [Icon(Icons.auto_graph_rounded, size: 20), SizedBox(width: 12), Text('Jahresrückblick')],
                   ),
                 ),
                 const PopupMenuItem(
