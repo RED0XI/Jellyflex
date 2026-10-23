@@ -29,6 +29,7 @@ import 'player_overlays.dart';
 import '../../widgets/focusable.dart';
 import '../../l10n/strings.dart';
 import '../../core/system_certs.dart';
+import '../../core/redact.dart';
 
 part 'player_tracks_panel.dart';
 part 'player_widgets.dart';
@@ -480,12 +481,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       } catch (e) {
         debugPrint('Wiedergabestart konnte nicht gemeldet werden: $e');
       }
+      // Inzwischen geschlossen? Dann keinen Timer mehr anlegen.
+      if (!mounted || _closing) return;
       _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) {
         _reportProgress();
         _saveLocalPlayback(synced: _reportedStart);
       });
     } catch (e) {
-      if (mounted) setState(() => _error = '$e'.replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = redactSecrets('$e'.replaceFirst('Exception: ', '')));
     }
   }
 
@@ -523,7 +526,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final url = media?.transcodingUrl;
     if (media == null || url == null) throw Exception(tr.noTranscodeFromServer);
     _playSessionId = info.playSessionId ?? _playSessionId;
-    await _player.open(Media('${_api.baseUrl}$url', httpHeaders: headers, start: start));
+    await _player.open(Media(_api.onServer(url), httpHeaders: headers, start: start));
 
     // Text-Untertitel kommen als eigene Datei, Bild-Untertitel sind eingebrannt.
     final sub = media.mediaStreams
@@ -532,7 +535,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     await _player.setSubtitleTrack(
       sub == null
           ? SubtitleTrack.no()
-          : SubtitleTrack.uri('${_api.baseUrl}${sub.deliveryUrl}', title: sub.displayTitle, language: sub.language),
+          : SubtitleTrack.uri(_api.onServer(sub.deliveryUrl!), title: sub.displayTitle, language: sub.language),
     );
   }
 
@@ -554,7 +557,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       await _applySubtitleStyle();
       await _api.reportPlaybackStart(_progressBody(position: position));
     } catch (e) {
-      if (mounted) setState(() => _error = '$e'.replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = redactSecrets('$e'.replaceFirst('Exception: ', '')));
     }
   }
 
@@ -565,7 +568,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final lower = message.toLowerCase();
     final isSubtitle = lower.contains('sub') || lower.contains('.srt') || lower.contains('.ass');
     if (!mounted || _error != null || isSubtitle || _player.state.duration > Duration.zero) return;
-    setState(() => _error = tr.fileCouldNotLoad(message));
+    setState(() => _error = tr.fileCouldNotLoad(redactSecrets(message)));
     _showControls(autoHide: false);
   }
 

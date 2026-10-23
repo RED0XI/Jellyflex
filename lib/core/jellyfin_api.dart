@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'images.dart';
 import 'models.dart';
 import '../l10n/strings.dart';
+import 'redact.dart';
 
 class ServerInfo {
   const ServerInfo({required this.url, required this.name, required this.version});
@@ -33,11 +34,16 @@ bool isLocalHost(String host) {
   return (b[0] & 0xFE) == 0xFC; // IPv6 fc00::/7 (private)
 }
 
-/// Fehler wegen eines ungültigen Zertifikats?
-bool isCertificateError(Object e) =>
-    e is HandshakeException ||
-    e is TlsException ||
-    (e is DioException && (e.type == DioExceptionType.badCertificate || isCertificateError(e.error ?? '')));
+/// Fehler wegen eines ungültigen Zertifikats (abgelaufen, selbst signiert,
+/// falscher Name)? Andere TLS-Fehler zählen nicht – z. B. spricht ein reiner
+/// http-Server im Heimnetz gar kein TLS (`WRONG_VERSION_NUMBER`), dann darf
+/// [JellyfinApi.probe] im Heimnetz auf http ausweichen.
+bool isCertificateError(Object e) {
+  if (e is DioException) return e.type == DioExceptionType.badCertificate || isCertificateError(e.error ?? '');
+  if (e is! TlsException) return false;
+  final text = e.toString().toUpperCase();
+  return text.contains('CERTIFICATE') || text.contains('HOSTNAME MISMATCH');
+}
 
 class AuthResult {
   const AuthResult({required this.token, required this.userId, required this.userName, this.userImageTag});
@@ -90,6 +96,7 @@ class JellyfinApi {
         ),
       ) {
     dio.options.headers['Authorization'] = authorizationHeader;
+    registerSecret(token);
   }
 
   static const clientName = 'Jellyflex';
@@ -537,6 +544,23 @@ class JellyfinApi {
       },
     ).query;
     return '$baseUrl/Videos/$itemId/stream?$query';
+  }
+
+  /// Vom Server gelieferte Adresse (z. B. `TranscodingUrl`) vollständig machen –
+  /// aber nur, wenn sie wirklich zum eigenen Server führt. Sonst könnte eine
+  /// manipulierte Antwort wie "@fremd.example/…" das Anmelde-Token an einen
+  /// anderen Rechner schicken.
+  String onServer(String relative) {
+    final base = Uri.parse(baseUrl);
+    final target = relative.startsWith('/') ? Uri.tryParse('$baseUrl$relative') : Uri.tryParse(relative);
+    if (target == null ||
+        target.userInfo.isNotEmpty ||
+        target.scheme != base.scheme ||
+        target.host != base.host ||
+        target.port != base.port) {
+      throw Exception(tr.unexpectedServerAddress);
+    }
+    return target.toString();
   }
 
   /// Externe Untertiteldatei (z. B. "Film.de.srt" neben dem Film) als Stream.

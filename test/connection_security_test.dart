@@ -28,6 +28,27 @@ void main() {
     expect(const ServerInfo(url: 'https://jf.example.com', name: '', version: '').insecure, isFalse);
   });
 
+  test('Nur echte Zertifikatsfehler zählen als Zertifikatsfehler', () {
+    expect(
+      isCertificateError(
+        const HandshakeException(
+          'Handshake error in client',
+          OSError('CERTIFICATE_VERIFY_FAILED: certificate has expired(handshake.cc:297)', 0),
+        ),
+      ),
+      isTrue,
+    );
+    expect(isCertificateError(const HandshakeException('Hostname mismatch')), isTrue);
+    // Ein reiner http-Server im Heimnetz spricht kein TLS – kein Zertifikatsproblem.
+    expect(
+      isCertificateError(
+        const HandshakeException('Handshake error in client', OSError('WRONG_VERSION_NUMBER(tls_record.cc:127)', 0)),
+      ),
+      isFalse,
+    );
+    expect(isCertificateError(const SocketException('Connection refused')), isFalse);
+  });
+
   test('Ungültiges Zertifikat: kein Verbinden, kein Ausweichen auf http', () async {
     try {
       await InternetAddress.lookup('expired.badssl.com');

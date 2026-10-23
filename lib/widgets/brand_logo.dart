@@ -34,6 +34,8 @@ class BrandLogo extends ConsumerWidget {
           child: Image.file(
             logo,
             height: size * 1.35,
+            // Nur so groß dekodieren wie nötig – auch bei riesigen Bilddateien.
+            cacheHeight: (size * 1.35 * MediaQuery.devicePixelRatioOf(context)).ceil(),
             fit: BoxFit.contain,
             filterQuality: FilterQuality.medium,
             errorBuilder: (_, _, _) => const SizedBox.shrink(),

@@ -107,9 +107,40 @@ void main() {
       ],
     );
     await fresh.read(sessionProvider.future);
+    // Der manipulierte Eintrag wird gar nicht erst übernommen …
+    expect(fresh.read(downloadsProvider), isEmpty);
+    // … und selbst wenn: Löschen bleibt im Download-Ordner.
     await fresh.read(downloadsProvider.notifier).remove('evil');
     expect(File('${outside.path}\\wichtig.txt').existsSync(), isTrue);
     fresh.dispose();
     outside.deleteSync(recursive: true);
+  });
+
+  test('Gespeicherte Videodatei außerhalb des Download-Ordners wird ignoriert', () async {
+    final folder = '${root.path}\\abc-1';
+    File('${root.path}\\downloads.json').writeAsStringSync(
+      jsonEncode([
+        for (final (id, media) in [('good', '$folder\\media.mkv'), ('bad', r'C:\Windows\notepad.exe')])
+          {
+            'itemId': id,
+            'serverUrl': _parent.serverUrl,
+            'userId': _parent.userId,
+            'name': id,
+            'type': 'Movie',
+            'folder': folder,
+            'mediaFile': media,
+            'status': 'done',
+          },
+      ]),
+    );
+    final fresh = ProviderContainer(
+      overrides: [
+        sessionProvider.overrideWith(_TestSession.new),
+        downloadsProvider.overrideWith(() => DownloadManager(root)),
+      ],
+    );
+    await fresh.read(sessionProvider.future);
+    expect(fresh.read(downloadsProvider).map((e) => e.itemId), ['good']);
+    fresh.dispose();
   });
 }

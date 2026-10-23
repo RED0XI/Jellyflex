@@ -102,6 +102,7 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
     try {
       final image = await boundary.toImage(pixelRatio: 2);
       final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
       final dir = Directory('${Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path}\\Pictures');
       await dir.create(recursive: true);
       final name = '${tr.recapFileName(appDisplayName(ref.read(settingsProvider)), stats.year)}.png'.replaceAll(
@@ -115,7 +116,10 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
           content: Text(tr.savedToPictures(name)),
           behavior: SnackBarBehavior.floating,
           width: 520,
-          action: SnackBarAction(label: tr.show, onPressed: () => Process.run('explorer', ['/select,', file.path])),
+          action: SnackBarAction(
+            label: tr.show,
+            onPressed: () => Process.run('explorer.exe', ['/select,${file.path}']),
+          ),
         ),
       );
     } catch (_) {

@@ -221,18 +221,25 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       }
     });
     // Nach dem Anmelden bzw. regelmäßig: offline Geschautes nachmelden.
-    ref.listen(sessionProvider, (_, _) => syncPending());
+    ref.listen(sessionProvider, (_, _) {
+      _accountChanged();
+      syncPending();
+    });
     _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) => syncPending());
 
     try {
       if (_indexFile.existsSync()) {
         final list = (jsonDecode(_indexFile.readAsStringSync()) as List)
             .map((e) => DownloadEntry.fromJson((e as Map).cast<String, dynamic>()))
+            // Die Liste liegt als Datei im Benutzerordner – Einträge, die auf fremde
+            // Orte zeigen (verändert oder beschädigt), werden ignoriert.
+            .where(_isSafeEntry)
             // Beim letzten Beenden unterbrochene Downloads gelten als wartend.
             .map((e) => e.status == DownloadStatus.downloading ? e.copyWith(status: DownloadStatus.queued) : e)
             .toList();
         // Wartende Downloads fortsetzen, sobald die App läuft.
         Future.microtask(() {
+          if (!ref.mounted) return;
           _pump();
           syncPending();
         });
@@ -256,20 +263,47 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   static final _safeId = RegExp(r'^[A-Za-z0-9_-]{1,64}$');
   static final _safeExt = RegExp(r'^[a-z0-9]{1,8}$');
 
-  /// Kurze, gleichbleibende Kennung eines Kontos für Ordnernamen (FNV-1a).
+  /// Kurze, gleichbleibende Kennung eines Kontos für Ordnernamen (64-Bit-FNV-1a,
+  /// damit sich zwei Konten praktisch nie denselben Ordner teilen).
   static String _ownerTag(String serverUrl, String userId) {
-    var hash = 0x811c9dc5;
+    var hash = 0xcbf29ce484222325;
     for (final unit in '$serverUrl|$userId'.codeUnits) {
-      hash = ((hash ^ unit) * 0x01000193) & 0xFFFFFFFF;
+      hash = (hash ^ unit) * 0x100000001b3; // läuft wie gewünscht über (64 Bit)
     }
-    return hash.toRadixString(16).padLeft(8, '0');
+    String half(int v) => (v & 0xFFFFFFFF).toRadixString(16).padLeft(8, '0');
+    return '${half(hash >>> 32)}${half(hash)}';
+  }
+
+  /// Gespeicherter Eintrag plausibel? Kennung harmlos, Ordner und Videodatei im Download-Ordner.
+  bool _isSafeEntry(DownloadEntry e) {
+    if (!_safeId.hasMatch(e.itemId) || !_insideRoot(e.folder)) return false;
+    final media = e.mediaFile;
+    if (media == null) return true;
+    return _isInside(e.folder, media);
+  }
+
+  /// Kontowechsel: Download des vorigen Kontos anhalten (er wartet, bis das
+  /// Konto wieder angemeldet ist) und die Downloads des neuen Kontos starten.
+  void _accountChanged() {
+    final running = _runningKey;
+    final entry = state.where((e) => e.key == running).firstOrNull;
+    if (entry != null && !isMine(entry)) {
+      _update(entry.key, (e) => e.copyWith(status: DownloadStatus.queued));
+      _cancel?.cancel('Konto gewechselt');
+      return; // Nach dem Abbruch startet _run den nächsten passenden Download.
+    }
+    _pump();
   }
 
   /// Liegt [path] wirklich im Download-Ordner (und ist nicht der Ordner selbst)?
-  bool _insideRoot(String path) {
-    final base = '${root.absolute.path.toLowerCase().replaceAll('/', '\\')}\\';
-    final target = Directory(path).absolute.path.toLowerCase().replaceAll('/', '\\');
-    return target.startsWith(base) && !target.substring(base.length).contains('..');
+  bool _insideRoot(String path) => _isInside(root.path, path);
+
+  /// Liegt [path] innerhalb von [base] (Groß-/Kleinschreibung und / bzw. \ egal)?
+  static bool _isInside(String base, String path) {
+    String norm(String p) => Directory(p).absolute.path.toLowerCase().replaceAll('/', '\\');
+    final prefix = '${norm(base)}\\';
+    final target = norm(path);
+    return target.startsWith(prefix) && !target.substring(prefix.length).contains('..');
   }
 
   /// Titel (Film oder Folge) zum Herunterladen vormerken – optional eine bestimmte Fassung.

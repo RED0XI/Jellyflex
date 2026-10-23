@@ -210,13 +210,10 @@ class _ScreensaverViewState extends ConsumerState<_ScreensaverView> with TickerP
   List<BaseItem> _items = const [];
   int _index = 0;
   Offset _drift = Offset.zero;
-  Timer? _clock;
-  DateTime _now = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _clock = Timer.periodic(const Duration(seconds: 1), (_) => setState(() => _now = DateTime.now()));
     _kenBurns.addStatusListener((status) {
       if (status == AnimationStatus.completed) _next();
     });
@@ -227,7 +224,6 @@ class _ScreensaverViewState extends ConsumerState<_ScreensaverView> with TickerP
   void dispose() {
     _fadeIn.dispose();
     _kenBurns.dispose();
-    _clock?.cancel();
     super.dispose();
   }
 
@@ -333,29 +329,31 @@ class _ScreensaverViewState extends ConsumerState<_ScreensaverView> with TickerP
               Positioned(
                 right: 56,
                 bottom: 48,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      formatClock(_now),
-                      style: const TextStyle(
-                        fontSize: 92,
-                        fontWeight: FontWeight.w300,
-                        letterSpacing: -2,
-                        height: 1,
-                        shadows: [Shadow(color: Colors.black54, blurRadius: 20)],
+                child: _Clock(
+                  builder: (now) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        formatClock(now),
+                        style: const TextStyle(
+                          fontSize: 92,
+                          fontWeight: FontWeight.w300,
+                          letterSpacing: -2,
+                          height: 1,
+                          shadows: [Shadow(color: Colors.black54, blurRadius: 20)],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      formatWeekdayDate(_now),
-                      style: const TextStyle(
-                        fontSize: 20,
-                        color: Color(0xFFE0E2EA),
-                        shadows: [Shadow(color: Colors.black54, blurRadius: 12)],
+                      const SizedBox(height: 6),
+                      Text(
+                        formatWeekdayDate(now),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          color: Color(0xFFE0E2EA),
+                          shadows: [Shadow(color: Colors.black54, blurRadius: 12)],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -364,6 +362,46 @@ class _ScreensaverViewState extends ConsumerState<_ScreensaverView> with TickerP
       ),
     );
   }
+}
+
+/// Uhr, die sich nur zur vollen Minute neu zeichnet (statt die ganze Ansicht jede Sekunde).
+class _Clock extends StatefulWidget {
+  const _Clock({required this.builder});
+
+  final Widget Function(DateTime now) builder;
+
+  @override
+  State<_Clock> createState() => _ClockState();
+}
+
+class _ClockState extends State<_Clock> {
+  DateTime _now = DateTime.now();
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _schedule();
+  }
+
+  void _schedule() {
+    final now = DateTime.now();
+    final nextMinute = DateTime(now.year, now.month, now.day, now.hour, now.minute + 1);
+    _timer = Timer(nextMinute.difference(now), () {
+      if (!mounted) return;
+      setState(() => _now = DateTime.now());
+      _schedule();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(_now);
 }
 
 class _TitleBlock extends ConsumerWidget {

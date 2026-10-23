@@ -629,6 +629,10 @@ class S {
   String get noFileFound => _t('No file found', 'Keine Datei gefunden');
   String connectionInterrupted(String received, String total) =>
       _t('Connection interrupted ($received of $total)', 'Verbindung unterbrochen ($received von $total)');
+  String get unexpectedServerAddress => _t(
+    'The server sent an address that doesn’t belong to it – blocked.',
+    'Der Server lieferte eine fremde Adresse – blockiert.',
+  );
   String get noConnectionToServer => _t('No connection to the server', 'Keine Verbindung zum Server');
   String serverError(int? code) => _t('Server error $code', 'Server-Fehler $code');
   String get encryptionFailed => _t('Encryption failed', 'Verschlüsselung fehlgeschlagen');

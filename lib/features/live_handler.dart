@@ -54,9 +54,9 @@ class _LiveHandlerState extends ConsumerState<LiveHandler> {
         _refreshDebounce = Timer(const Duration(milliseconds: 1500), _refresh);
       case 'Play':
         final ids = (data['ItemIds'] as List?)?.whereType<String>().toList() ?? const [];
-        if (ids.isEmpty) return;
+        if (ids.isEmpty || !_safeId.hasMatch(ids.first)) return;
         final ticks = (data['StartPositionTicks'] as num?)?.toInt() ?? 0;
-        widget.router.push('/play/${ids.first}${ticks > 0 ? '?start=$ticks' : ''}');
+        _open('/play/${ids.first}${ticks > 0 ? '?start=$ticks' : ''}');
       case 'Playstate':
         final command = data['Command'] as String?;
         if (command != null) RemoteControl.onPlaystate?.call(command, data);
@@ -82,22 +82,39 @@ class _LiveHandlerState extends ConsumerState<LiveHandler> {
             width: 480,
             backgroundColor: AppColors.surfaceHigh,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            duration: Duration(milliseconds: int.tryParse('${args['TimeoutMs']}') ?? 5000),
+            // Server bestimmt die Dauer – aber nie endlos.
+            duration: Duration(milliseconds: (int.tryParse('${args['TimeoutMs']}') ?? 5000).clamp(1000, 15000)),
           ),
         );
       case 'DisplayContent':
         final id = args['ItemId'] as String?;
-        if (id != null) router.push('/item/$id');
+        if (id != null && _safeId.hasMatch(id)) _open('/item/$id');
       case 'GoHome':
         router.go('/');
       case 'GoToSearch':
-        router.push('/search');
+        _open('/search');
       case 'GoToSettings':
-        router.push('/settings');
+        _open('/settings');
       case 'Back':
         if (router.canPop()) router.pop();
       case 'ToggleFullscreen':
         toggleWindowFullscreen();
+    }
+  }
+
+  /// Kennungen vom Server landen in App-Adressen – nur harmlose Zeichen zulassen.
+  static final _safeId = RegExp(r'^[A-Za-z0-9_-]{1,64}$');
+
+  /// Seite öffnen. Läuft gerade ein Player, wird er ersetzt (die Wiedergabe endet) –
+  /// so liegt nie ein Player unsichtbar unter einer anderen Seite und es entsteht
+  /// kein zweiter Player.
+  void _open(String location) {
+    final router = widget.router;
+    final inPlayer = router.routerDelegate.currentConfiguration.isNotEmpty && router.state.uri.path.startsWith('/play');
+    if (inPlayer) {
+      router.pushReplacement(location);
+    } else {
+      router.push(location);
     }
   }
 

@@ -36,19 +36,39 @@ String _iconPathFor(String logoPath) => '${logoPath.substring(0, logoPath.lastIn
 /// Jede Wahl bekommt einen neuen Dateinamen, damit kein altes Bild aus dem
 /// Zwischenspeicher angezeigt wird; ältere Logos werden aufgeräumt.
 Future<String> importLogo(String sourcePath, {Directory? dir}) async {
-  final bytes = await File(sourcePath).readAsBytes();
-  // Erst prüfen, ob es überhaupt ein lesbares Bild ist.
-  final codec = await ui.instantiateImageCodec(bytes);
-  final image = (await codec.getNextFrame()).image;
+  final source = File(sourcePath);
+  // Riesige Dateien gar nicht erst laden (ein Logo braucht keine 20 MB).
+  if (await source.length() > 20 * 1024 * 1024) throw const FormatException('Bild zu groß');
+  final ext = sourcePath.split('.').last.toLowerCase();
+  if (!const {'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'}.contains(ext)) throw const FormatException('Kein Bild');
+  final bytes = await source.readAsBytes();
+  // Prüfen, ob es ein lesbares Bild ist – verkleinert dekodiert (fürs Symbol reichen 512 px).
+  final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+  final codec = await ui.instantiateImageCodecWithSize(
+    buffer,
+    getTargetSize: (w, h) {
+      final scale = math.min(1.0, 512 / math.max(w, h));
+      return ui.TargetImageSize(width: (w * scale).round(), height: (h * scale).round());
+    },
+  );
+  // Den Puffer gibt instantiateImageCodecWithSize selbst frei.
+  final ui.Image image;
+  try {
+    image = (await codec.getNextFrame()).image;
+  } finally {
+    codec.dispose();
+  }
 
   final folder = dir ?? appDataDir;
   await folder.create(recursive: true);
-  final ext = sourcePath.split('.').last.toLowerCase();
   final stamp = DateTime.now().millisecondsSinceEpoch;
   final target = File('${folder.path}\\logo_$stamp.$ext');
   await target.writeAsBytes(bytes);
-  await File(_iconPathFor(target.path)).writeAsBytes(await _icoFrom(image));
-  image.dispose();
+  try {
+    await File(_iconPathFor(target.path)).writeAsBytes(await _icoFrom(image));
+  } finally {
+    image.dispose();
+  }
 
   // Alte Logos löschen.
   await for (final f in folder.list()) {
@@ -76,7 +96,9 @@ Future<Uint8List> _icoFrom(ui.Image image) async {
     Rect.fromLTWH((size - w) / 2, (size - h) / 2, w, h),
     Paint()..filterQuality = FilterQuality.high,
   );
-  final square = await recorder.endRecording().toImage(size, size);
+  final picture = recorder.endRecording();
+  final square = await picture.toImage(size, size);
+  picture.dispose();
   final png = (await square.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
   square.dispose();
 

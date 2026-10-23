@@ -39,24 +39,48 @@ class LiveConnection {
 
   void start() => _connect();
 
+  /// Zählt Verbindungen – Meldungen alter Verbindungen werden ignoriert.
+  int _generation = 0;
+  StreamSubscription<dynamic>? _subscription;
+
   Future<void> _connect() async {
     if (_closed) return;
+    final generation = ++_generation;
+    WebSocket? socket;
     try {
-      final query = Uri(queryParameters: {'api_key': ?api.token, 'deviceId': api.deviceId}).query;
+      // Anmeldung nur über den Authorization-Kopf – ein Token in der Adresse
+      // landet sonst in Protokollen von Proxys (z. B. nginx).
+      final query = Uri(queryParameters: {'deviceId': api.deviceId}).query;
       final url = '${api.baseUrl.replaceFirst(RegExp('^http', caseSensitive: false), 'ws')}/socket?$query';
-      final socket = await WebSocket.connect(url, headers: {'Authorization': api.authorizationHeader});
-      if (_closed) {
+      socket = await WebSocket.connect(url, headers: {'Authorization': api.authorizationHeader});
+      if (_closed || generation != _generation) {
         await socket.close();
         return;
       }
       _socket = socket;
       _attempt = 0;
-      socket.listen(_onData, onDone: _scheduleReconnect, onError: (_) => _scheduleReconnect(), cancelOnError: true);
+      _subscription = socket.listen(
+        (raw) {
+          if (generation == _generation) _onData(raw);
+        },
+        onDone: () => _lost(generation),
+        onError: (_) => _lost(generation),
+        cancelOnError: true,
+      );
       // Dem Server mitteilen, dass diese App fernsteuerbar ist.
       await api.reportCapabilities();
     } catch (_) {
-      _scheduleReconnect();
+      _lost(generation);
     }
+  }
+
+  /// Verbindung [generation] ist weg (oder unbrauchbar): aufräumen, neu versuchen.
+  void _lost(int generation) {
+    if (generation != _generation) return;
+    _subscription?.cancel();
+    _subscription = null;
+    _socket?.close().ignore();
+    _scheduleReconnect();
   }
 
   void _onData(dynamic raw) {
@@ -104,6 +128,7 @@ class LiveConnection {
     _closed = true;
     _keepAlive?.cancel();
     _reconnect?.cancel();
+    await _subscription?.cancel();
     await _socket?.close();
     _socket = null;
     await _messages.close();

@@ -10,6 +10,8 @@ import 'details/details_screen.dart';
 import 'downloads/downloads_screen.dart';
 import '../l10n/strings.dart';
 
+import 'package:flutter/scheduler.dart';
+
 enum _ItemAction {
   play,
   playFromStart,
@@ -158,4 +160,17 @@ void restoreFocusAfterMenu(FocusNode? node) {
   };
   FocusManager.instance.addListener(listener);
   listener();
+  // Nach dem Schließen des Menüs nicht mehr gebraucht: nach ~60 gezeichneten
+  // Bildern (die Schließ-Animation ist dann längst vorbei) wieder abmelden.
+  var frames = 0;
+  void countFrame(Duration _) {
+    if (++frames >= 60) {
+      FocusManager.instance.removeListener(listener);
+    } else {
+      // Keine zusätzlichen Bilder erzwingen – nur ohnehin gezeichnete zählen.
+      SchedulerBinding.instance.addPostFrameCallback(countFrame);
+    }
+  }
+
+  SchedulerBinding.instance.addPostFrameCallback(countFrame);
 }

@@ -301,7 +301,9 @@ void _seedPeople() {
                 'Autorenfilmen. Für ihre Darstellung in „Kalte Brandung“ wurde sie mehrfach ausgezeichnet. Neben '
                 'der Schauspielerei engagiert sie sich für Nachwuchsprojekte und schreibt an ihrem ersten '
                 'Drehbuch. Sie lebt mit ihrer Familie an der Ostsee und spricht fließend Englisch, Französisch '
-                'und Schwedisch. In Interviews betont sie gern, dass ihre liebsten Rollen die leisen sind.'
+                'und Schwedisch. In Interviews betont sie gern, dass ihre liebsten Rollen die leisen sind. '
+                'Wenn sie nicht dreht, findet man sie meist auf dem Wasser – sie segelt seit ihrer Jugend und hat schon zweimal '
+                'die Ostsee allein überquert.'
           : 'Bekannt aus zahlreichen Film- und Fernsehproduktionen.',
       'PremiereDate': '${1960 + i * 3}-0${1 + i % 9}-1${i % 9}T00:00:00.0000000Z',
       if (i == 7) 'EndDate': '2021-11-03T00:00:00.0000000Z',

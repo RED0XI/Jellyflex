@@ -48,8 +48,9 @@ class SecureStore {
   }
 
   Future<void> _save() {
-    // Schreibvorgänge nacheinander ausführen.
-    return _pending = _pending.then((_) async {
+    // Schreibvorgänge nacheinander ausführen. Ein Fehler wird gemeldet, blockiert
+    // aber nicht alle folgenden Speichervorgänge.
+    final run = _pending.catchError((_) {}).then((_) async {
       final file = _file;
       await file.parent.create(recursive: true);
       final encrypted = _Dpapi.protect(Uint8List.fromList(utf8.encode(jsonEncode(_cache ?? {}))));
@@ -58,6 +59,8 @@ class SecureStore {
       await tmp.writeAsBytes(encrypted, flush: true);
       await tmp.rename(file.path);
     });
+    _pending = run.catchError((_) {});
+    return run;
   }
 
   Future<String?> read({required String key}) async => (await _load())[key];
@@ -124,10 +127,15 @@ abstract final class _Dpapi {
         ..pbData = buffer;
       final ok = fn(inBlob, nullptr, nullptr, nullptr, nullptr, _uiForbidden, outBlob);
       if (ok == 0) return null;
-      final result = Uint8List.fromList(outBlob.ref.pbData.asTypedList(outBlob.ref.cbData));
-      _localFree(outBlob.ref.pbData.cast());
-      return result;
+      return Uint8List.fromList(outBlob.ref.pbData.asTypedList(outBlob.ref.cbData));
     } finally {
+      // Klartext (Token!) im nativen Speicher überschreiben, bevor er freigegeben wird.
+      final out = outBlob.ref.pbData;
+      if (out != nullptr) {
+        out.asTypedList(outBlob.ref.cbData).fillRange(0, outBlob.ref.cbData, 0);
+        _localFree(out.cast());
+      }
+      buffer.asTypedList(input.isEmpty ? 1 : input.length).fillRange(0, input.isEmpty ? 1 : input.length, 0);
       calloc.free(buffer);
       calloc.free(inBlob);
       calloc.free(outBlob);
