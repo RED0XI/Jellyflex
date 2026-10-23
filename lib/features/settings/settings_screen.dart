@@ -19,6 +19,8 @@ import '../../widgets/theme_picker.dart';
 import '../../widgets/layout_picker.dart';
 import '../../core/image_cache.dart';
 import 'about_section.dart';
+import '../../core/profile_pin.dart';
+import '../../widgets/pin_dialog.dart';
 import '../../core/downloads.dart' show formatBytes;
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -464,6 +466,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 ],
                               ),
                             ),
+                            const _PinRow(),
                           ],
                         ),
 
@@ -643,6 +646,64 @@ class _ImageCacheRowState extends State<_ImageCacheRow> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Profil-PIN festlegen, ändern oder entfernen (Ändern/Entfernen nur mit der alten PIN).
+class _PinRow extends ConsumerWidget {
+  const _PinRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionProvider).value;
+    if (session == null) return const SizedBox.shrink();
+    final ctrl = ref.read(sessionProvider.notifier);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    void snack(String text) =>
+        messenger?.showSnackBar(SnackBar(content: Text(text), behavior: SnackBarBehavior.floating, width: 420));
+
+    Future<bool> confirmOld() async {
+      final hash = session.pinHash;
+      if (hash == null) return true;
+      final pin = await showPinDialog(
+        context,
+        title: tr.pinCurrent,
+        accountKey: session.accountKey,
+        check: (pin) => ProfilePin.verify(pin, hash),
+      );
+      return pin != null;
+    }
+
+    Future<void> change() async {
+      if (!await confirmOld() || !context.mounted) return;
+      final pin = await askNewPin(context);
+      if (pin == null) return;
+      await ctrl.setPin(await ProfilePin.hash(pin));
+      snack(tr.pinSaved);
+    }
+
+    Future<void> remove() async {
+      if (!await confirmOld()) return;
+      await ctrl.setPin(null);
+      snack(tr.pinRemoved);
+    }
+
+    return _Row(
+      title: tr.profilePin,
+      subtitle: session.hasPin ? tr.profilePinOnHint : tr.profilePinHint,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (session.hasPin) TextButton(onPressed: remove, child: Text(tr.pinRemove)),
+          const SizedBox(width: 6),
+          TextButton.icon(
+            onPressed: change,
+            icon: Icon(session.hasPin ? Icons.password_rounded : Icons.lock_outline_rounded, size: 18),
+            label: Text(session.hasPin ? tr.pinChange : tr.pinSet),
+          ),
+        ],
       ),
     );
   }

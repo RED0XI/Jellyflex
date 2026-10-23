@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:jellyflex/core/secure_store.dart';
 import 'package:jellyflex/core/settings.dart';
 import 'package:jellyflex/l10n/strings.dart';
 
@@ -10,6 +11,8 @@ import 'package:jellyflex/l10n/strings.dart';
 /// [dir]: Ordner für die Datei (sonst ein neuer Temp-Ordner).
 SettingsController testSettings([Directory? dir, AppLanguage language = AppLanguage.de]) {
   final folder = dir ?? Directory.systemTemp.createTempSync('jellyflex_test_settings_');
+  // Auch Anmeldedaten (Konten, PIN) nur in einer Temp-Datei – nie im echten Speicher.
+  SecureStore.instance = SecureStore.forFile(File('${folder.path}\\secure.bin'));
   final file = File('${folder.path}\\settings.json');
   if (!file.existsSync()) file.writeAsStringSync(jsonEncode({'language': language.name}));
   return SettingsController(file);

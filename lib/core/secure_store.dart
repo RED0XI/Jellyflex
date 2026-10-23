@@ -18,7 +18,8 @@ class SecureStore {
   /// Nur für Tests: Speicher in einer bestimmten Datei.
   SecureStore.forFile(File file) : this._(file);
 
-  static final instance = SecureStore._(null);
+  /// Der Speicher der App. Tests ersetzen ihn durch eine Temp-Datei (nie den echten).
+  static SecureStore instance = SecureStore._(null);
 
   final File? _fileOverride;
   Map<String, String>? _cache;

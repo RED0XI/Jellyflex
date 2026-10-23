@@ -15,6 +15,7 @@ class AuthSession {
     required this.token,
     required this.deviceId,
     this.userImageTag,
+    this.pinHash,
   });
 
   final String serverUrl;
@@ -24,6 +25,22 @@ class AuthSession {
   final String token;
   final String deviceId;
   final String? userImageTag;
+
+  /// Hash der Profil-PIN (siehe [ProfilePin]); `null` = ohne PIN.
+  final String? pinHash;
+
+  bool get hasPin => pinHash != null;
+
+  AuthSession withPin(String? hash) => AuthSession(
+    serverUrl: serverUrl,
+    serverName: serverName,
+    userId: userId,
+    userName: userName,
+    token: token,
+    deviceId: deviceId,
+    userImageTag: userImageTag,
+    pinHash: hash,
+  );
 
   /// Eindeutig pro Server + Benutzer (für die Liste gespeicherter Konten).
   String get accountKey => '$serverUrl|$userId';
@@ -41,6 +58,7 @@ class AuthSession {
     'token': token,
     'deviceId': deviceId,
     'userImageTag': userImageTag,
+    if (pinHash != null) 'pinHash': pinHash,
   };
 
   factory AuthSession.fromJson(Map<String, dynamic> json) => AuthSession(
@@ -51,10 +69,11 @@ class AuthSession {
     token: json['token'] as String,
     deviceId: json['deviceId'] as String,
     userImageTag: json['userImageTag'] as String?,
+    pinHash: json['pinHash'] as String?,
   );
 }
 
-final _storage = SecureStore.instance;
+SecureStore get _storage => SecureStore.instance;
 const _sessionKey = 'jellyflex.session';
 const _deviceIdKey = 'jellyflex.deviceId';
 const _lastServerKey = 'jellyflex.lastServer';
@@ -91,6 +110,12 @@ class SessionController extends AsyncNotifier<AuthSession?> {
       final accounts = await loadSavedAccounts();
       if (!accounts.any((a) => a.accountKey == session.accountKey)) {
         await _saveAccounts([...accounts, session]);
+      }
+      // Profil mit PIN: nicht automatisch öffnen, sondern über "Wer schaut?" mit PIN.
+      final saved = accounts.where((a) => a.accountKey == session.accountKey).firstOrNull;
+      if ((saved ?? session).hasPin) {
+        await _storage.delete(key: _sessionKey);
+        return null;
       }
       return session;
     } catch (_) {
@@ -137,9 +162,29 @@ class SessionController extends AsyncNotifier<AuthSession?> {
       userImageTag: result.userImageTag,
     );
     await _storage.write(key: _lastServerKey, value: server.url);
-    final accounts = [...await loadSavedAccounts()]..removeWhere((a) => a.accountKey == session.accountKey);
-    await _saveAccounts([session, ...accounts]);
-    await activate(session);
+    final previous = await loadSavedAccounts();
+    // Erneute Anmeldung behält eine gesetzte Profil-PIN.
+    final pin = previous.where((a) => a.accountKey == session.accountKey).firstOrNull?.pinHash;
+    final accounts = [...previous]..removeWhere((a) => a.accountKey == session.accountKey);
+    final withPin = session.withPin(pin);
+    await _saveAccounts([withPin, ...accounts]);
+    await activate(withPin);
+  }
+
+  /// Profil-PIN des angemeldeten Kontos setzen (`null` = entfernen).
+  Future<void> setPin(String? pinHash) async {
+    final session = state.value;
+    if (session == null) return;
+    final updated = session.withPin(pinHash);
+    final saved = await loadSavedAccounts();
+    final accounts = [
+      for (final a in saved) a.accountKey == session.accountKey ? updated : a,
+      if (!saved.any((a) => a.accountKey == session.accountKey)) updated,
+    ];
+    await _saveAccounts(accounts);
+    await _storage.write(key: _sessionKey, value: jsonEncode(updated.toJson()));
+    state = AsyncData(updated);
+    ref.invalidate(savedAccountsProvider);
   }
 
   /// Zu einem gespeicherten Konto wechseln.

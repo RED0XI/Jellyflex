@@ -12,6 +12,8 @@ import '../../widgets/brand_logo.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/focusable.dart';
 import '../../l10n/strings.dart';
+import '../../core/profile_pin.dart';
+import '../../widgets/pin_dialog.dart';
 import '../../core/image_cache.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -211,6 +213,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
+  /// Profil öffnen – mit PIN-Abfrage, falls eine gesetzt ist.
+  Future<void> _openProfile(AuthSession account) async {
+    final hash = account.pinHash;
+    if (hash != null) {
+      final pin = await showPinDialog(
+        context,
+        title: tr.pinFor(account.userName),
+        accountKey: account.accountKey,
+        check: (pin) => ProfilePin.verify(pin, hash),
+      );
+      if (pin == null || !mounted) return;
+    }
+    await ref.read(sessionProvider.notifier).activate(account);
+  }
+
   /// "Wer schaut?" – gespeicherte Konten zum schnellen Wechseln.
   Widget _buildProfiles(List<AuthSession> accounts) {
     return Column(
@@ -228,7 +245,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 name: a.userName,
                 subtitle: a.serverName,
                 imageUrl: a.userImageUrl,
-                onTap: () => ref.read(sessionProvider.notifier).activate(a),
+                locked: a.hasPin,
+                onTap: () => _openProfile(a),
                 onForget: () => ref.read(sessionProvider.notifier).forgetAccount(a),
               ),
             _ProfileTile(
@@ -484,6 +502,7 @@ class _ProfileTile extends StatefulWidget {
     this.icon,
     this.onForget,
     this.small = false,
+    this.locked = false,
   });
 
   final String name;
@@ -493,6 +512,9 @@ class _ProfileTile extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback? onForget;
   final bool small;
+
+  /// Mit Profil-PIN geschützt (kleines Schloss).
+  final bool locked;
 
   @override
   State<_ProfileTile> createState() => _ProfileTileState();
@@ -562,16 +584,27 @@ class _ProfileTileState extends State<_ProfileTile> {
                     ),
             ),
             const SizedBox(height: 10),
-            Text(
-              widget.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: widget.small ? 12.5 : 15,
-                fontWeight: FontWeight.w600,
-                color: hovered ? Colors.white : AppColors.textSecondary,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.locked) ...[
+                  Icon(Icons.lock_rounded, size: 14, color: AppColors.textMuted, semanticLabel: tr.pinProtected),
+                  const SizedBox(width: 4),
+                ],
+                Flexible(
+                  child: Text(
+                    widget.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: widget.small ? 12.5 : 15,
+                      fontWeight: FontWeight.w600,
+                      color: hovered ? Colors.white : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
             ),
             if (widget.subtitle != null)
               Text(

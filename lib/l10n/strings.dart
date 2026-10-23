@@ -236,6 +236,30 @@ class S {
   String get goodEvening => _t('Good evening', 'Guten Abend');
   String get coverStory => _t('Cover story', 'Titelgeschichte');
   String get layout => _t('Layout', 'Layout');
+  String get profilePin => _t('Profile PIN', 'Profil-PIN');
+  String get profilePinHint => _t(
+    'Optional: asks for a PIN before this profile opens on this computer.',
+    'Optional: fragt nach einer PIN, bevor dieses Profil auf diesem Computer öffnet.',
+  );
+  String get profilePinOnHint =>
+      _t('On – this profile only opens with its PIN.', 'An – dieses Profil öffnet nur mit seiner PIN.');
+  String get pinSet => _t('Set PIN', 'PIN festlegen');
+  String get pinChange => _t('Change PIN', 'PIN ändern');
+  String get pinRemove => _t('Remove', 'Entfernen');
+  String get pinSaved => _t('PIN saved', 'PIN gespeichert');
+  String get pinRemoved => _t('PIN removed', 'PIN entfernt');
+  String get pinCurrent => _t('Current PIN', 'Aktuelle PIN');
+  String get pinChoose => _t('Choose a PIN', 'PIN wählen');
+  String get pinChooseHint => _t('4 to 6 digits', '4 bis 6 Ziffern');
+  String get pinRepeat => _t('Repeat PIN', 'PIN wiederholen');
+  String get pinFormat => _t('Please enter 4 to 6 digits', 'Bitte 4 bis 6 Ziffern eingeben');
+  String get pinWrong => _t('Wrong PIN', 'Falsche PIN');
+  String pinLocked(int s) => _t('Too many tries – wait $s s', 'Zu viele Versuche – $s s warten');
+  String pinFor(String name) => _t('PIN for $name', 'PIN für $name');
+  String pinDigits(int n) => _t('$n digits entered', '$n Ziffern eingegeben');
+  String get pinDelete => _t('Delete digit', 'Ziffer löschen');
+  String get pinConfirm => _t('Confirm', 'Bestätigen');
+  String get pinProtected => _t('Protected with PIN', 'Mit PIN geschützt');
   String downloadFinished(String name) => _t('“$name” is downloaded', '„$name“ ist heruntergeladen');
   String downloadsFinished(int n) => _t('$n downloads finished', '$n Downloads fertig');
   String get themeMusic => _t('Theme music', 'Titelmusik');
