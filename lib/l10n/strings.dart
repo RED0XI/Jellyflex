@@ -236,6 +236,17 @@ class S {
   String get goodEvening => _t('Good evening', 'Guten Abend');
   String get coverStory => _t('Cover story', 'Titelgeschichte');
   String get layout => _t('Layout', 'Layout');
+  String get select => _t('Select', 'Auswählen');
+  String get selected => _t('selected', 'ausgewählt');
+  String get notSelected => _t('not selected', 'nicht ausgewählt');
+  String selectedCount(int n) => _t('$n selected', '$n ausgewählt');
+  String get selectAll => _t('Select all', 'Alle auswählen');
+  String get endSelection => _t('End selection (Esc)', 'Auswahl beenden (Esc)');
+  String get favorite => _t('Favorite', 'Favorit');
+  String get selectionMarkedWatched => _t('Marked as watched', 'Als gesehen markiert');
+  String get selectionMarkedUnwatched => _t('Marked as unwatched', 'Als ungesehen markiert');
+  String get selectionAddedToFavorites => _t('Added to favorites', 'Zu Favoriten hinzugefügt');
+  String get selectionDownloading => _t('Downloads started', 'Downloads gestartet');
   String get recentSearches => _t('Recent searches', 'Letzte Suchen');
   String get clearHistory => _t('Clear history', 'Verlauf löschen');
   String get filterAll => _t('All', 'Alle');

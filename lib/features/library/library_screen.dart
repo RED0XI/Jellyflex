@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:flutter/services.dart';
+
+import '../../core/downloads.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../theme.dart';
@@ -11,6 +14,8 @@ import '../../widgets/states.dart';
 import '../../widgets/top_scrim.dart';
 import '../../widgets/focusable.dart';
 import '../../l10n/strings.dart';
+import '../home/home_providers.dart';
+import 'library_selection.dart';
 
 enum LibrarySort {
   name('SortName', 'Ascending'),
@@ -126,6 +131,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   List<String> _genres = const [];
   int _requestId = 0;
 
+  /// Auswahlmodus: `null` = aus, sonst die ausgewählten Kennungen.
+  Set<String>? _selection;
+  bool _busy = false;
+
   String get _includeTypes => switch (widget.collectionType) {
     'movies' => 'Movie',
     'tvshows' => 'Series',
@@ -135,6 +144,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_onKey);
     _scroll.addListener(_maybeLoadMore);
     _loadMore();
     ref
@@ -146,8 +156,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         .catchError((_) {});
   }
 
+  /// Esc beendet den Auswahlmodus – egal, wo gerade der Fokus liegt.
+  bool _onKey(KeyEvent event) {
+    if (_selection == null || event is! KeyDownEvent || event.logicalKey != LogicalKeyboardKey.escape) return false;
+    if (!(ModalRoute.of(context)?.isCurrent ?? false)) return false;
+    setState(() => _selection = null);
+    return true;
+  }
+
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
     _scroll.dispose();
     super.dispose();
   }
@@ -197,6 +216,50 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     } finally {
       if (mounted && id == _requestId) setState(() => _loading = false);
     }
+  }
+
+  void _toggleSelect(BaseItem item) => setState(() {
+    final s = _selection!;
+    if (!s.remove(item.id)) s.add(item.id);
+  });
+
+  List<BaseItem> get _selected => _items.where((i) => _selection?.contains(i.id) ?? false).toList();
+
+  /// Aktion für alle ausgewählten Titel ausführen, danach deren Daten neu laden.
+  Future<void> _bulk(Future<void> Function(BaseItem item) action, String done) async {
+    final items = _selected;
+    if (items.isEmpty) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    setState(() => _busy = true);
+    var failed = 0;
+    for (final item in items) {
+      try {
+        await action(item);
+      } catch (_) {
+        failed++;
+      }
+      if (!mounted) return;
+    }
+    try {
+      final fresh = await ref.read(apiProvider).getItemsByIds([for (final i in items) i.id]);
+      final byId = {for (final f in fresh) f.id: f};
+      if (mounted) {
+        setState(() {
+          for (var i = 0; i < _items.length; i++) {
+            _items[i] = byId[_items[i].id] ?? _items[i];
+          }
+        });
+      }
+    } catch (_) {}
+    ref.invalidate(homeProvider);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _selection = {};
+    });
+    messenger?.showSnackBar(
+      SnackBar(content: Text(failed == 0 ? done : tr.didNotWork), behavior: SnackBarBehavior.floating, width: 420),
+    );
   }
 
   void _apply(LibraryFilter filter) {
@@ -285,6 +348,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                               selected: f.decade,
                               onSelected: (d) => _apply(f.copyWith(decade: () => d)),
                             ),
+                            _ToggleChip(
+                              label: tr.select,
+                              icon: Icons.checklist_rounded,
+                              active: _selection != null,
+                              onTap: () => setState(() => _selection = _selection == null ? {} : null),
+                            ),
                             if (f.hasFilters)
                               TextButton.icon(
                                 onPressed: () => _apply(LibraryFilter(sort: f.sort)),
@@ -352,7 +421,24 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             mainAxisExtent: cardWidth * 1.5 + kCardTextHeight,
                           ),
                           itemCount: _items.length,
-                          itemBuilder: (context, i) => PosterCard(item: _items[i], width: cardWidth),
+                          itemBuilder: (context, i) {
+                            final card = PosterCard(item: _items[i], width: cardWidth);
+                            final selection = _selection;
+                            if (selection == null) return card;
+                            // Im Auswahlmodus wählt ein Klick an/ab statt zu öffnen.
+                            return Stack(
+                              children: [
+                                ExcludeFocus(child: card),
+                                Positioned.fill(
+                                  child: SelectableOverlay(
+                                    item: _items[i],
+                                    selected: selection.contains(_items[i].id),
+                                    onToggle: () => _toggleSelect(_items[i]),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         );
                       },
                     ),
@@ -367,6 +453,32 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ),
           ),
           TopScrim(scroll: _scroll),
+          if (_selection case final selection?)
+            Positioned(
+              left: 0,
+              right: 0,
+              // Über Meldungen (Snackbars) und dem Offline-Hinweis.
+              bottom: 96,
+              child: Center(
+                child: SelectionBar(
+                  count: selection.length,
+                  busy: _busy,
+                  onWatched: () => _bulk((i) => ref.read(apiProvider).setPlayed(i.id, true), tr.selectionMarkedWatched),
+                  onUnwatched: () =>
+                      _bulk((i) => ref.read(apiProvider).setPlayed(i.id, false), tr.selectionMarkedUnwatched),
+                  onFavorite: () =>
+                      _bulk((i) => ref.read(apiProvider).setFavorite(i.id, true), tr.selectionAddedToFavorites),
+                  // Herunterladen geht nur bei Filmen (Serien über die Staffeln).
+                  onDownload: _selected.any((i) => i.isMovie)
+                      ? () => _bulk((i) async {
+                          if (i.isMovie) await ref.read(downloadsProvider.notifier).enqueue(i);
+                        }, tr.selectionDownloading)
+                      : null,
+                  onSelectAll: () => setState(() => selection.addAll(_items.map((i) => i.id))),
+                  onClose: () => setState(() => _selection = null),
+                ),
+              ),
+            ),
         ],
       ),
     );
