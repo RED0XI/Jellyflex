@@ -424,12 +424,13 @@ Object? _handle(HttpRequest req) {
   if (path == '/Items/Latest') {
     return q['parentId'] == 'lib-shows' ? series.reversed.toList() : movies.reversed.toList();
   }
-  if (path == '/Genres')
+  if (path == '/Genres') {
     return {
       'Items': [
         for (final g in _genres) {'Name': g, 'Id': 'genre-$g'},
       ],
     };
+  }
   if (path == '/Movies/Recommendations') {
     return [
       {
