@@ -470,6 +470,15 @@ class JellyfinApi {
     return null;
   }
 
+  /// Titelmusik eines Films/einer Serie (oder `null`).
+  Future<BaseItem?> getThemeSong(String itemId) async {
+    final songs = await _getItems('/Items/$itemId/ThemeSongs', {'userId': userId, 'inheritFromParent': true});
+    return songs.firstOrNull;
+  }
+
+  /// Audio-Datei unverändert streamen (Authorization im Kopf, nicht in der Adresse).
+  String audioStreamUrl(String id) => '$baseUrl/Audio/$id/stream?static=true';
+
   /// Genres einer Bibliothek (für Filter und Genre-Reihen).
   Future<List<String>> getGenres(String? parentId, {String includeItemTypes = 'Movie,Series'}) async {
     final items = await _getItems('/Genres', {

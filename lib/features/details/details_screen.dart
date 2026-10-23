@@ -22,6 +22,7 @@ import '../home/hero_banner.dart';
 import '../home/home_providers.dart';
 import '../../widgets/focusable.dart';
 import 'media_info_dialog.dart';
+import 'theme_music.dart';
 import '../../l10n/strings.dart';
 
 final itemProvider = FutureProvider.autoDispose.family<BaseItem, String>((ref, id) async {
@@ -131,6 +132,7 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
 
     return Stack(
       children: [
+        ThemeMusic(itemId: item.isEpisode ? (item.seriesId ?? item.id) : item.id),
         // Hintergrundbild, wird beim Scrollen dunkler.
         Positioned(
           top: 0,

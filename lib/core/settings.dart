@@ -58,6 +58,7 @@ class AppSettings {
     this.imageCacheMb = 300,
     this.layoutId = 'cinema',
     this.recentSearches = const [],
+    this.themeMusic = false,
     this.updateCheck = false,
     this.seasonalThemes = true,
     this.ambilight = AmbilightMode.window,
@@ -96,6 +97,9 @@ class AppSettings {
 
   /// Letzte Suchbegriffe (nur auf diesem Gerät, höchstens 8).
   final List<String> recentSearches;
+
+  /// Titelmusik auf Detailseiten (Standard: aus).
+  final bool themeMusic;
 
   /// Beim Start nach einer neuen Version fragen (Standard: aus).
   final bool updateCheck;
@@ -149,6 +153,7 @@ class AppSettings {
     int? imageCacheMb,
     String? layoutId,
     List<String>? recentSearches,
+    bool? themeMusic,
     bool? updateCheck,
     bool? seasonalThemes,
     AmbilightMode? ambilight,
@@ -172,6 +177,7 @@ class AppSettings {
     imageCacheMb: imageCacheMb ?? this.imageCacheMb,
     layoutId: layoutId ?? this.layoutId,
     recentSearches: recentSearches ?? this.recentSearches,
+    themeMusic: themeMusic ?? this.themeMusic,
     updateCheck: updateCheck ?? this.updateCheck,
     seasonalThemes: seasonalThemes ?? this.seasonalThemes,
     ambilight: ambilight ?? this.ambilight,
@@ -197,6 +203,7 @@ class AppSettings {
     'imageCacheMb': imageCacheMb,
     'layoutId': layoutId,
     'recentSearches': recentSearches,
+    'themeMusic': themeMusic,
     'updateCheck': updateCheck,
     'seasonalThemes': seasonalThemes,
     'ambilight': ambilight.name,
@@ -222,6 +229,7 @@ class AppSettings {
     imageCacheMb: ((json['imageCacheMb'] as num?)?.toInt() ?? 300).clamp(0, 5000),
     updateCheck: json['updateCheck'] as bool? ?? false,
     layoutId: json['layoutId'] as String? ?? 'cinema',
+    themeMusic: json['themeMusic'] as bool? ?? false,
     recentSearches: [
       for (final s in (json['recentSearches'] as List?) ?? const [])
         if (s is String && s.trim().isNotEmpty) s.trim(),

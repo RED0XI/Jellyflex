@@ -174,6 +174,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ),
                             _Row(
+                              title: tr.themeMusic,
+                              subtitle: tr.themeMusicHint,
+                              trailing: _Toggle(
+                                value: s.themeMusic,
+                                onChanged: (v) => ctrl.update((s) => s.copyWith(themeMusic: v)),
+                              ),
+                            ),
+                            _Row(
                               title: tr.autoSkipIntro,
                               subtitle: tr.autoSkipIntroHint,
                               trailing: _Toggle(

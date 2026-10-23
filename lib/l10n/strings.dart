@@ -236,6 +236,11 @@ class S {
   String get goodEvening => _t('Good evening', 'Guten Abend');
   String get coverStory => _t('Cover story', 'Titelgeschichte');
   String get layout => _t('Layout', 'Layout');
+  String get themeMusic => _t('Theme music', 'Titelmusik');
+  String get themeMusicHint => _t(
+    'Plays a title’s theme song quietly on its page (if your server has one).',
+    'Spielt leise die Titelmusik auf der Detailseite (falls der Server eine hat).',
+  );
   String get select => _t('Select', 'Auswählen');
   String get selected => _t('selected', 'ausgewählt');
   String get notSelected => _t('not selected', 'nicht ausgewählt');

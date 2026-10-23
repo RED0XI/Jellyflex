@@ -29,6 +29,9 @@ final _sockets = <WebSocket>{};
 /// Bytes pro Sekunde beim Ausliefern von Videos (0 = so schnell wie möglich).
 var _throttleBps = 0;
 
+/// Zuletzt angefragte Titelmusik (für Tests).
+String? _lastThemeSong;
+
 /// Verzögerung je Bild (simuliert ein langsames Netz) und Anzahl ausgelieferter Bilder.
 var _imageDelayMs = 0;
 var _imageRequests = 0;
@@ -547,6 +550,14 @@ Object? _handle(HttpRequest req) {
   final seg = path.split('/').where((s) => s.isNotEmpty).toList();
 
   if (path == '/System/Ping') return 'Jellyfin Server';
+  // Titelmusik: jeder Titel hat eine (das Testvideo, nur der Ton zählt).
+  if (seg.length == 3 && seg[0] == 'Items' && seg[2] == 'ThemeSongs') {
+    return {
+      'Items': [
+        {'Id': 'theme_${seg[1]}', 'Name': 'Titelmusik', 'Type': 'Audio'},
+      ],
+    };
+  }
   if (path == '/Persons') {
     final term = (q['searchTerm'] ?? '').toLowerCase();
     return _page([
@@ -800,6 +811,16 @@ Future<void> main() async {
           s.add(body);
         }
         res.write('{"sent": ${_sockets.length}}');
+        await res.close();
+        continue;
+      }
+      if (seg.length == 3 && seg[0] == 'Audio' && seg[2] == 'stream') {
+        _lastThemeSong = seg[1];
+        unawaited(_serveVideo(req));
+        continue;
+      }
+      if (req.uri.path == '/debug/lasttheme') {
+        res.write(jsonEncode({'id': _lastThemeSong}));
         await res.close();
         continue;
       }
