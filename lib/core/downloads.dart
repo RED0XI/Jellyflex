@@ -66,6 +66,9 @@ class DownloadEntry {
   /// Lokaler Fortschritt wurde noch nicht an den Server gemeldet.
   final bool needsSync;
 
+  /// Eindeutig je Konto: derselbe Titel kann von zwei Konten geladen sein.
+  String get key => '$serverUrl|$userId|$itemId';
+
   double get progress => total > 0 ? (received / total).clamp(0, 1).toDouble() : 0;
   bool get isDone => status == DownloadStatus.done && mediaFile != null;
   bool get isActive => status == DownloadStatus.queued || status == DownloadStatus.downloading;
@@ -192,7 +195,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
 
   final Directory? _rootOverride;
   CancelToken? _cancel;
-  String? _runningId;
+  String? _runningKey;
   Future<void>? _running;
   Timer? _saveTimer;
   Timer? _syncTimer;
@@ -239,15 +242,43 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     return const [];
   }
 
-  DownloadEntry? entryFor(String itemId) => state.where((e) => e.itemId == itemId).firstOrNull;
+  /// Gehört der Download zum angemeldeten Konto? Andere Konten (z. B. ein
+  /// Kinderprofil) sehen fremde Downloads nicht.
+  bool isMine(DownloadEntry e) {
+    final session = ref.read(sessionProvider).value;
+    return session != null && e.serverUrl == session.serverUrl && e.userId == session.userId;
+  }
+
+  /// Download eines Titels für das angemeldete Konto (oder `null`).
+  DownloadEntry? entryFor(String itemId) => state.where((e) => e.itemId == itemId && isMine(e)).firstOrNull;
+
+  /// Kennungen vom Server werden Ordnernamen – nur harmlose Zeichen zulassen.
+  static final _safeId = RegExp(r'^[A-Za-z0-9_-]{1,64}$');
+  static final _safeExt = RegExp(r'^[a-z0-9]{1,8}$');
+
+  /// Kurze, gleichbleibende Kennung eines Kontos für Ordnernamen (FNV-1a).
+  static String _ownerTag(String serverUrl, String userId) {
+    var hash = 0x811c9dc5;
+    for (final unit in '$serverUrl|$userId'.codeUnits) {
+      hash = ((hash ^ unit) * 0x01000193) & 0xFFFFFFFF;
+    }
+    return hash.toRadixString(16).padLeft(8, '0');
+  }
+
+  /// Liegt [path] wirklich im Download-Ordner (und ist nicht der Ordner selbst)?
+  bool _insideRoot(String path) {
+    final base = '${root.absolute.path.toLowerCase().replaceAll('/', '\\')}\\';
+    final target = Directory(path).absolute.path.toLowerCase().replaceAll('/', '\\');
+    return target.startsWith(base) && !target.substring(base.length).contains('..');
+  }
 
   /// Titel (Film oder Folge) zum Herunterladen vormerken – optional eine bestimmte Fassung.
   Future<void> enqueue(BaseItem item, {String? mediaSourceId}) async {
     if (item.isSeries || item.isSeason || item.isCollection) return;
     if (entryFor(item.id) != null) return;
     final session = ref.read(sessionProvider).value;
-    if (session == null) return;
-    final folder = '${root.path}\\${item.id}';
+    if (session == null || !_safeId.hasMatch(item.id)) return;
+    final folder = '${root.path}\\${item.id}-${_ownerTag(session.serverUrl, session.userId)}';
     _set([
       ...state,
       DownloadEntry(
@@ -277,13 +308,17 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   }
 
   void pause(String itemId) {
+    final entry = entryFor(itemId);
+    if (entry == null) return;
     // Erst den Status setzen, damit der laufende Download den Abbruch als Pause erkennt.
-    _update(itemId, (e) => e.copyWith(status: DownloadStatus.paused));
-    if (_runningId == itemId) _cancel?.cancel('pausiert');
+    _update(entry.key, (e) => e.copyWith(status: DownloadStatus.paused));
+    if (_runningKey == entry.key) _cancel?.cancel('pausiert');
   }
 
   void resume(String itemId) {
-    _update(itemId, (e) => e.copyWith(status: DownloadStatus.queued, error: () => null));
+    final entry = entryFor(itemId);
+    if (entry == null) return;
+    _update(entry.key, (e) => e.copyWith(status: DownloadStatus.queued, error: () => null));
     _pump();
   }
 
@@ -291,8 +326,8 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   Future<void> remove(String itemId) async {
     final entry = entryFor(itemId);
     if (entry == null) return;
-    _set(state.where((e) => e.itemId != itemId).toList());
-    if (_runningId == itemId) {
+    _set(state.where((e) => e.key != entry.key).toList());
+    if (_runningKey == entry.key) {
       _cancel?.cancel('gelöscht');
       // Windows kann geöffnete Dateien nicht löschen → erst den Download beenden lassen.
       try {
@@ -300,6 +335,11 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       } catch (_) {}
     }
     final dir = Directory(entry.folder);
+    // Niemals außerhalb des Download-Ordners löschen.
+    if (!_insideRoot(dir.path)) {
+      _pump();
+      return;
+    }
     for (var attempt = 0; attempt < 5; attempt++) {
       try {
         if (await dir.exists()) await dir.delete(recursive: true);
@@ -312,20 +352,21 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   }
 
   /// Belegter Speicherplatz aller Downloads (Bytes).
-  int get usedBytes => state.fold(0, (sum, e) => sum + (e.isDone ? e.total : e.received));
+  int get usedBytes => state.where(isMine).fold(0, (sum, e) => sum + (e.isDone ? e.total : e.received));
 
   // --- Offline geschaut -------------------------------------------------------
 
   /// Merkt sich die Stelle, an der ein heruntergeladener Titel gerade läuft.
   /// [synced] = der Server hat den Stand bereits (Wiedergabe online gemeldet).
   void savePlayback(String itemId, {required int positionTicks, int? runtimeTicks, required bool synced}) {
-    if (entryFor(itemId) == null) return;
+    final entry = entryFor(itemId);
+    if (entry == null) return;
     // Wie Jellyfin: unter 5 % zählt nicht als angefangen, ab 90 % als gesehen.
     final runtime = runtimeTicks ?? 0;
     final played = runtime > 0 && positionTicks >= runtime * 0.9;
     final position = played || (runtime > 0 && positionTicks < runtime * 0.05) ? 0 : positionTicks;
     _update(
-      itemId,
+      entry.key,
       (e) => e.copyWith(positionTicks: position, played: played, watchedAt: DateTime.now(), needsSync: !synced),
     );
   }
@@ -355,7 +396,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
               'LastPlayedDate': watchedAt.toUtc().toIso8601String(),
             });
           }
-          _update(entry.itemId, (e) => e.watchedAt == entry.watchedAt ? e.copyWith(needsSync: false) : e);
+          _update(entry.key, (e) => e.watchedAt == entry.watchedAt ? e.copyWith(needsSync: false) : e);
         } catch (e) {
           debugPrint('Offline-Fortschritt noch nicht gemeldet (${entry.name}): $e');
           break; // Server vermutlich nicht erreichbar – später erneut.
@@ -374,7 +415,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     final current = order(episode);
     final candidates = [
       for (final e in state)
-        if (e.isDone && e.type == 'Episode' && e.itemId != episode.id) ?e.loadItem(),
+        if (isMine(e) && e.isDone && e.type == 'Episode' && e.itemId != episode.id) ?e.loadItem(),
     ].where((i) => i.seriesId == seriesId && order(i) > current).toList()..sort((a, b) => order(a).compareTo(order(b)));
     return candidates.firstOrNull;
   }
@@ -382,8 +423,9 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   // --- Interna --------------------------------------------------------------
 
   void _pump() {
-    if (_runningId != null) return;
-    final next = state.where((e) => e.status == DownloadStatus.queued).firstOrNull;
+    if (_runningKey != null) return;
+    // Nur Downloads des angemeldeten Kontos laufen lassen.
+    final next = state.where((e) => e.status == DownloadStatus.queued && isMine(e)).firstOrNull;
     if (next == null) return;
     _running = _run(next);
   }
@@ -392,14 +434,14 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     final session = ref.read(sessionProvider).value;
     // Nur mit dem Konto fortsetzen, das den Download begonnen hat.
     if (session == null || session.serverUrl != entry.serverUrl || session.userId != entry.userId) {
-      _update(entry.itemId, (e) => e.copyWith(status: DownloadStatus.paused, error: () => tr.otherAccountSignedIn));
+      _update(entry.key, (e) => e.copyWith(status: DownloadStatus.paused, error: () => tr.otherAccountSignedIn));
       return;
     }
     final api = ref.read(apiProvider);
     final cancel = CancelToken();
-    _runningId = entry.itemId;
+    _runningKey = entry.key;
     _cancel = cancel;
-    _update(entry.itemId, (e) => e.copyWith(status: DownloadStatus.downloading, error: () => null));
+    _update(entry.key, (e) => e.copyWith(status: DownloadStatus.downloading, error: () => null));
 
     try {
       await Directory(entry.folder).create(recursive: true);
@@ -408,11 +450,13 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       final source = sources.where((s) => s.id == entry.mediaSourceId).firstOrNull ?? sources.firstOrNull;
       if (source == null) throw Exception(tr.noFileFound);
       await File(entry.itemJsonPath).writeAsString(jsonEncode(item.raw));
-      await _downloadImages(api, item, entry);
-      await _downloadSubtitles(api, item, source, entry);
+      await _downloadImages(api, item, entry, cancel);
+      await _downloadSubtitles(api, item, source, entry, cancel);
       if (cancel.isCancelled) return;
 
-      final ext = (source.container ?? 'mkv').split(',').first;
+      // Dateiendung vom Server nur übernehmen, wenn sie harmlos ist.
+      final container = (source.container ?? '').split(',').first.toLowerCase();
+      final ext = _safeExt.hasMatch(container) ? container : 'mkv';
       final target = File('${entry.folder}\\media.$ext');
       final part = File('${target.path}.part');
       final already = await part.exists() ? await part.length() : 0;
@@ -441,11 +485,19 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
         total = contentLength > 0 ? (resumed ? already : 0) + contentLength : 0;
         final sink = part.openWrite(mode: resumed ? FileMode.append : FileMode.write);
         try {
+          var unflushed = 0;
           await for (final chunk in response.data!.stream) {
             if (cancel.isCancelled) break;
             sink.add(chunk);
             received += chunk.length;
-            _reportProgress(entry.itemId, received, total);
+            // Regelmäßig auf die Festplatte warten – sonst sammelt sich bei schnellem
+            // Netz und langsamer Platte viel Video im Arbeitsspeicher.
+            unflushed += chunk.length;
+            if (unflushed >= 8 * 1024 * 1024) {
+              await sink.flush();
+              unflushed = 0;
+            }
+            _reportProgress(entry.key, received, total);
           }
         } finally {
           await sink.close();
@@ -459,7 +511,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       if (await target.exists()) await target.delete();
       await part.rename(target.path);
       _update(
-        entry.itemId,
+        entry.key,
         (e) => e.copyWith(
           status: DownloadStatus.done,
           received: received,
@@ -477,46 +529,60 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
           DioException() => tr.noConnectionToServer,
           _ => '$e'.replaceFirst('Exception: ', ''),
         };
-        _update(entry.itemId, (x) => x.copyWith(status: DownloadStatus.failed, error: () => message));
+        _update(entry.key, (x) => x.copyWith(status: DownloadStatus.failed, error: () => message));
       }
     } finally {
-      _runningId = null;
+      _runningKey = null;
       _cancel = null;
       _pump();
     }
   }
 
-  Future<void> _downloadImages(JellyfinApi api, BaseItem item, DownloadEntry entry) async {
-    final dio = Dio();
+  /// Nebendateien: kurze Zeitlimits und abbrechbar (Pause/Löschen wartet sonst ewig).
+  static final _sideOptions = BaseOptions(
+    connectTimeout: const Duration(seconds: 15),
+    receiveTimeout: const Duration(seconds: 30),
+  );
+
+  Future<void> _downloadImages(JellyfinApi api, BaseItem item, DownloadEntry entry, CancelToken cancel) async {
+    final dio = Dio(_sideOptions);
     final poster = api.imageUrlOrNull(Images.poster(item), fillWidth: 400, fillHeight: 600);
     final backdrop = api.imageUrlOrNull(Images.landscape(item), maxWidth: 1280);
     for (final (url, path) in [(poster, entry.posterPath), (backdrop, entry.backdropPath)]) {
       if (url == null) continue;
       try {
-        await dio.download(url, path);
+        await dio.download(url, path, cancelToken: cancel);
       } catch (_) {}
     }
   }
 
-  Future<void> _downloadSubtitles(JellyfinApi api, BaseItem item, MediaSource source, DownloadEntry entry) async {
-    final dio = Dio(BaseOptions(headers: {'Authorization': api.authorizationHeader}));
+  Future<void> _downloadSubtitles(
+    JellyfinApi api,
+    BaseItem item,
+    MediaSource source,
+    DownloadEntry entry,
+    CancelToken cancel,
+  ) async {
+    final dio = Dio(_sideOptions.copyWith(headers: {'Authorization': api.authorizationHeader}));
     for (final s in source.mediaStreams.where((s) => s.type == 'Subtitle' && s.isExternal)) {
       final url = api.subtitleUrl(item.id, source.id, s);
+      final ext = url.split('.').last.toLowerCase();
+      if (!_safeExt.hasMatch(ext)) continue;
       try {
-        await dio.download(url, '${entry.folder}\\subtitle_${s.index}.${url.split('.').last}');
+        await dio.download(url, '${entry.folder}\\subtitle_${s.index}.$ext', cancelToken: cancel);
       } catch (_) {}
     }
   }
 
-  void _reportProgress(String itemId, int received, int total) {
+  void _reportProgress(String key, int received, int total) {
     final now = DateTime.now();
     if (now.difference(_lastProgressUpdate) < const Duration(milliseconds: 400)) return;
     _lastProgressUpdate = now;
-    _update(itemId, (e) => e.copyWith(received: received, total: total));
+    _update(key, (e) => e.copyWith(received: received, total: total));
   }
 
-  void _update(String itemId, DownloadEntry Function(DownloadEntry e) change) {
-    _set([for (final e in state) e.itemId == itemId ? change(e) : e]);
+  void _update(String key, DownloadEntry Function(DownloadEntry e) change) {
+    _set([for (final e in state) e.key == key ? change(e) : e]);
   }
 
   void _set(List<DownloadEntry> entries) {
@@ -536,10 +602,19 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
 
 final downloadsProvider = NotifierProvider<DownloadManager, List<DownloadEntry>>(DownloadManager.new);
 
-/// Fertiger Download eines Titels (oder `null`).
+/// Downloads des angemeldeten Kontos.
+final myDownloadsProvider = Provider<List<DownloadEntry>>((ref) {
+  final session = ref.watch(sessionProvider).value;
+  if (session == null) return const [];
+  return [
+    for (final e in ref.watch(downloadsProvider))
+      if (e.serverUrl == session.serverUrl && e.userId == session.userId) e,
+  ];
+});
+
+/// Download eines Titels für das angemeldete Konto (oder `null`).
 final downloadedProvider = Provider.family<DownloadEntry?, String>((ref, itemId) {
-  final entries = ref.watch(downloadsProvider);
-  return entries.where((e) => e.itemId == itemId).firstOrNull;
+  return ref.watch(myDownloadsProvider).where((e) => e.itemId == itemId).firstOrNull;
 });
 
 String formatBytes(int bytes) {

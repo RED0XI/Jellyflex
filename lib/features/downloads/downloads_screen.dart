@@ -31,7 +31,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final entries = ref.watch(downloadsProvider);
+    final entries = ref.watch(myDownloadsProvider);
     final manager = ref.read(downloadsProvider.notifier);
     final active = entries.where((e) => !e.isDone).toList();
     final done = entries.where((e) => e.isDone).toList();

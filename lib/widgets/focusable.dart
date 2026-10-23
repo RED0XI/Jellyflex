@@ -65,12 +65,7 @@ class _FocusableState extends State<Focusable> {
     final enabled = widget.enabled && widget.onTap != null;
     // Für Bildschirmleser: ein Knopf (mit Fokus), benannt nach seinem Text.
     return MergeSemantics(
-      child: Semantics(
-        button: true,
-        enabled: enabled,
-        label: widget.semanticLabel,
-        child: _detector(enabled),
-      ),
+      child: Semantics(button: true, enabled: enabled, label: widget.semanticLabel, child: _detector(enabled)),
     );
   }
 
