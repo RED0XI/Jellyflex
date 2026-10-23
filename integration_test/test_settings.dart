@@ -5,6 +5,7 @@ import 'package:jellyflex/core/downloads.dart';
 import 'package:jellyflex/core/secure_store.dart';
 import 'package:jellyflex/core/series_tracks.dart';
 import 'package:jellyflex/core/settings.dart';
+import 'package:jellyflex/core/version.dart';
 import 'package:jellyflex/l10n/strings.dart';
 
 /// Einstellungen für App-Tests: eine eigene Datei im Temp-Ordner – nie die echte
@@ -18,6 +19,9 @@ SettingsController testSettings([Directory? dir, AppLanguage language = AppLangu
   SeriesTracks.instance = SeriesTracks.forFile(File('${folder.path}\\series_tracks.json'));
   DownloadManager.testDirectory = folder;
   final file = File('${folder.path}\\settings.json');
-  if (!file.existsSync()) file.writeAsStringSync(jsonEncode({'language': language.name}));
+  // "Was ist neu" schon gesehen – sonst läge das Fenster in jedem Test über der App.
+  if (!file.existsSync()) {
+    file.writeAsStringSync(jsonEncode({'language': language.name, 'lastSeenVersion': appVersion}));
+  }
   return SettingsController(file);
 }

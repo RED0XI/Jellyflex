@@ -1003,4 +1003,11 @@ class S {
     'New versions are downloaded and checked in the background and installed when you close Jellyflex.',
     'Neue Versionen werden im Hintergrund geladen, geprüft und beim Schließen von Jellyflex installiert.',
   );
+
+  // --- Was ist neu -----------------------------------------------------------
+
+  String whatsNewTitle(String version) => _t('What’s new in Jellyflex $version', 'Neu in Jellyflex $version');
+  String versionLabelShort(String version) => _t('Version $version', 'Version $version');
+  String get allReleaseNotes => _t('All release notes', 'Alle Versionshinweise');
+  String get gotIt => _t('Got it', 'Alles klar');
 }

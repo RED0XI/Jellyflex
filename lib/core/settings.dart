@@ -79,6 +79,7 @@ class AppSettings {
     this.smartMaxGb = 0,
     this.pinLockMinutes = 0,
     this.autoUpdate = true,
+    this.lastSeenVersion,
   });
 
   /// Zuletzt eingestellte Lautstärke im Player (0–100).
@@ -116,6 +117,9 @@ class AppSettings {
 
   /// Gefundene Updates im Hintergrund laden, prüfen und beim Beenden installieren.
   final bool autoUpdate;
+
+  /// Version, deren Neuigkeiten zuletzt gezeigt wurden (für "Was ist neu").
+  final String? lastSeenVersion;
 
   /// Klänge bei "Überrasch mich" und im Quiz.
   final bool soundEffects;
@@ -222,6 +226,7 @@ class AppSettings {
     int? smartMaxGb,
     int? pinLockMinutes,
     bool? autoUpdate,
+    String? Function()? lastSeenVersion,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -258,6 +263,7 @@ class AppSettings {
     smartMaxGb: smartMaxGb ?? this.smartMaxGb,
     pinLockMinutes: pinLockMinutes ?? this.pinLockMinutes,
     autoUpdate: autoUpdate ?? this.autoUpdate,
+    lastSeenVersion: lastSeenVersion != null ? lastSeenVersion() : this.lastSeenVersion,
   );
 
   Map<String, dynamic> toJson() => {
@@ -296,6 +302,7 @@ class AppSettings {
     'smartMaxGb': smartMaxGb,
     'pinLockMinutes': pinLockMinutes,
     'autoUpdate': autoUpdate,
+    'lastSeenVersion': lastSeenVersion,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -334,6 +341,7 @@ class AppSettings {
     smartMaxGb: ((json['smartMaxGb'] as num?)?.toInt() ?? 0).clamp(0, 100000),
     pinLockMinutes: ((json['pinLockMinutes'] as num?)?.toInt() ?? 0).clamp(0, 24 * 60),
     autoUpdate: json['autoUpdate'] as bool? ?? true,
+    lastSeenVersion: json['lastSeenVersion'] as String?,
   );
 }
 
@@ -348,12 +356,16 @@ class SettingsController extends Notifier<AppSettings> {
 
   File get _file => _fileOverride ?? File('${appDataDir.path}\\settings.json');
 
+  /// Gab es beim Start schon Einstellungen? (Nein = frisch installiert.)
+  bool existedOnStart = false;
+
   @override
   AppSettings build() {
     // Tests mit eigener Einstellungsdatei bekommen auch einen eigenen Bild-Zwischenspeicher.
     if (_fileOverride case final file?) ImageDiskCache.instance.directory = Directory('${file.parent.path}\\images');
     try {
-      if (_file.existsSync()) {
+      existedOnStart = _file.existsSync();
+      if (existedOnStart) {
         final loaded = AppSettings.fromJson(jsonDecode(_file.readAsStringSync()) as Map<String, dynamic>);
         _apply(loaded);
         return loaded;

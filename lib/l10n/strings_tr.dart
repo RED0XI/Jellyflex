@@ -1275,4 +1275,12 @@ final class _Tr extends S {
   String get autoUpdate => 'Güncellemeleri otomatik yükle';
   @override
   String get autoUpdateHint => 'Yeni sürümler arka planda indirilir, kontrol edilir ve Jellyflex kapatılınca yüklenir.';
+  @override
+  String whatsNewTitle(String version) => 'Jellyflex $version sürümündeki yenilikler';
+  @override
+  String versionLabelShort(String version) => 'Sürüm $version';
+  @override
+  String get allReleaseNotes => 'Tüm sürüm notları';
+  @override
+  String get gotIt => 'Anladım';
 }

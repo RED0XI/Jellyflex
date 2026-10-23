@@ -76,7 +76,11 @@ void main() {
 
     // Hinweis auf ein Update: gut lesbar (helle Schrift auf dunklem Grund), Knopf "Aktualisieren".
     await offerUpdate(
-      const UpdateRelease('9.9.9', installerUrl: 'https://example.invalid/x.exe', signatureUrl: 'https://example.invalid/x.sig'),
+      const UpdateRelease(
+        '9.9.9',
+        installerUrl: 'https://example.invalid/x.exe',
+        signatureUrl: 'https://example.invalid/x.sig',
+      ),
       () => null,
       automatic: false,
     );
