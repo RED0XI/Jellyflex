@@ -619,33 +619,19 @@ class _SeasonsSectionState extends ConsumerState<_SeasonsSection> {
               final season = seasons[i];
               return _SeasonChip(
                 label: season.name,
+                watched: season.userData.played,
                 selected: season.id == selected,
                 onTap: () => setState(() => _selectedSeasonId = season.id),
               );
             },
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 0),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () async {
-                final episodes = ref.read(episodesProvider((widget.series.id, selected))).value ?? const <BaseItem>[];
-                final messenger = ScaffoldMessenger.maybeOf(context);
-                final added = await ref.read(downloadsProvider.notifier).enqueueAll(episodes);
-                messenger?.showSnackBar(
-                  SnackBar(
-                    content: Text(added == 0 ? tr.seasonAlreadyDownloaded : tr.episodesDownloading(added)),
-                    behavior: SnackBarBehavior.floating,
-                    width: 420,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.download_rounded, size: 18),
-              label: Text(tr.downloadSeason),
-            ),
-          ),
+        _SeasonTools(
+          series: widget.series,
+          season: seasons.firstWhere((s) => s.id == selected, orElse: () => seasons.first),
+          // Nach "als gesehen markieren" springt "Als Nächstes" in die nächste Staffel –
+          // die gewählte Staffel bleibt trotzdem stehen.
+          onAction: () => setState(() => _selectedSeasonId = selected),
         ),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
@@ -673,10 +659,13 @@ class _QualityBadge extends StatelessWidget {
 }
 
 class _SeasonChip extends StatefulWidget {
-  const _SeasonChip({required this.label, required this.selected, required this.onTap});
+  const _SeasonChip({required this.label, required this.selected, required this.onTap, this.watched = false});
 
   final String label;
   final bool selected;
+
+  /// Alle Folgen gesehen → kleiner Haken.
+  final bool watched;
   final VoidCallback onTap;
 
   @override
@@ -696,16 +685,139 @@ class _SeasonChipState extends State<_SeasonChip> {
           color: widget.selected ? Colors.white : Colors.white.withValues(alpha: hovered ? 0.16 : 0.08),
           borderRadius: BorderRadius.circular(22),
         ),
-        child: Text(
-          widget.label,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: widget.selected ? AppColors.background : AppColors.textPrimary,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.watched) ...[
+              Icon(
+                Icons.check_circle_rounded,
+                size: 16,
+                color: widget.selected ? AppColors.background : AppColors.accent,
+                semanticLabel: tr.watched,
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              widget.label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: widget.selected ? AppColors.background : AppColors.textPrimary,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+/// Werkzeuge für die gewählte Staffel: Fortschritt, ganz als gesehen/ungesehen
+/// markieren, herunterladen – mit Fortschritt der Downloads dieser Staffel.
+class _SeasonTools extends ConsumerWidget {
+  const _SeasonTools({required this.series, required this.season, required this.onAction});
+
+  final BaseItem series;
+  final BaseItem season;
+
+  /// Vor jeder Aktion: Auswahl der Staffel festhalten.
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final episodes = ref.watch(episodesProvider((series.id, season.id))).value ?? const <BaseItem>[];
+    final watched = episodes.where((e) => e.userData.played).length;
+    final allWatched = episodes.isNotEmpty && watched == episodes.length;
+    final ids = {for (final e in episodes) e.id};
+    final downloads = ref.watch(myDownloadsProvider).where((d) => ids.contains(d.itemId)).toList();
+    final done = downloads.where((d) => d.isDone).length;
+    final total = downloads.fold(0, (sum, d) => sum + (d.isDone ? d.received : d.total));
+    final received = downloads.fold(0, (sum, d) => sum + d.received);
+    final downloading = downloads.length > done;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+
+    void snack(String text) =>
+        messenger?.showSnackBar(SnackBar(content: Text(text), behavior: SnackBarBehavior.floating, width: 420));
+
+    Future<void> markAll(bool played) async {
+      if (played && !await _confirmMarkSeason(context, season.name, episodes.length)) return;
+      onAction();
+      try {
+        // Jellyfin markiert mit der Staffel alle ihre Folgen.
+        await ref.read(apiProvider).setPlayed(season.id, played);
+        ref.invalidate(episodesProvider((series.id, season.id)));
+        ref.invalidate(seasonsProvider(series.id));
+        ref.invalidate(seriesNextUpProvider(series.id));
+        ref.invalidate(homeProvider);
+        snack(played ? tr.seasonMarkedWatched(season.name) : tr.seasonMarkedUnwatched(season.name));
+      } catch (_) {
+        snack(tr.didNotWork);
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 0),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          if (episodes.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                tr.episodesWatchedOf(watched, episodes.length),
+                style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+              ),
+            ),
+          TextButton.icon(
+            onPressed: episodes.isEmpty ? null : () => markAll(!allWatched),
+            icon: Icon(allWatched ? Icons.remove_done_rounded : Icons.done_all_rounded, size: 18),
+            label: Text(allWatched ? tr.markSeasonUnwatched : tr.markSeasonWatched),
+          ),
+          TextButton.icon(
+            onPressed: episodes.isEmpty
+                ? null
+                : () async {
+                    final added = await ref.read(downloadsProvider.notifier).enqueueAll(episodes);
+                    snack(added == 0 ? tr.seasonAlreadyDownloaded : tr.episodesDownloading(added));
+                  },
+            icon: Icon(
+              done == episodes.length && episodes.isNotEmpty ? Icons.download_done_rounded : Icons.download_rounded,
+              size: 18,
+            ),
+            label: Text(downloads.isEmpty ? tr.downloadSeason : tr.downloadedOf(done, episodes.length)),
+          ),
+          if (downloading)
+            SizedBox(
+              width: 140,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: LinearProgressIndicator(
+                  value: total > 0 ? received / total : null,
+                  minHeight: 5,
+                  backgroundColor: Colors.white.withValues(alpha: 0.12),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<bool> _confirmMarkSeason(BuildContext context, String season, int count) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(tr.markSeasonWatchedQuestion(season)),
+      content: Text(tr.markSeasonWatchedDetail(count)),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr.cancel)),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(tr.markSeasonWatched)),
+      ],
+    ),
+  );
+  return ok ?? false;
 }
 
 class _EpisodesRow extends ConsumerWidget {

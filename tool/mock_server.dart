@@ -693,6 +693,16 @@ Object? _handle(HttpRequest req) {
     if (item != null) {
       final key = seg[0] == 'UserFavoriteItems' ? 'IsFavorite' : 'Played';
       item['UserData'][key] = req.method == 'POST';
+      if (key == 'Played' && (item['Type'] == 'Season' || item['Type'] == 'Series')) {
+        final now = DateTime.now().toUtc().toIso8601String();
+        for (final child in byId.values) {
+          if (child['SeasonId'] == seg[1] || child['SeriesId'] == seg[1]) {
+            child['UserData']['Played'] = req.method == 'POST';
+            if (req.method == 'POST') child['UserData']['LastPlayedDate'] = now;
+            child['UserData']['PlaybackPositionTicks'] = 0;
+          }
+        }
+      }
     }
     return item?['UserData'] ?? {};
   }

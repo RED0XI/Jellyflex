@@ -237,6 +237,19 @@ class S {
   String get coverStory => _t('Cover story', 'Titelgeschichte');
   String get layout => _t('Layout', 'Layout');
   String get recapOnlyYou => _t('Only your profile counts', 'Gezählt wird nur dein Profil');
+  String get watched => _t('Watched', 'Gesehen');
+  String episodesWatchedOf(int n, int total) => _t('$n of $total watched', '$n von $total gesehen');
+  String downloadedOf(int n, int total) => _t('$n of $total downloaded', '$n von $total heruntergeladen');
+  String get markSeasonWatched => _t('Mark season watched', 'Staffel als gesehen markieren');
+  String get markSeasonUnwatched => _t('Mark season unwatched', 'Staffel als ungesehen markieren');
+  String markSeasonWatchedQuestion(String season) =>
+      _t('Mark “$season” as watched?', '„$season“ als gesehen markieren?');
+  String markSeasonWatchedDetail(int n) => _t(
+    'All $n episodes will be marked as watched. Your yearly recap won’t count them as watched time.',
+    'Alle $n Folgen werden als gesehen markiert. Im Jahresrückblick zählen sie nicht als geschaute Zeit.',
+  );
+  String seasonMarkedWatched(String season) => _t('$season marked as watched', '$season als gesehen markiert');
+  String seasonMarkedUnwatched(String season) => _t('$season marked as unwatched', '$season als ungesehen markiert');
   String recapMarkedNote(int n) => _t(
     '$n ${n == 1 ? 'title was' : 'titles were'} only marked as watched (not counted)',
     '$n ${n == 1 ? 'Titel wurde' : 'Titel wurden'} nur als gesehen markiert (nicht gezählt)',
