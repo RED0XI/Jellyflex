@@ -44,12 +44,14 @@ zwei Untertitelspuren, siehe `lib/dev/player_harness.dart`):
 flutter test integration_test/player_tracks_test.dart -d windows
 ```
 
-**Downloads-Test** (braucht den laufenden Demo-Server und das Testvideo; prüft Laden, Pause,
-Löschen, Offline-Schauen und das Nachmelden des Fortschritts):
+**Weitere App-Tests** (brauchen den laufenden Demo-Server, die meisten auch das Testvideo), z. B.:
 
 ```bash
 flutter test integration_test/downloads_test.dart -d windows
 ```
+
+Je Datei ein eigener Aufruf – mehrere Dateien in einem Lauf scheitern unter Windows.
+Bildschirmfotos landen in `build/screenshots/`.
 
 ## Funktionen
 
@@ -73,6 +75,20 @@ flutter test integration_test/downloads_test.dart -d windows
 - Windows-Medienanzeige (Titel/Bild im Lautstärke-Overlay) und Medientasten
 - Einstellungen: bevorzugte Sprachen, Intro automatisch überspringen, Untertitelgröße …
 
+**Extras**
+
+- **Eigener Name und eigenes Logo** (Einstellungen → Personalisieren): erscheinen in der
+  Titelleiste, beim Start, bei der Anmeldung, im Fenstertitel und als Taskleisten-Symbol
+- **Überrasch mich** (🎲 oben): Poster-Rad wie ein Spielautomat, mit Filtern (Filme/Serien,
+  nur Ungesehenes, Genre, „fertig bis“ Uhrzeit)
+- **Bildschirmschoner**: nach einer Weile ohne Eingabe gleiten Bilder deiner Titel vorbei, mit Uhr
+- **Schlaf-Timer** (🌙 im Player): am Ende der Folge oder nach 15–90 Minuten, wird langsam leiser
+- **Saisonale Akzente**: Halloween, Weihnachten, Silvester, Valentinstag – Effekte und passende Reihe
+- **Ambilight**: die Farben des Bildes leuchten in den schwarzen Balken neben/über dem Video
+- **Mini-Player** (`P` im Player): kleines Fenster unten rechts, immer im Vordergrund
+- **Film-Quiz** (❓ oben): Welcher Film ist das? Unscharfes Bild wird immer deutlicher, mit Rekord
+- **Jahresrückblick** (Profilmenü): Stunden, Lieblingsgenre, Serie des Jahres … als Karten, als Bild speicherbar
+
 Bilder werden genauso ausgewählt wie in der offiziellen Jellyfin-Weboberfläche
 (`poster`/`folder`/`cover` → Primary, `backdrop`/`fanart` → Backdrop, `landscape`/`thumb` → Thumb,
 `logo`/`clearlogo` → Logo – inkl. Rückfall auf Staffel- bzw. Serienbilder), siehe `lib/core/images.dart`.
@@ -91,7 +107,10 @@ Bilder werden genauso ausgewählt wie in der offiziellen Jellyfin-Weboberfläche
 | Player | `↑` / `↓` | Lautstärke |
 | Player | `F` / `F11` / Doppelklick | Vollbild |
 | Player | `M` | Stumm |
-| Player | `Esc` | Vollbild verlassen bzw. Player schließen |
+| Player | `P` | Mini-Player an/aus |
+| Player | `Esc` | Mini-Player bzw. Vollbild verlassen, sonst Player schließen |
+| Quiz | `1`–`4`, `Enter` | Antworten, weiter |
+| Jahresrückblick | `←` / `→` | Karte zurück / weiter |
 
 **Ohne Maus:** Pfeiltasten bewegen die Auswahl (wie bei TV-Apps), Enter öffnet,
 Menütaste bzw. Umschalt+F10 öffnet das Kontextmenü.
