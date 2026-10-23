@@ -26,6 +26,7 @@ import 'theme.dart';
 import 'widgets/window_frame.dart';
 import 'l10n/strings.dart';
 import 'features/home/home_providers.dart';
+import 'widgets/offline_banner.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Bei jeder An-/Abmeldung die Weiterleitungen neu prüfen.
@@ -139,7 +140,10 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
         router: router,
         child: LiveHandler(
           router: router,
-          child: WindowFrame(router: router, child: child!),
+          child: WindowFrame(
+            router: router,
+            child: OfflineBanner(router: router, child: child!),
+          ),
         ),
       ),
     );

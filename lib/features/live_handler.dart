@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/live_connection.dart';
+import '../core/server_status.dart';
+import '../l10n/strings.dart';
 import '../theme.dart';
 import '../widgets/window_frame.dart';
 import 'details/details_screen.dart';
@@ -36,6 +38,21 @@ class _LiveHandlerState extends ConsumerState<LiveHandler> {
       _subscription?.cancel();
       _subscription = connection?.messages.listen(_onMessage);
     }, fireImmediately: true);
+    // Wieder erreichbar: Daten neu laden.
+    ref.listenManual<bool>(serverOnlineProvider, (was, online) {
+      if (was == false && online) {
+        _refresh();
+        appMessengerKey.currentState?.showSnackBar(
+          SnackBar(
+            content: Text(tr.backOnline),
+            behavior: SnackBarBehavior.floating,
+            width: 420,
+            backgroundColor: AppColors.surfaceHigh,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    });
   }
 
   @override

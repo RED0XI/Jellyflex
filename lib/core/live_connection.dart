@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'jellyfin_api.dart';
@@ -37,6 +38,17 @@ class LiveConnection {
   Stream<LiveMessage> get messages => _messages.stream;
   bool get isConnected => _socket != null;
 
+  /// Ob die Verbindung gerade steht (für die Anzeige "Server nicht erreichbar").
+  final connected = ValueNotifier<bool>(false);
+
+  /// Nicht auf die nächste Wartezeit warten, sondern sofort neu verbinden.
+  void retryNow() {
+    if (_closed || isConnected) return;
+    _reconnect?.cancel();
+    _attempt = 0;
+    _connect();
+  }
+
   void start() => _connect();
 
   /// Zählt Verbindungen – Meldungen alter Verbindungen werden ignoriert.
@@ -59,6 +71,7 @@ class LiveConnection {
       }
       _socket = socket;
       _attempt = 0;
+      connected.value = true;
       _subscription = socket.listen(
         (raw) {
           if (generation == _generation) _onData(raw);
@@ -118,6 +131,7 @@ class LiveConnection {
   void _scheduleReconnect() {
     _keepAlive?.cancel();
     _socket = null;
+    if (!_closed) connected.value = false;
     if (_closed || (_reconnect?.isActive ?? false)) return;
     _attempt++;
     final delay = Duration(seconds: math.min(60, 1 << math.min(_attempt, 6)));
@@ -132,6 +146,7 @@ class LiveConnection {
     await _socket?.close();
     _socket = null;
     await _messages.close();
+    connected.dispose();
   }
 }
 

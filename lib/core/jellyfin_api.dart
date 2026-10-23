@@ -219,6 +219,19 @@ class JellyfinApi {
   }
 
   /// Meldet dem Server, welche Fernsteuerbefehle diese App versteht.
+  /// Ist der Server erreichbar? (Kurze Anfrage ohne Daten.)
+  Future<bool> ping() async {
+    try {
+      final res = await dio.get<dynamic>(
+        '/System/Ping',
+        options: Options(sendTimeout: const Duration(seconds: 5), receiveTimeout: const Duration(seconds: 5)),
+      );
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> reportCapabilities() => dio.post(
     '/Sessions/Capabilities/Full',
     data: {

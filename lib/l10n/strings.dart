@@ -642,6 +642,9 @@ class S {
     'Der Server lieferte eine fremde Adresse – blockiert.',
   );
   String get noConnectionToServer => _t('No connection to the server', 'Keine Verbindung zum Server');
+  String get serverOffline => _t('Server not reachable', 'Server nicht erreichbar');
+  String get offlineHint => _t('Your downloads still work.', 'Deine Downloads funktionieren weiterhin.');
+  String get backOnline => _t('Connected to the server again', 'Wieder mit dem Server verbunden');
   String serverError(int? code) => _t('Server error $code', 'Server-Fehler $code');
   String get encryptionFailed => _t('Encryption failed', 'Verschlüsselung fehlgeschlagen');
 }

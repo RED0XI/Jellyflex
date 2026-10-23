@@ -546,6 +546,7 @@ Object? _handle(HttpRequest req) {
   final q = req.uri.queryParameters;
   final seg = path.split('/').where((s) => s.isNotEmpty).toList();
 
+  if (path == '/System/Ping') return 'Jellyfin Server';
   if (path == '/System/Info/Public') {
     return {'ServerName': 'Demo-Server', 'Version': '12.2.0', 'Id': 'mock-server', 'ProductName': 'Jellyfin Server'};
   }
@@ -708,7 +709,7 @@ Future<void> main() async {
     try {
       final seg = req.uri.pathSegments;
       // Live-Verbindung wie bei Jellyfin (/socket).
-      if (req.uri.path == '/socket' && WebSocketTransformer.isUpgradeRequest(req)) {
+      if (req.uri.path == '/socket' && WebSocketTransformer.isUpgradeRequest(req) && !_offline) {
         final socket = await WebSocketTransformer.upgrade(req);
         _sockets.add(socket);
         socket.add(jsonEncode({'MessageType': 'ForceKeepAlive', 'Data': 60}));
@@ -725,6 +726,11 @@ Future<void> main() async {
       }
       if (req.uri.path == '/debug/offline') {
         _offline = req.uri.queryParameters['on'] == '1';
+        if (_offline) {
+          for (final s in _sockets.toList()) {
+            await s.close();
+          }
+        }
         res.write('{"offline": $_offline}');
         await res.close();
         continue;
