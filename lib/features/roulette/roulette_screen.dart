@@ -16,6 +16,7 @@ import '../../widgets/jf_image.dart';
 import '../../widgets/media_cards.dart';
 import '../details/details_screen.dart';
 import '../../l10n/strings.dart';
+import '../../core/ui_sounds.dart';
 
 enum _Kind { movies, series, both }
 
@@ -59,12 +60,16 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
     super.initState();
     _spin.addListener(() {
       final t = const Cubic(0.12, 0.9, 0.22, 1).transform(_spin.value);
-      setState(() => _offset = _spinFrom + (_spinTo - _spinFrom) * t);
+      final next = _spinFrom + (_spinTo - _spinFrom) * t;
+      // Jedes Poster, das an der Mitte vorbeizieht, macht "tick".
+      if ((next + 0.5).floor() != (_offset + 0.5).floor()) UiSounds.play(UiSound.tick);
+      setState(() => _offset = next);
     });
     _spin.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         setState(() => _winner = _reel[_spinTo.round()]);
         _confetti.forward(from: 0);
+        UiSounds.play(UiSound.win);
         // Infos zum Gewinner ins Bild holen (bei kleinen Fenstern).
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!_scroll.hasClients) return;

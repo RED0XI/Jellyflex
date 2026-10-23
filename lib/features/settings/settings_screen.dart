@@ -301,6 +301,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               child: const BrandLogo(size: 34),
                             ),
                             _Row(
+                              title: tr.sounds,
+                              subtitle: tr.soundsHint,
+                              trailing: _Toggle(
+                                value: s.soundEffects,
+                                onChanged: (v) => ctrl.update((s) => s.copyWith(soundEffects: v)),
+                              ),
+                            ),
+                            _Row(
                               title: tr.appName,
                               subtitle: tr.appNameHint,
                               trailing: SizedBox(

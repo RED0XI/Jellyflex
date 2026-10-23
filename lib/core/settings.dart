@@ -7,6 +7,7 @@ import '../l10n/strings.dart';
 import 'format.dart';
 import '../theme.dart';
 import 'themes.dart';
+import 'ui_sounds.dart';
 
 /// Wählbare Sprachen für Ton und Untertitel (ISO 639-2, wie Jellyfin/mpv sie liefern).
 const settingsLanguages = ['ger', 'eng', 'jpn', 'fre', 'spa', 'ita', 'tur', 'kor', 'rus', 'por', 'chi'];
@@ -57,7 +58,11 @@ class AppSettings {
     this.quizHighscore = 0,
     this.language = AppLanguage.en,
     this.themeId = 'midnight',
+    this.soundEffects = true,
   });
+
+  /// Klänge bei "Überrasch mich" und im Quiz.
+  final bool soundEffects;
 
   /// Farbschema (siehe lib/core/themes.dart).
   final String themeId;
@@ -128,6 +133,7 @@ class AppSettings {
     int? quizHighscore,
     AppLanguage? language,
     String? themeId,
+    bool? soundEffects,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -146,6 +152,7 @@ class AppSettings {
     quizHighscore: quizHighscore ?? this.quizHighscore,
     language: language ?? this.language,
     themeId: themeId ?? this.themeId,
+    soundEffects: soundEffects ?? this.soundEffects,
   );
 
   Map<String, dynamic> toJson() => {
@@ -166,6 +173,7 @@ class AppSettings {
     'quizHighscore': quizHighscore,
     'language': language.name,
     'themeId': themeId,
+    'soundEffects': soundEffects,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -186,6 +194,7 @@ class AppSettings {
     quizHighscore: (json['quizHighscore'] as num?)?.toInt() ?? 0,
     language: AppLanguage.values.asNameMap()[json['language']] ?? AppLanguage.en,
     themeId: json['themeId'] as String? ?? 'midnight',
+    soundEffects: json['soundEffects'] as bool? ?? true,
   );
 }
 
@@ -207,6 +216,7 @@ class SettingsController extends Notifier<AppSettings> {
         final loaded = AppSettings.fromJson(jsonDecode(_file.readAsStringSync()) as Map<String, dynamic>);
         appLanguage = loaded.language;
         appPalette = paletteById(loaded.themeId);
+        UiSounds.enabled = loaded.soundEffects;
         return loaded;
       }
     } catch (_) {
@@ -219,6 +229,7 @@ class SettingsController extends Notifier<AppSettings> {
     final next = change(state);
     appLanguage = next.language;
     appPalette = paletteById(next.themeId);
+    UiSounds.enabled = next.soundEffects;
     state = next;
     try {
       _file.parent.createSync(recursive: true);

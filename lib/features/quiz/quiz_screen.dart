@@ -14,6 +14,7 @@ import '../../widgets/buttons.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/jf_image.dart';
 import '../../l10n/strings.dart';
+import '../../core/ui_sounds.dart';
 
 /// Eine Quizrunde: richtiger Titel, vier Antworten (in zufälliger Reihenfolge),
 /// Bildausschnitt, an dem gezoomt wird.
@@ -137,6 +138,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> with TickerProviderStat
     // 100 Punkte fürs Richtige, bis zu 900 dazu für Schnelligkeit.
     final points = right ? 100 + (900 * (1 - _reveal.value)).round() : 0;
     _reveal.stop();
+    UiSounds.play(right ? UiSound.correct : UiSound.wrong);
     setState(() {
       _picked = item ?? round.answer;
       _lastPoints = points;

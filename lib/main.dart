@@ -4,10 +4,12 @@ import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
+import 'core/ui_sounds.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
+  UiSounds.preload();
   await windowManager.ensureInitialized();
 
   const options = WindowOptions(

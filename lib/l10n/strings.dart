@@ -230,6 +230,11 @@ class S {
     'An image (PNG, JPG …) – shown before the name and as the taskbar icon.',
     'Ein Bild (PNG, JPG …) – wird vor dem Namen und als Symbol in der Taskleiste gezeigt.',
   );
+  String get sounds => _t('Sounds', 'Klänge');
+  String get soundsHint => _t(
+    'Ticks and jingles in “Surprise me” and the movie quiz.',
+    'Ticken und Melodien bei „Überrasch mich“ und im Film-Quiz.',
+  );
   String get theme => _t('Theme', 'Theme');
   String get themeHint => _t('Colours of the whole app – changes instantly.', 'Farben der ganzen App – wirkt sofort.');
   String themeName(String id) => switch (id) {
