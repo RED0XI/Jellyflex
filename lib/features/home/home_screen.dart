@@ -6,12 +6,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/images.dart';
 import '../../core/models.dart';
+import '../../core/seasons.dart';
 import '../../core/session.dart';
 import '../../theme.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/jf_image.dart';
 import '../../widgets/media_cards.dart';
 import '../../widgets/media_row.dart';
+import '../../widgets/seasonal_particles.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/states.dart';
 import 'hero_banner.dart';
@@ -37,6 +39,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final home = ref.watch(homeProvider);
+    final season = ref.watch(activeSeasonProvider);
+    final seasonal = ref.watch(seasonalSectionProvider).value;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final heroHeight = (screenHeight * 0.80).clamp(520.0, 920.0);
 
@@ -49,32 +53,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               controller: _scroll,
               physics: physics,
               slivers: [
-                SliverToBoxAdapter(child: HeroBanner(height: heroHeight)),
-                ...home.when(
-                  data: (data) => [
-                    SliverList.separated(
-                      itemCount: data.sections.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 26),
-                      itemBuilder: (context, i) => _SectionRow(section: data.sections[i]),
-                    ),
-                    // Empfehlungen, Sammlungen, Genres – erscheinen, sobald geladen.
-                    SliverList.list(
-                      children: [
-                        for (final section in ref.watch(discoverProvider).value ?? const <HomeSection>[])
-                          Padding(
-                            padding: const EdgeInsets.only(top: 26),
-                            child: _SectionRow(section: section),
-                          ),
-                      ],
-                    ),
-                    if (data.libraries.isNotEmpty)
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 26),
-                          child: _LibrariesRow(libraries: data.libraries),
-                        ),
+                SliverToBoxAdapter(
+                  child: Stack(
+                    children: [
+                      HeroBanner(height: heroHeight),
+                      // Platz bleibt stabil, auch ohne Saison (Fokus im Banner bleibt erhalten).
+                      Positioned.fill(
+                        child: season == null ? const SizedBox.shrink() : SeasonalParticles(season: season),
                       ),
-                  ],
+                    ],
+                  ),
+                ),
+                ...home.when(
+                  data: (data) {
+                    // Saison-Reihe direkt nach "Weiterschauen"/"Als Nächstes".
+                    final sections = [...data.sections];
+                    if (seasonal != null) {
+                      final at = sections.where((s) => s.style == SectionStyle.landscape).length;
+                      sections.insert(at, seasonal);
+                    }
+                    return [
+                      SliverList.separated(
+                        itemCount: sections.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 26),
+                        itemBuilder: (context, i) => _SectionRow(section: sections[i]),
+                      ),
+                      // Empfehlungen, Sammlungen, Genres – erscheinen, sobald geladen.
+                      SliverList.list(
+                        children: [
+                          for (final section in ref.watch(discoverProvider).value ?? const <HomeSection>[])
+                            Padding(
+                              padding: const EdgeInsets.only(top: 26),
+                              child: _SectionRow(section: section),
+                            ),
+                        ],
+                      ),
+                      if (data.libraries.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 26),
+                            child: _LibrariesRow(libraries: data.libraries),
+                          ),
+                        ),
+                    ];
+                  },
                   loading: () => [const SliverToBoxAdapter(child: RowsSkeleton())],
                   error: (e, _) => [
                     SliverToBoxAdapter(
@@ -255,6 +277,14 @@ class _TopNav extends ConsumerWidget {
         child: Row(
           children: [
             const BrandLogo(size: 26),
+            if (ref.watch(activeSeasonProvider) case final season?)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Tooltip(
+                  message: seasonInfo[season]!.title,
+                  child: Text(seasonInfo[season]!.emoji, style: const TextStyle(fontSize: 20)),
+                ),
+              ),
             const SizedBox(width: 40),
             const _NavLink(label: 'Startseite', active: true),
             for (final lib in libraries) _NavLink(label: lib.name, onTap: () => openLibrary(context, lib)),

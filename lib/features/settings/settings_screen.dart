@@ -230,6 +230,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ),
                             ),
                             _Row(
+                              title: 'Saisonale Akzente',
+                              subtitle:
+                                  'Zu Halloween, Weihnachten, Silvester und Valentinstag: passende Reihe '
+                                  'und kleine Effekte auf der Startseite.',
+                              trailing: _Toggle(
+                                value: s.seasonalThemes,
+                                onChanged: (v) => ctrl.update((s) => s.copyWith(seasonalThemes: v)),
+                              ),
+                            ),
+                            _Row(
                               title: 'Episodenbilder bei „Weiterschauen“',
                               subtitle: 'Aus: Statt des Standbilds der Folge das Bild der Serie zeigen.',
                               trailing: _Toggle(

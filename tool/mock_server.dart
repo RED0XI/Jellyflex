@@ -610,7 +610,9 @@ Object? _handle(HttpRequest req) {
     if (types.contains('BoxSet')) list.add(byId['boxset0']!);
     final genre = q['genres'];
     if (genre != null) {
-      return _page([...movies, ...series].where((i) => (i['Genres'] as List).contains(genre)).toList(), q);
+      // Mehrere Genres mit "|" getrennt (wie bei Jellyfin).
+      final wanted = genre.split('|');
+      return _page([...movies, ...series].where((i) => (i['Genres'] as List).any(wanted.contains)).toList(), q);
     }
     if (types.contains('Movie') && q['parentId'] != 'lib-shows') list.addAll(movies);
     if (types.contains('Series') && q['parentId'] != 'lib-movies') list.addAll(series);

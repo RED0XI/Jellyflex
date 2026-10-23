@@ -58,7 +58,11 @@ class AppSettings {
     this.appName,
     this.logoPath,
     this.screensaverMinutes = 5,
+    this.seasonalThemes = true,
   });
+
+  /// Halloween, Weihnachten … mit passender Reihe und kleinen Effekten.
+  final bool seasonalThemes;
 
   /// Bildschirmschoner nach so vielen Minuten ohne Eingabe; 0 = aus.
   final int screensaverMinutes;
@@ -109,6 +113,7 @@ class AppSettings {
     String? Function()? appName,
     String? Function()? logoPath,
     int? screensaverMinutes,
+    bool? seasonalThemes,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -122,6 +127,7 @@ class AppSettings {
     appName: appName != null ? appName() : this.appName,
     logoPath: logoPath != null ? logoPath() : this.logoPath,
     screensaverMinutes: screensaverMinutes ?? this.screensaverMinutes,
+    seasonalThemes: seasonalThemes ?? this.seasonalThemes,
   );
 
   Map<String, dynamic> toJson() => {
@@ -137,6 +143,7 @@ class AppSettings {
     'appName': appName,
     'logoPath': logoPath,
     'screensaverMinutes': screensaverMinutes,
+    'seasonalThemes': seasonalThemes,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -152,6 +159,7 @@ class AppSettings {
     appName: json['appName'] as String?,
     logoPath: json['logoPath'] as String?,
     screensaverMinutes: (json['screensaverMinutes'] as num?)?.toInt() ?? 5,
+    seasonalThemes: json['seasonalThemes'] as bool? ?? true,
   );
 }
 

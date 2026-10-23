@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models.dart';
+import '../../core/seasons.dart';
 import '../../core/session.dart';
+import '../../core/settings.dart';
 
 enum SectionStyle { poster, landscape }
 
@@ -79,6 +81,34 @@ final discoverProvider = FutureProvider.autoDispose<List<HomeSection>>((ref) asy
     for (final (genre, items) in genreRows)
       if (items.length >= 4) HomeSection(genre, items, SectionStyle.poster),
   ];
+});
+
+/// Aktuelle Saison (Halloween, Weihnachten …), falls eingeschaltet.
+final activeSeasonProvider = Provider.autoDispose<Season?>((ref) {
+  if (!ref.watch(settingsProvider.select((s) => s.seasonalThemes))) return null;
+  return currentSeason();
+});
+
+/// Reihe zur Saison: passende Genres plus Titel mit Stichwörtern ("Weihnacht" …).
+final seasonalSectionProvider = FutureProvider.autoDispose<HomeSection?>((ref) async {
+  final season = ref.watch(activeSeasonProvider);
+  if (season == null) return null;
+  final info = seasonInfo[season]!;
+  final api = ref.watch(apiProvider);
+  final results = await Future.wait([
+    if (info.genres.isNotEmpty) _safe(api.getByGenre(info.genres.join('|'), limit: 30)),
+    for (final word in info.keywords) _safe(api.search(word, limit: 12)),
+  ]);
+  final seen = <String>{};
+  // Stichwort-Treffer zuerst (sie passen am besten), dann die Genres gemischt.
+  final byKeyword = results.skip(info.genres.isEmpty ? 0 : 1).expand((r) => r);
+  final byGenre = info.genres.isEmpty ? <BaseItem>[] : ([...results.first]..shuffle());
+  final items = [
+    for (final item in [...byKeyword, ...byGenre])
+      if ((item.isMovie || item.isSeries) && seen.add(item.id)) item,
+  ].take(24).toList();
+  if (items.length < 3) return null;
+  return HomeSection('${info.emoji}  ${info.title}', items, SectionStyle.poster);
 });
 
 /// URL des Profilbilds des angemeldeten Benutzers (oder `null`).

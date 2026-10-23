@@ -80,9 +80,8 @@ void main() {
         ),
       );
       await _pumpFor(tester, const Duration(seconds: 3));
-      bool visible() => find.byType(MouseRegion).evaluate().any(
-        (e) => (e.widget as MouseRegion).cursor == SystemMouseCursors.none,
-      );
+      bool visible() =>
+          find.byType(MouseRegion).evaluate().any((e) => (e.widget as MouseRegion).cursor == SystemMouseCursors.none);
 
       // --- Starten (wie "Jetzt anzeigen" in den Einstellungen) ---
       screensaverPreview.value++;
