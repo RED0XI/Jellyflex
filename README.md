@@ -4,8 +4,7 @@ A modern, smooth [Jellyfin](https://jellyfin.org) client for Windows – built w
 [media_kit](https://github.com/media-kit/media-kit) (mpv). Inspired by Wholphin.
 
 > **Made with Claude.** Jellyflex was written with [Claude Code](https://claude.com/claude-code),
-> Anthropic's AI coding assistant. The project owner decided what to build, tested every
-> version and gave feedback; Claude wrote the code, the tests and this README.
+> Anthropic's AI coding assistant; Claude wrote the code, the tests and this README.
 
 ## Quick start
 
