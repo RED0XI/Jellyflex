@@ -67,7 +67,11 @@ class AppSettings {
     this.language = AppLanguage.en,
     this.themeId = 'midnight',
     this.soundEffects = true,
+    this.playerVolume = 100,
   });
+
+  /// Zuletzt eingestellte Lautstärke im Player (0–100).
+  final double playerVolume;
 
   /// Klänge bei "Überrasch mich" und im Quiz.
   final bool soundEffects;
@@ -162,6 +166,7 @@ class AppSettings {
     AppLanguage? language,
     String? themeId,
     bool? soundEffects,
+    double? playerVolume,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -186,6 +191,7 @@ class AppSettings {
     language: language ?? this.language,
     themeId: themeId ?? this.themeId,
     soundEffects: soundEffects ?? this.soundEffects,
+    playerVolume: playerVolume ?? this.playerVolume,
   );
 
   Map<String, dynamic> toJson() => {
@@ -212,6 +218,7 @@ class AppSettings {
     'language': language.name,
     'themeId': themeId,
     'soundEffects': soundEffects,
+    'playerVolume': playerVolume,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -238,6 +245,7 @@ class AppSettings {
     language: AppLanguage.values.asNameMap()[json['language']] ?? AppLanguage.en,
     themeId: json['themeId'] as String? ?? 'midnight',
     soundEffects: json['soundEffects'] as bool? ?? true,
+    playerVolume: ((json['playerVolume'] as num?)?.toDouble() ?? 100).clamp(0, 100).toDouble(),
   );
 }
 
@@ -277,6 +285,9 @@ class SettingsController extends Notifier<AppSettings> {
     UiSounds.enabled = s.soundEffects;
     ImageDiskCache.instance.maxBytes = s.imageCacheMb * 1024 * 1024;
   }
+
+  /// Aktuelle Einstellungen (auch dort lesbar, wo kein `ref` mehr verfügbar ist).
+  AppSettings get current => state;
 
   void update(AppSettings Function(AppSettings s) change) {
     final next = change(state);

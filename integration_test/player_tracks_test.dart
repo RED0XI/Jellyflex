@@ -116,7 +116,12 @@ void main() {
 
     await tester.pumpWidget(
       buildHarnessApp(
-        settings: const AppSettings(audioLanguage: 'eng', subtitleLanguage: 'eng', autoSkipIntro: true),
+        settings: const AppSettings(
+          audioLanguage: 'eng',
+          subtitleLanguage: 'eng',
+          autoSkipIntro: true,
+          playerVolume: 40,
+        ),
       ),
     );
     await tester.pump();
@@ -131,6 +136,7 @@ void main() {
     debugPrint('Mit Einstellungen: audio=${p.state.track.audio.id} sub=${p.state.track.subtitle.id}');
     expect(p.state.track.audio.id, '2', reason: 'Englische Tonspur bevorzugt');
     expect(p.state.track.subtitle.id, '2', reason: 'Englische Untertitel bevorzugt');
+    expect(p.state.volume, 40, reason: 'Gespeicherte Lautstärke');
 
     // Im Intro (3 s – 25 s) wird automatisch ans Ende gesprungen.
     await p.seek(const Duration(seconds: 5));

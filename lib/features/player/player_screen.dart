@@ -72,6 +72,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   late final VideoController _video = VideoController(_player);
   late final JellyfinApi _api = ref.read(apiProvider);
   late final DownloadManager _downloads = ref.read(downloadsProvider.notifier);
+
+  /// Schon in initState gelesen – beim Schließen (dispose) ist ref nicht mehr nutzbar.
+  late final SettingsController _settings = ref.read(settingsProvider.notifier);
   final _focus = FocusNode();
   final _subscriptions = <StreamSubscription<dynamic>>[];
 
@@ -110,7 +113,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _closing = false;
   bool _reportedStart = false;
   bool _tracksApplied = false;
-  double _volumeBeforeMute = 100;
+  late double _volumeBeforeMute = ref.read(settingsProvider).playerVolume.clamp(1, 100).toDouble();
+  Timer? _volumeSaveTimer;
   Timer? _hideTimer;
   Timer? _progressTimer;
 
@@ -133,6 +137,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    _settings;
     _start();
     _scheduleHide();
     _restoreFullscreen; // Zustand beim Öffnen merken.
@@ -366,6 +371,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    if (_volumeSaveTimer?.isActive ?? false) {
+      _volumeSaveTimer!.cancel();
+      _saveVolume();
+    }
     _progressTimer?.cancel();
     for (final s in _subscriptions) {
       s.cancel();
@@ -477,6 +486,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       // Zertifikate prüfen, bevor mit dem Anmelde-Token gestreamt wird.
       await SystemCerts.secure(_player);
       await PlayerScreen.debugBeforeOpen?.call(_player);
+      // Zuletzt eingestellte Lautstärke (stumm wird nicht übernommen).
+      await _player.setVolume(_volumeBeforeMute);
       await _openStream(start);
 
       await _applySubtitleStyle();
@@ -835,7 +846,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _player.seek(target);
   }
 
-  void _setVolume(double v) => _player.setVolume(v.clamp(0, 100).toDouble());
+  void _setVolume(double v) {
+    _player.setVolume(v.clamp(0, 100).toDouble());
+    // Gebündelt speichern (Pfeiltaste gedrückt halten = viele Änderungen).
+    _volumeSaveTimer?.cancel();
+    _volumeSaveTimer = Timer(const Duration(milliseconds: 800), _saveVolume);
+  }
+
+  /// Lautstärke für den nächsten Start merken – Stummschalten zählt nicht.
+  void _saveVolume() {
+    final v = _player.state.volume.roundToDouble();
+    if (v <= 0 || v == _settings.current.playerVolume) return;
+    _settings.update((s) => s.copyWith(playerVolume: v));
+  }
 
   void _toggleMute() {
     final v = _player.state.volume;
