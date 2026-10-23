@@ -26,10 +26,13 @@ import 'player_overlays.dart';
 import '../../widgets/focusable.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
-  const PlayerScreen({super.key, required this.itemId, this.startTicks, this.restoreFullscreen});
+  const PlayerScreen({super.key, required this.itemId, this.startTicks, this.restoreFullscreen, this.mediaSourceId});
 
   final String itemId;
   final int? startTicks;
+
+  /// Gewählte Fassung bei mehreren Versionen; `null` = Standard (erste).
+  final String? mediaSourceId;
 
   /// Vollbild-Zustand, der beim Schließen wiederhergestellt wird (bei "Nächste Folge"
   /// vom vorherigen Player übernommen). `null` = aktuellen Zustand nehmen.
@@ -273,7 +276,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     try {
       // Heruntergeladen? Dann die lokale Datei nehmen – offline auch ohne Server.
       final download = _downloads.entryFor(widget.itemId);
-      if (download != null && download.isDone && File(download.mediaFile!).existsSync()) {
+      // Lokal nur, wenn nicht ausdrücklich eine andere Fassung gewählt wurde.
+      final sameVersion =
+          widget.mediaSourceId == null ||
+          download?.mediaSourceId == null ||
+          widget.mediaSourceId == download!.mediaSourceId;
+      if (download != null && download.isDone && sameVersion && File(download.mediaFile!).existsSync()) {
         _localFile = download.mediaFile;
       }
       BaseItem item;
@@ -288,7 +296,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       }
       final sources = info.mediaSources.isNotEmpty ? info.mediaSources : item.mediaSources;
       if (sources.isEmpty) throw Exception('Keine abspielbare Datei gefunden.');
-      final source = sources.first;
+      final wanted = widget.mediaSourceId ?? (_localFile != null ? download?.mediaSourceId : null);
+      final source = sources.where((s) => s.id == wanted).firstOrNull ?? sources.first;
       if (!mounted) return;
       final settings = ref.read(settingsProvider);
       var maxBitrate = settings.maxBitrate;

@@ -12,6 +12,7 @@
 //   POST /debug/throttle?bps=200000   Videos langsam ausliefern (0 = normal)
 //   POST /debug/offline?on=1          Server "nicht erreichbar" spielen (503)
 //   GET  /debug/userdata/{id}         Benutzerdaten eines Titels ansehen
+//   GET  /debug/laststream            zuletzt angefragter Video-Stream (Fassung)
 
 import 'dart:async';
 import 'dart:convert';
@@ -109,6 +110,134 @@ const _overview =
     'Eine fesselnde Geschichte über Mut, Freundschaft und die Frage, was uns wirklich zusammenhält. '
     'Als ein unerwartetes Ereignis alles auf den Kopf stellt, müssen die Figuren über sich hinauswachsen – '
     'und entdecken dabei, dass nichts so ist, wie es scheint.';
+
+/// Zuletzt angefragter Video-Stream (für Tests: welche Fassung spielt der Player?).
+var _lastStream = <String, String>{};
+
+const _externalSub = {
+  'Type': 'Subtitle',
+  'Index': 3,
+  'Language': 'ger',
+  'Codec': 'srt',
+  'IsExternal': true,
+  'DisplayTitle': 'Deutsch - SRT - Extern',
+};
+
+Map<String, dynamic> _source(String id, String container, {required int width, required int height}) => {
+  'Id': id,
+  'Container': container,
+  'Size': 4200000000,
+  'Bitrate': 6000000,
+  'MediaStreams': [
+    {'Type': 'Video', 'Index': 0, 'Codec': 'hevc', 'Width': width, 'Height': height, 'VideoRange': 'SDR'},
+    {
+      'Type': 'Audio',
+      'Index': 1,
+      'Language': 'ger',
+      'Codec': 'eac3',
+      'Channels': 6,
+      'DisplayTitle': 'Deutsch - EAC3 - 5.1 - Standard',
+    },
+    {
+      'Type': 'Audio',
+      'Index': 2,
+      'Language': 'eng',
+      'Codec': 'truehd',
+      'Channels': 8,
+      'DisplayTitle': 'Englisch - TrueHD - 7.1',
+    },
+  ],
+};
+
+List<Map<String, dynamic>> _twoVersions(String id, String name) => [
+  {
+    'Id': id,
+    'Name': '4K Remux',
+    'Container': 'mkv',
+    'Size': 61400000000,
+    'Bitrate': 62000000,
+    'Path': '/media/filme/$name (2019)/$name - 2160p.mkv',
+    'MediaStreams': [
+      {
+        'Type': 'Video',
+        'Index': 0,
+        'Codec': 'hevc',
+        'Profile': 'Main 10',
+        'Width': 3840,
+        'Height': 2160,
+        'VideoRange': 'HDR',
+        'VideoRangeType': 'DOVIWithHDR10',
+        'BitDepth': 10,
+        'RealFrameRate': 23.976,
+        'BitRate': 58000000,
+      },
+      {
+        'Type': 'Audio',
+        'Index': 1,
+        'Language': 'ger',
+        'Codec': 'eac3',
+        'Channels': 6,
+        'BitRate': 768000,
+        'SampleRate': 48000,
+        'IsDefault': true,
+        'DisplayTitle': 'Deutsch - Dolby Digital+ - 5.1 - Standard',
+      },
+      {
+        'Type': 'Audio',
+        'Index': 2,
+        'Language': 'eng',
+        'Codec': 'truehd',
+        'Profile': 'Dolby TrueHD + Dolby Atmos',
+        'Channels': 8,
+        'BitRate': 4500000,
+        'SampleRate': 48000,
+        'DisplayTitle': 'Englisch - TrueHD Atmos - 7.1',
+      },
+      _externalSub,
+    ],
+  },
+  {
+    'Id': '$id-hd',
+    'Name': '1080p',
+    'Container': 'mkv',
+    'Size': 9800000000,
+    'Bitrate': 10500000,
+    'Path': '/media/filme/$name (2019)/$name - 1080p.mkv',
+    'MediaStreams': [
+      {
+        'Type': 'Video',
+        'Index': 0,
+        'Codec': 'h264',
+        'Profile': 'High',
+        'Width': 1920,
+        'Height': 1080,
+        'VideoRange': 'SDR',
+        'BitDepth': 8,
+        'RealFrameRate': 23.976,
+        'BitRate': 9000000,
+      },
+      {
+        'Type': 'Audio',
+        'Index': 1,
+        'Language': 'ger',
+        'Codec': 'ac3',
+        'Channels': 6,
+        'BitRate': 640000,
+        'IsDefault': true,
+        'DisplayTitle': 'Deutsch - Dolby Digital - 5.1 - Standard',
+      },
+      {
+        'Type': 'Audio',
+        'Index': 2,
+        'Language': 'eng',
+        'Codec': 'aac',
+        'Channels': 2,
+        'DisplayTitle': 'Englisch - AAC - Stereo',
+      },
+      _externalSub,
+    ],
+  },
+];
 
 final movies = <Map<String, dynamic>>[];
 final series = <Map<String, dynamic>>[];
@@ -215,26 +344,8 @@ void _seed() {
         played: i == 5,
         favorite: i % 5 == 1,
       ),
-      'MediaSources': [
-        {
-          'Id': id,
-          'Container': 'mkv',
-          'MediaStreams': [
-            {'Type': 'Video', 'Index': 0, 'Codec': 'hevc'},
-            {'Type': 'Audio', 'Index': 1, 'Language': 'ger', 'DisplayTitle': 'Deutsch - EAC3 - 5.1 - Standard'},
-            {'Type': 'Audio', 'Index': 2, 'Language': 'eng', 'DisplayTitle': 'Englisch - TrueHD - 7.1'},
-            if (i == 0)
-              {
-                'Type': 'Subtitle',
-                'Index': 3,
-                'Language': 'ger',
-                'Codec': 'srt',
-                'IsExternal': true,
-                'DisplayTitle': 'Deutsch - SRT - Extern',
-              },
-          ],
-        },
-      ],
+      // "Das Echo der Sterne" gibt es in zwei Fassungen (4K + 1080p).
+      'MediaSources': i == 0 ? _twoVersions(id, _movieNames[i]) : [_source(id, 'mkv', width: 1920, height: 1080)],
     };
     movies.add(m);
     byId[id] = m;
@@ -593,6 +704,12 @@ Future<void> main() async {
         await res.close();
         continue;
       }
+      if (req.uri.path == '/debug/laststream') {
+        res.headers.contentType = ContentType.json;
+        res.write(jsonEncode(_lastStream));
+        await res.close();
+        continue;
+      }
       if (seg.length == 3 && seg[0] == 'debug' && seg[1] == 'userdata') {
         res.headers.contentType = ContentType.json;
         res.write(jsonEncode(byId[seg[2]]?['UserData']));
@@ -631,6 +748,9 @@ Future<void> main() async {
       }
       if (seg.length == 3 && seg[0] == 'Videos' && seg[2] == 'stream') {
         // Nicht abwarten: Streams laufen parallel zu anderen Anfragen.
+        if (req.uri.queryParameters['static'] == 'true') {
+          _lastStream = {'itemId': seg[1], ...req.uri.queryParameters};
+        }
         unawaited(_serveVideo(req));
         continue;
       }

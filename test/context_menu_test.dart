@@ -42,7 +42,9 @@ void main() {
       routes: [
         GoRoute(
           path: '/',
-          builder: (_, _) => Scaffold(body: Center(child: LandscapeCard(item: episode))),
+          builder: (_, _) => Scaffold(
+            body: Center(child: LandscapeCard(item: episode)),
+          ),
         ),
         GoRoute(path: '/play/:id', builder: (_, s) => Text('PLAYER ${s.uri}')),
         GoRoute(path: '/item/:id', builder: (_, s) => Text('DETAILS ${s.pathParameters['id']}')),

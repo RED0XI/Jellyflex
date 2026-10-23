@@ -157,6 +157,14 @@ class MediaSource {
 
   String get id => raw['Id'] as String;
   String? get container => raw['Container'] as String?;
+
+  /// Name der Fassung (z. B. "Director's Cut" oder Dateiname-Zusatz wie "2160p").
+  String? get name => raw['Name'] as String?;
+
+  /// Dateigröße in Bytes.
+  int? get size => (raw['Size'] as num?)?.toInt();
+  String? get path => raw['Path'] as String?;
+  int? get runTimeTicks => (raw['RunTimeTicks'] as num?)?.toInt();
   int? get defaultAudioStreamIndex => (raw['DefaultAudioStreamIndex'] as num?)?.toInt();
   int? get defaultSubtitleStreamIndex => (raw['DefaultSubtitleStreamIndex'] as num?)?.toInt();
 
@@ -175,6 +183,10 @@ class MediaSource {
   /// Die n-te Spur hier entspricht der mpv-Spur mit der ID "n+1".
   List<MediaStream> embeddedStreams(String type) =>
       mediaStreams.where((s) => s.type == type && !s.isExternal).toList()..sort((a, b) => a.index.compareTo(b.index));
+
+  MediaStream? get videoStream => mediaStreams.where((s) => s.type == 'Video').firstOrNull;
+  List<MediaStream> get audioStreams => mediaStreams.where((s) => s.type == 'Audio').toList();
+  List<MediaStream> get subtitleStreams => mediaStreams.where((s) => s.type == 'Subtitle').toList();
 }
 
 class MediaStream {
@@ -191,6 +203,21 @@ class MediaStream {
   bool get isDefault => raw['IsDefault'] == true;
   bool get isForced => raw['IsForced'] == true;
   int? get height => (raw['Height'] as num?)?.toInt();
+  int? get width => (raw['Width'] as num?)?.toInt();
+  String? get title => raw['Title'] as String?;
+  String? get profile => raw['Profile'] as String?;
+
+  /// Bitrate dieser Spur (bit/s).
+  int? get bitRate => (raw['BitRate'] as num?)?.toInt();
+  int? get bitDepth => (raw['BitDepth'] as num?)?.toInt();
+  double? get frameRate => ((raw['RealFrameRate'] ?? raw['AverageFrameRate']) as num?)?.toDouble();
+
+  /// "SDR" oder "HDR"; genauer: [videoRangeType] (HDR10, HDR10Plus, DOVI, HLG …).
+  String? get videoRange => raw['VideoRange'] as String?;
+  String? get videoRangeType => raw['VideoRangeType'] as String?;
+  int? get channels => (raw['Channels'] as num?)?.toInt();
+  String? get channelLayout => raw['ChannelLayout'] as String?;
+  int? get sampleRate => (raw['SampleRate'] as num?)?.toInt();
 
   /// "External", "Encode" (eingebrannt) … – nur bei umgerechneter Wiedergabe.
   String? get deliveryMethod => raw['DeliveryMethod'] as String?;

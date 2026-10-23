@@ -24,6 +24,7 @@ class DownloadEntry {
     required this.folder,
     this.seriesName,
     this.episodeLabel,
+    this.mediaSourceId,
     this.status = DownloadStatus.queued,
     this.received = 0,
     this.total = 0,
@@ -42,6 +43,9 @@ class DownloadEntry {
   final String type;
   final String? seriesName;
   final String? episodeLabel;
+
+  /// Heruntergeladene Fassung (bei mehreren Versionen), sonst `null` = erste.
+  final String? mediaSourceId;
 
   /// Ordner mit Video, Infos (item.json) und Bildern.
   final String folder;
@@ -90,6 +94,7 @@ class DownloadEntry {
     int? total,
     String? Function()? mediaFile,
     String? Function()? error,
+    String? mediaSourceId,
     int? positionTicks,
     bool? played,
     DateTime? watchedAt,
@@ -103,6 +108,7 @@ class DownloadEntry {
     folder: folder,
     seriesName: seriesName,
     episodeLabel: episodeLabel,
+    mediaSourceId: mediaSourceId ?? this.mediaSourceId,
     status: status ?? this.status,
     received: received ?? this.received,
     total: total ?? this.total,
@@ -122,6 +128,7 @@ class DownloadEntry {
     'type': type,
     'seriesName': seriesName,
     'episodeLabel': episodeLabel,
+    'mediaSourceId': mediaSourceId,
     'folder': folder,
     'status': status.name,
     'received': received,
@@ -142,6 +149,7 @@ class DownloadEntry {
     type: (j['type'] as String?) ?? '',
     seriesName: j['seriesName'] as String?,
     episodeLabel: j['episodeLabel'] as String?,
+    mediaSourceId: j['mediaSourceId'] as String?,
     folder: j['folder'] as String,
     status: DownloadStatus.values.asNameMap()[j['status']] ?? DownloadStatus.paused,
     received: (j['received'] as num?)?.toInt() ?? 0,
@@ -232,8 +240,8 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
 
   DownloadEntry? entryFor(String itemId) => state.where((e) => e.itemId == itemId).firstOrNull;
 
-  /// Titel (Film oder Folge) zum Herunterladen vormerken.
-  Future<void> enqueue(BaseItem item) async {
+  /// Titel (Film oder Folge) zum Herunterladen vormerken – optional eine bestimmte Fassung.
+  Future<void> enqueue(BaseItem item, {String? mediaSourceId}) async {
     if (item.isSeries || item.isSeason || item.isCollection) return;
     if (entryFor(item.id) != null) return;
     final session = ref.read(sessionProvider).value;
@@ -249,6 +257,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
         type: item.type,
         seriesName: item.seriesName,
         episodeLabel: item.episodeLabel,
+        mediaSourceId: mediaSourceId,
         folder: folder,
       ),
     ]);
@@ -394,7 +403,8 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     try {
       await Directory(entry.folder).create(recursive: true);
       final item = await api.getItem(entry.itemId);
-      final source = item.mediaSources.firstOrNull;
+      final sources = item.mediaSources;
+      final source = sources.where((s) => s.id == entry.mediaSourceId).firstOrNull ?? sources.firstOrNull;
       if (source == null) throw Exception('Keine Datei gefunden');
       await File(entry.itemJsonPath).writeAsString(jsonEncode(item.raw));
       await _downloadImages(api, item, entry);
@@ -449,8 +459,13 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       await part.rename(target.path);
       _update(
         entry.itemId,
-        (e) =>
-            e.copyWith(status: DownloadStatus.done, received: received, total: received, mediaFile: () => target.path),
+        (e) => e.copyWith(
+          status: DownloadStatus.done,
+          received: received,
+          total: received,
+          mediaFile: () => target.path,
+          mediaSourceId: source.id,
+        ),
       );
     } catch (e) {
       // Pausiert oder gelöscht – Status wurde schon gesetzt. Beim Abbruch kann

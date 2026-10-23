@@ -67,6 +67,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => PlayerScreen(
           itemId: state.pathParameters['id']!,
           startTicks: int.tryParse(state.uri.queryParameters['start'] ?? ''),
+          mediaSourceId: state.uri.queryParameters['source'],
           restoreFullscreen: switch (state.uri.queryParameters['rf']) {
             '1' => true,
             '0' => false,

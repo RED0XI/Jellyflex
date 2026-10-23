@@ -6,6 +6,7 @@ import '../../core/downloads.dart';
 import '../downloads/downloads_screen.dart';
 import '../../core/format.dart';
 import '../../core/images.dart';
+import '../../core/media_info.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../theme.dart';
@@ -20,6 +21,7 @@ import '../../widgets/top_scrim.dart';
 import '../home/hero_banner.dart';
 import '../home/home_providers.dart';
 import '../../widgets/focusable.dart';
+import 'media_info_dialog.dart';
 
 final itemProvider = FutureProvider.autoDispose.family<BaseItem, String>((ref, id) async {
   try {
@@ -97,6 +99,9 @@ class DetailsScreen extends ConsumerStatefulWidget {
 class _DetailsScreenState extends ConsumerState<DetailsScreen> {
   final _scroll = ScrollController();
 
+  /// Gewählte Fassung (bei mehreren Versionen); `null` = Standard.
+  String? _sourceId;
+
   @override
   void dispose() {
     _scroll.dispose();
@@ -122,6 +127,8 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
     final size = MediaQuery.sizeOf(context);
     final people = item.people.where((p) => p.type == 'Actor' || p.type == 'GuestStar').take(24).toList();
     final similarId = item.isEpisode ? item.seriesId : item.id;
+    final sources = item.mediaSources;
+    final source = sources.where((s) => s.id == _sourceId).firstOrNull ?? sources.firstOrNull;
 
     return Stack(
       children: [
@@ -181,7 +188,7 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(kPageGutter, size.height * 0.26, kPageGutter, 40),
-                  child: _Header(item: item),
+                  child: _Header(item: item, source: source, onSelectSource: (id) => setState(() => _sourceId = id)),
                 ),
               ),
               if (item.isSeries) SliverToBoxAdapter(child: _SeasonsSection(series: item)),
@@ -208,9 +215,13 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
 }
 
 class _Header extends ConsumerWidget {
-  const _Header({required this.item});
+  const _Header({required this.item, this.source, required this.onSelectSource});
 
   final BaseItem item;
+
+  /// Gewählte Fassung (für Abzeichen, Abspielen, Medieninfo).
+  final MediaSource? source;
+  final ValueChanged<String> onSelectSource;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -248,6 +259,8 @@ class _Header extends ConsumerWidget {
       if (item.isSeries && item.childCount != null)
         Text('${item.childCount} ${item.childCount == 1 ? 'Staffel' : 'Staffeln'}'),
       if (item.officialRating != null) RatingBadge(item.officialRating!),
+      if (source != null && !item.isSeries && !item.isCollection)
+        for (final badge in qualityBadges(source!)) _QualityBadge(badge),
       if (remaining != null && !item.isSeries && remaining > Duration.zero)
         Text(
           'Endet um ${formatClock(DateTime.now().add(remaining))}',
@@ -318,7 +331,7 @@ class _Header extends ConsumerWidget {
               ),
             ],
             const SizedBox(height: 28),
-            _ActionButtons(item: item),
+            _ActionButtons(item: item, source: source, onSelectSource: onSelectSource),
           ],
         ),
       ),
@@ -327,9 +340,11 @@ class _Header extends ConsumerWidget {
 }
 
 class _ActionButtons extends ConsumerStatefulWidget {
-  const _ActionButtons({required this.item});
+  const _ActionButtons({required this.item, this.source, required this.onSelectSource});
 
   final BaseItem item;
+  final MediaSource? source;
+  final ValueChanged<String> onSelectSource;
 
   @override
   ConsumerState<_ActionButtons> createState() => _ActionButtonsState();
@@ -367,9 +382,61 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
     }
   }
 
+  static String _shortVersion(MediaSource source) {
+    final short = [?resolutionLabel(source.videoStream), ?hdrLabel(source.videoStream)].join(' ');
+    return short.isNotEmpty ? short : (source.name ?? '?');
+  }
+
+  /// Nur bei mehreren Fassungen gezielt eine abspielen, sonst entscheidet der Server.
+  String? get _chosenSourceId => widget.item.mediaSources.length > 1 ? widget.source?.id : null;
+
+  Future<void> _chooseVersion(BuildContext buttonContext) async {
+    final box = buttonContext.findRenderObject()! as RenderBox;
+    final overlay = Overlay.of(buttonContext).context.findRenderObject()! as RenderBox;
+    final position = box.localToGlobal(Offset(0, box.size.height + 6), ancestor: overlay);
+    final current = widget.source?.id;
+    final previousFocus = FocusManager.instance.primaryFocus;
+    final chosen = await showMenu<String>(
+      context: buttonContext,
+      position: RelativeRect.fromRect(position & const Size(1, 1), Offset.zero & overlay.size),
+      constraints: const BoxConstraints(minWidth: 320),
+      items: [
+        for (final s in widget.item.mediaSources)
+          PopupMenuItem(
+            value: s.id,
+            height: 56,
+            child: Row(
+              children: [
+                Icon(
+                  s.id == current ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                  size: 20,
+                  color: s.id == current ? AppColors.accent : AppColors.textMuted,
+                ),
+                const SizedBox(width: 14),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(versionLabel(s), style: const TextStyle(fontWeight: FontWeight.w600)),
+                      if (versionDetails(s).isNotEmpty)
+                        Text(versionDetails(s), style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+    previousFocus?.requestFocus();
+    if (chosen != null) widget.onSelectSource(chosen);
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
+    final source = widget.source;
     final favorite = _favorite ?? item.userData.isFavorite;
     final played = _played ?? item.userData.played;
 
@@ -403,14 +470,14 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
           PrimaryButton(
             label: resuming ? 'Fortsetzen  ·  ${remainingLabel(item) ?? ''}' : 'Abspielen',
             icon: Icons.play_arrow_rounded,
-            onPressed: () => playItem(context, item),
+            onPressed: () => playItem(context, item, mediaSourceId: _chosenSourceId),
           ),
           if (resuming) ...[
             const SizedBox(width: 12),
             GlassButton(
               label: 'Von vorne',
               icon: Icons.replay_rounded,
-              onPressed: () => playItem(context, item, fromStart: true),
+              onPressed: () => playItem(context, item, fromStart: true, mediaSourceId: _chosenSourceId),
             ),
           ],
         ],
@@ -423,6 +490,14 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         playButtons,
+        if (item.mediaSources.length > 1 && source != null)
+          Builder(
+            builder: (buttonContext) => GlassButton(
+              label: 'Fassung: ${_shortVersion(source)}',
+              icon: Icons.video_settings_rounded,
+              onPressed: () => _chooseVersion(buttonContext),
+            ),
+          ),
         CircleIconButton(
           icon: Icons.check_rounded,
           tooltip: played ? 'Als ungesehen markieren' : 'Als gesehen markieren',
@@ -437,7 +512,13 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
           activeColor: const Color(0xFFFF5C8A),
           onPressed: _toggleFavorite,
         ),
-        if (!item.isSeries && !item.isCollection) _DownloadButton(item: item),
+        if (!item.isSeries && !item.isCollection) _DownloadButton(item: item, mediaSourceId: _chosenSourceId),
+        if (source != null && !item.isSeries && !item.isCollection)
+          CircleIconButton(
+            icon: Icons.info_outline_rounded,
+            tooltip: 'Medieninfo (Auflösung, Ton, Untertitel …)',
+            onPressed: () => showMediaInfoDialog(context, item, source),
+          ),
       ],
     );
   }
@@ -445,9 +526,12 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
 
 /// Herunterladen / Fortschritt / Fertig – je nach Zustand des Downloads.
 class _DownloadButton extends ConsumerWidget {
-  const _DownloadButton({required this.item});
+  const _DownloadButton({required this.item, this.mediaSourceId});
 
   final BaseItem item;
+
+  /// Gewählte Fassung (bei mehreren Versionen).
+  final String? mediaSourceId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -457,7 +541,7 @@ class _DownloadButton extends ConsumerWidget {
       return CircleIconButton(
         icon: Icons.download_rounded,
         tooltip: 'Herunterladen (offline ansehen)',
-        onPressed: () => manager.enqueue(item),
+        onPressed: () => manager.enqueue(item, mediaSourceId: mediaSourceId),
       );
     }
     if (entry.isDone) {
@@ -569,6 +653,22 @@ class _SeasonsSectionState extends ConsumerState<_SeasonsSection> {
           child: _EpisodesRow(key: ValueKey(selected), seriesId: widget.series.id, seasonId: selected),
         ),
       ],
+    );
+  }
+}
+
+/// Kleines Abzeichen für Bild-/Tonqualität (4K, HDR10, Atmos …).
+class _QualityBadge extends StatelessWidget {
+  const _QualityBadge(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(5)),
+      child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
     );
   }
 }

@@ -19,11 +19,12 @@ const double kCardTextHeight = 52;
 /// Öffnet die Detailseite eines Eintrags.
 void openItem(BuildContext context, BaseItem item) => context.push('/item/${item.id}');
 
-/// Startet die Wiedergabe (ggf. an der gespeicherten Stelle).
-void playItem(BuildContext context, BaseItem item, {bool fromStart = false}) {
+/// Startet die Wiedergabe (ggf. an der gespeicherten Stelle) – optional eine
+/// bestimmte Fassung ([mediaSourceId]), wenn es mehrere gibt.
+void playItem(BuildContext context, BaseItem item, {bool fromStart = false, String? mediaSourceId}) {
   final ticks = item.userData.playbackPositionTicks;
-  final query = !fromStart && ticks > 0 ? '?start=$ticks' : '';
-  context.push('/play/${item.id}$query');
+  final query = Uri(queryParameters: {if (!fromStart && ticks > 0) 'start': '$ticks', 'source': ?mediaSourceId}).query;
+  context.push('/play/${item.id}${query.isEmpty ? '' : '?$query'}');
 }
 
 /// Gemeinsame Hover-Logik: leicht vergrößern, Schatten, Rahmen.

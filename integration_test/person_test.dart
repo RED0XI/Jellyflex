@@ -14,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:jellyflex/app.dart';
 import 'package:jellyflex/core/session.dart';
+import 'package:jellyflex/features/details/details_screen.dart';
 import 'package:jellyflex/features/person/person_screen.dart';
 import 'package:jellyflex/widgets/media_cards.dart';
 import 'package:window_manager/window_manager.dart';
@@ -73,9 +74,17 @@ void main() {
     // Detailseite → in der Besetzung auf die erste Person klicken.
     container.read(routerProvider).push('/item/movie0');
     await _pumpFor(tester, const Duration(seconds: 2));
+    // Die Besetzung steht weiter unten – schrittweise hinscrollen.
     final cast = find.text('Lena Brandt');
+    final details = tester.widget<CustomScrollView>(
+      find.descendant(of: find.byType(DetailsScreen), matching: find.byType(CustomScrollView)),
+    );
+    for (var i = 0; i < 10 && cast.evaluate().isEmpty; i++) {
+      details.controller!.jumpTo(details.controller!.offset + 250);
+      await _pumpFor(tester, const Duration(milliseconds: 300));
+    }
     expect(cast, findsOneWidget);
-    await tester.scrollUntilVisible(cast, 300, scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(cast);
     await _pumpFor(tester, const Duration(milliseconds: 500));
     await tester.tap(cast);
     await _pumpFor(tester, const Duration(seconds: 3));

@@ -59,6 +59,10 @@ flutter test integration_test/downloads_test.dart -d windows
 - **Personenseiten**: Klick auf jemanden aus der Besetzung zeigt Foto, Lebensdaten, Biografie und
   alle Filme, Serien und Gastauftritte dieser Person auf deinem Server
 - Bibliotheksraster mit Nachladen und Sortierung, Live-Suche
+- **Fassungen**: Gibt es einen Film mehrfach (z. B. 4K und 1080p), wählst du auf der Detailseite
+  die Fassung zum Abspielen und Herunterladen; Abzeichen zeigen 4K, HDR/Dolby Vision, Atmos
+- **Medieninfo** (ⓘ auf der Detailseite): Auflösung, Codec, HDR, Farbtiefe, Bildrate, Tonspuren,
+  Untertitel, Dateigröße und Bitrate
 - **Direct Play** aller Formate über mpv (HEVC, AV1, HDR, DTS/TrueHD, ASS/PGS-Untertitel)
 - Ton-/Untertitelauswahl nach deinen Jellyfin-Einstellungen, externe Untertiteldateien (.srt/.ass)
 - **Intro/Rückblick überspringen** (Media Segments, z. B. vom Intro-Skipper-Plugin)
