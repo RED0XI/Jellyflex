@@ -20,7 +20,12 @@ class Focusable extends StatefulWidget {
     this.autofocus = false,
     this.enabled = true,
     this.scrollAlignment = 0.5,
+    this.semanticLabel,
   });
+
+  /// Name für Bildschirmleser. Ohne Angabe gilt der sichtbare Text im Inneren
+  /// (z. B. Titel und Jahr einer Karte).
+  final String? semanticLabel;
 
   /// [highlighted] = mit der Maus überfahren oder fokussiert.
   final Widget Function(BuildContext context, bool highlighted) builder;
@@ -58,6 +63,18 @@ class _FocusableState extends State<Focusable> {
   @override
   Widget build(BuildContext context) {
     final enabled = widget.enabled && widget.onTap != null;
+    // Für Bildschirmleser: ein Knopf (mit Fokus), benannt nach seinem Text.
+    return MergeSemantics(
+      child: Semantics(
+        button: true,
+        enabled: enabled,
+        label: widget.semanticLabel,
+        child: _detector(enabled),
+      ),
+    );
+  }
+
+  Widget _detector(bool enabled) {
     return FocusableActionDetector(
       // Ohne Aktion nicht per Tastatur/Controller anspringbar.
       enabled: enabled,
