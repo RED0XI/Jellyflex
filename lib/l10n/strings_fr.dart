@@ -1259,8 +1259,6 @@ final class _Fr extends S {
   @override
   String get updateReleasePage => 'Page des versions';
   @override
-  String get updateInstall => 'Télécharger et installer';
-  @override
   String get profileLocked => 'Verrouillé – saisis ton code PIN pour continuer';
   @override
   String get unlock => 'Déverrouiller';
@@ -1270,4 +1268,22 @@ final class _Fr extends S {
   String get pinLock => 'Verrouiller en cas d’absence';
   @override
   String get pinLockHint => 'Redemande le code PIN après ce délai sans action (pas pendant la lecture d’une vidéo).';
+  @override
+  String get update => 'Mettre à jour';
+  @override
+  String updateToVersion(String version) => 'Mise à jour vers la version $version';
+  @override
+  String get updateDownloading => 'Téléchargement et vérification de la mise à jour …';
+  @override
+  String get updateInstalling => 'Installation – Jellyflex redémarre tout seul.';
+  @override
+  String updateReady(String version) =>
+      'La version $version est prête – elle s’installera à la fermeture de Jellyflex.';
+  @override
+  String get restartNow => 'Redémarrer maintenant';
+  @override
+  String get autoUpdate => 'Installer les mises à jour automatiquement';
+  @override
+  String get autoUpdateHint =>
+      'Les nouvelles versions sont téléchargées et vérifiées en arrière-plan, puis installées à la fermeture de Jellyflex.';
 }

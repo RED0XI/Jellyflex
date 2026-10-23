@@ -79,6 +79,18 @@ ThemeData buildTheme([String? key]) {
       textStyle: textTheme.bodySmall,
       waitDuration: const Duration(milliseconds: 500),
     ),
+    // Hinweise unten (SnackBars): dunkler Kasten mit heller Schrift – Flutters Standard
+    // ist dunkle Schrift auf hellem Grund, was auf eigenem dunklem Grund unlesbar wird.
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: AppColors.surfaceHigh,
+      contentTextStyle: textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
+      actionTextColor: AppColors.accent,
+      closeIconColor: AppColors.textSecondary,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+    ),
     popupMenuTheme: PopupMenuThemeData(
       color: AppColors.surfaceHigh,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

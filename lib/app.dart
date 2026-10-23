@@ -119,7 +119,11 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
         final latest = await UpdateCheck.latestRelease();
         if (!mounted || latest == null || !UpdateCheck.isNewer(latest.version)) return;
         final router = ref.read(routerProvider);
-        showUpdateNotice(latest, () => router.routerDelegate.navigatorKey.currentContext);
+        await offerUpdate(
+          latest,
+          () => router.routerDelegate.navigatorKey.currentContext,
+          automatic: ref.read(settingsProvider).autoUpdate,
+        );
       });
     }
     // Eigener Name/Logo: Fenstertitel und Taskleisten-Symbol mitziehen.

@@ -15,37 +15,58 @@ import '../../l10n/strings.dart';
 import '../../theme.dart';
 import '../live_handler.dart';
 
-/// Neue Version gefunden? Kurze Meldung mit "Ansehen" – öffnet einen Dialog
-/// (geprüft installieren oder Versionsseite). [dialogContext] liefert einen
-/// Kontext unterhalb des Navigators.
-void showUpdateNotice(UpdateRelease release, BuildContext? Function() dialogContext) {
+void _notice(String text, {required String action, required VoidCallback onAction}) {
   appMessengerKey.currentState?.showSnackBar(
     SnackBar(
-      content: Text(tr.updateAvailable(release.version)),
+      content: Text(text),
       behavior: SnackBarBehavior.floating,
-      width: 480,
-      duration: const Duration(seconds: 10),
-      backgroundColor: AppColors.surfaceHigh,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      action: SnackBarAction(
-        label: tr.show,
-        onPressed: () {
-          final context = dialogContext();
-          if (context == null || !release.canInstall) {
-            UpdateCheck.openReleasesPage();
-            return;
-          }
-          showDialog<void>(
-            context: context,
-            builder: (_) => _UpdateDialog(release: release),
-          );
-        },
-      ),
+      width: 520,
+      duration: const Duration(seconds: 15),
+      action: SnackBarAction(label: action, onPressed: onAction),
     ),
   );
 }
 
-/// Neue Version: geprüft herunterladen und installieren – oder die Versionsseite öffnen.
+/// Neue Version gefunden. [automatic]: im Hintergrund laden und prüfen, dann
+/// "Jetzt neu starten" anbieten – sonst wird beim Beenden installiert. Ohne
+/// [automatic]: Hinweis mit "Aktualisieren" (lädt, prüft, installiert und startet neu).
+/// [dialogContext] liefert einen Kontext unterhalb des Navigators.
+Future<void> offerUpdate(
+  UpdateRelease release,
+  BuildContext? Function() dialogContext, {
+  required bool automatic,
+}) async {
+  if (!release.canInstall) {
+    // Ohne Installer/Signatur im Release: nur auf die Versionsseite verweisen.
+    _notice(tr.updateAvailable(release.version), action: tr.updateReleasePage, onAction: UpdateCheck.openReleasesPage);
+    return;
+  }
+  if (automatic) {
+    final file = await UpdateCheck.downloadVerified(release);
+    if (file != null) {
+      await UpdateCheck.installOnExit(file);
+      _notice(tr.updateReady(release.version), action: tr.restartNow, onAction: () => UpdateCheck.runInstaller(file));
+      return;
+    }
+    // Laden/Prüfen klappte nicht – wie ohne Automatik anbieten.
+  }
+  _notice(
+    tr.updateAvailable(release.version),
+    action: tr.update,
+    onAction: () {
+      final context = dialogContext();
+      if (context == null) return;
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => _UpdateDialog(release: release),
+      );
+    },
+  );
+}
+
+/// Update läuft: laden und prüfen (mit Fortschritt), dann still installieren –
+/// Jellyflex startet danach von selbst neu. Klappt etwas nicht: Versionsseite.
 class _UpdateDialog extends StatefulWidget {
   const _UpdateDialog({required this.release});
 
@@ -56,16 +77,17 @@ class _UpdateDialog extends StatefulWidget {
 }
 
 class _UpdateDialogState extends State<_UpdateDialog> {
-  bool _busy = false;
   double? _progress;
   bool _failed = false;
+  bool _installing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _install();
+  }
 
   Future<void> _install() async {
-    setState(() {
-      _busy = true;
-      _failed = false;
-      _progress = null;
-    });
     final file = await UpdateCheck.downloadVerified(
       widget.release,
       onProgress: (p) {
@@ -74,12 +96,12 @@ class _UpdateDialogState extends State<_UpdateDialog> {
     );
     if (!mounted) return;
     if (file == null) {
-      setState(() {
-        _busy = false;
-        _failed = true;
-      });
+      setState(() => _failed = true);
       return;
     }
+    setState(() => _installing = true);
+    // Kurz zeigen, was passiert, dann beendet sich die App für den Installer.
+    await Future<void>.delayed(const Duration(milliseconds: 800));
     await UpdateCheck.runInstaller(file);
   }
 
@@ -87,29 +109,30 @@ class _UpdateDialogState extends State<_UpdateDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppColors.surface,
-      title: Text(tr.updateAvailable(widget.release.version)),
+      title: Text(tr.updateToVersion(widget.release.version)),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 440),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(tr.updateVerifiedHint),
-            if (_busy) ...[const SizedBox(height: 16), LinearProgressIndicator(value: _progress)],
-            if (_failed) ...[
+            if (_failed)
+              Text(tr.updateVerifyFailed, style: const TextStyle(color: Color(0xFFFF6B6B)))
+            else ...[
+              Text(_installing ? tr.updateInstalling : tr.updateDownloading),
               const SizedBox(height: 16),
-              Text(tr.updateVerifyFailed, style: const TextStyle(color: Color(0xFFFF6B6B))),
+              LinearProgressIndicator(value: _installing ? null : _progress),
+              const SizedBox(height: 12),
+              Text(tr.updateVerifiedHint, style: TextStyle(color: AppColors.textMuted, fontSize: 12.5)),
             ],
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: _busy ? null : UpdateCheck.openReleasesPage, child: Text(tr.updateReleasePage)),
-        FilledButton.icon(
-          onPressed: _busy ? null : _install,
-          icon: const Icon(Icons.system_update_alt_rounded, size: 18),
-          label: Text(tr.updateInstall),
-        ),
+        if (_failed) ...[
+          TextButton(onPressed: UpdateCheck.openReleasesPage, child: Text(tr.updateReleasePage)),
+          FilledButton(onPressed: () => Navigator.pop(context), child: Text(tr.close)),
+        ],
       ],
     );
   }
@@ -120,7 +143,7 @@ Future<void> checkForUpdateNow(BuildContext context) async {
   final messenger = ScaffoldMessenger.maybeOf(context);
   final latest = await UpdateCheck.latestRelease();
   if (latest != null && UpdateCheck.isNewer(latest.version)) {
-    showUpdateNotice(latest, () => context.mounted ? context : null);
+    await offerUpdate(latest, () => context.mounted ? context : null, automatic: false);
     return;
   }
   messenger?.showSnackBar(
@@ -250,6 +273,15 @@ class AboutRows extends ConsumerWidget {
             ],
           ),
         ),
+        if (s.updateCheck)
+          row(
+            title: tr.autoUpdate,
+            subtitle: tr.autoUpdateHint,
+            trailing: toggle(
+              value: s.autoUpdate,
+              onChanged: (v) => ctrl.update((s) => s.copyWith(autoUpdate: v)),
+            ),
+          ),
         row(
           title: tr.errorReport,
           subtitle: tr.errorReportHint,

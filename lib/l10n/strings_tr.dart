@@ -1250,8 +1250,6 @@ final class _Tr extends S {
   @override
   String get updateReleasePage => 'Sürüm sayfası';
   @override
-  String get updateInstall => 'İndir ve yükle';
-  @override
   String get profileLocked => 'Kilitli – devam etmek için PIN’ini gir';
   @override
   String get unlock => 'Kilidi aç';
@@ -1261,4 +1259,20 @@ final class _Tr extends S {
   String get pinLock => 'Uzaktayken kilitle';
   @override
   String get pinLockHint => 'Bu süre boyunca giriş olmazsa PIN’i yeniden ister (video oynarken değil).';
+  @override
+  String get update => 'Güncelle';
+  @override
+  String updateToVersion(String version) => '$version sürümüne güncelleniyor';
+  @override
+  String get updateDownloading => 'Güncelleme indiriliyor ve kontrol ediliyor …';
+  @override
+  String get updateInstalling => 'Yükleniyor – Jellyflex kendiliğinden yeniden başlar.';
+  @override
+  String updateReady(String version) => '$version sürümü hazır – Jellyflex kapatılınca yüklenecek.';
+  @override
+  String get restartNow => 'Şimdi yeniden başlat';
+  @override
+  String get autoUpdate => 'Güncellemeleri otomatik yükle';
+  @override
+  String get autoUpdateHint => 'Yeni sürümler arka planda indirilir, kontrol edilir ve Jellyflex kapatılınca yüklenir.';
 }

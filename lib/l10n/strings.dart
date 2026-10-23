@@ -974,7 +974,6 @@ class S {
     'Das Update ließ sich nicht laden oder die Signatur stimmt nicht – es wurde nichts installiert.',
   );
   String get updateReleasePage => _t('Release page', 'Versionsseite');
-  String get updateInstall => _t('Download & install', 'Laden & installieren');
 
   // --- Sperre bei Abwesenheit ------------------------------------------------
 
@@ -985,5 +984,23 @@ class S {
   String get pinLockHint => _t(
     'Asks for the PIN again after this long without input (not while a video is playing).',
     'Fragt nach so langer Zeit ohne Eingabe wieder nach der PIN (nicht während ein Video läuft).',
+  );
+
+  // --- Automatische Updates --------------------------------------------------
+
+  String get update => _t('Update', 'Aktualisieren');
+  String updateToVersion(String version) => _t('Updating to version $version', 'Update auf Version $version');
+  String get updateDownloading => _t('Downloading and checking the update …', 'Update wird geladen und geprüft …');
+  String get updateInstalling =>
+      _t('Installing – Jellyflex restarts by itself.', 'Wird installiert – Jellyflex startet von selbst neu.');
+  String updateReady(String version) => _t(
+    'Version $version is ready – it installs when you close Jellyflex.',
+    'Version $version ist bereit – sie wird beim Schließen von Jellyflex installiert.',
+  );
+  String get restartNow => _t('Restart now', 'Jetzt neu starten');
+  String get autoUpdate => _t('Install updates automatically', 'Updates automatisch installieren');
+  String get autoUpdateHint => _t(
+    'New versions are downloaded and checked in the background and installed when you close Jellyflex.',
+    'Neue Versionen werden im Hintergrund geladen, geprüft und beim Schließen von Jellyflex installiert.',
   );
 }

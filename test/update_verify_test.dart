@@ -35,6 +35,19 @@ void main() {
     expect(await UpdateCheck.verify(installer, signature), isFalse);
   });
 
+  test('Automatisches Update: still, mit Neustart, gleiche Installationsart', () {
+    final relaunch = UpdateCheck.installScript(r'C:\Temp\JellyflexUpdate\Setup.exe', relaunch: true, allUsers: false);
+    expect(relaunch, contains(r'"C:\Temp\JellyflexUpdate\Setup.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART'));
+    expect(relaunch, contains('/CURRENTUSER'));
+    expect(relaunch, contains('/RELAUNCH'));
+    // Erst warten (App muss beendet sein), dann installieren.
+    expect(relaunch.indexOf('ping'), lessThan(relaunch.indexOf('Setup.exe')));
+
+    final onExit = UpdateCheck.installScript(r'C:\x\Setup.exe', relaunch: false, allUsers: true);
+    expect(onExit, contains('/ALLUSERS'));
+    expect(onExit, isNot(contains('/RELAUNCH')), reason: 'Beim Beenden nicht wieder öffnen');
+  });
+
   test('Laden: nur mit gültiger Signatur entsteht eine Datei', () async {
     var payload = installer;
     var signature = await sign(installer);

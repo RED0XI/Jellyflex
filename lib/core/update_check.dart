@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'version.dart';
 
@@ -128,11 +129,54 @@ abstract final class UpdateCheck {
     }
   }
 
-  /// Geprüften Installer starten; die App beendet sich danach (der Installer ersetzt sie).
-  static Future<void> runInstaller(File installer) async {
-    await Process.start(installer.path, const [], mode: ProcessStartMode.detached);
-    await Future<void>.delayed(const Duration(milliseconds: 500));
+  /// Geprüften Installer still (ohne Fragen) starten; die App beendet sich gleich danach.
+  /// [relaunch]: Jellyflex nach dem Update wieder öffnen (sonst bleibt sie zu – z. B.
+  /// beim Installieren während des Beendens).
+  static Future<void> runInstaller(File installer, {bool relaunch = true}) async {
+    final script = File('${installer.parent.path}\\run_update.cmd');
+    await script.writeAsString(installScript(installer.path, relaunch: relaunch, allUsers: _installedForAllUsers));
+    // Über ein kleines Skript mit kurzer Pause: der Installer darf erst loslegen,
+    // wenn diese App ganz beendet ist (sonst meldet er "Jellyflex läuft noch").
+    await Process.start('cmd.exe', ['/c', script.path], mode: ProcessStartMode.detached);
     exit(0);
+  }
+
+  /// Inhalt des Startskripts für den Installer.
+  @visibleForTesting
+  static String installScript(String installer, {required bool relaunch, required bool allUsers}) {
+    final args = [
+      '/VERYSILENT',
+      '/SUPPRESSMSGBOXES',
+      '/NORESTART',
+      allUsers ? '/ALLUSERS' : '/CURRENTUSER',
+      if (relaunch) '/RELAUNCH',
+    ].join(' ');
+    return '@echo off\r\nping -n 3 127.0.0.1 >nul\r\n"$installer" $args\r\n';
+  }
+
+  /// Wurde Jellyflex für alle Benutzer (unter "Programme") installiert? Dann das Update
+  /// genauso – sonst entstünde eine zweite Installation nur für diesen Benutzer.
+  static bool get _installedForAllUsers {
+    final exe = Platform.resolvedExecutable.toLowerCase();
+    return [
+      Platform.environment['ProgramFiles'],
+      Platform.environment['ProgramFiles(x86)'],
+    ].whereType<String>().any((p) => exe.startsWith('${p.toLowerCase()}\\'));
+  }
+
+  // --- Automatisch installieren ---------------------------------------------
+
+  /// Geprüfter Installer, der beim Beenden der App installiert wird (oder `null`).
+  static File? _pendingInstaller;
+  static bool _exitHookInstalled = false;
+
+  /// Update beim Beenden installieren (still, ohne Neustart der App).
+  static Future<void> installOnExit(File installer) async {
+    _pendingInstaller = installer;
+    if (_exitHookInstalled) return;
+    _exitHookInstalled = true;
+    windowManager.addListener(_ExitInstaller());
+    await windowManager.setPreventClose(true);
   }
 
   /// Ist [latest] neuer als [current]? (Versionen im Format 1.2.3)
@@ -150,6 +194,18 @@ abstract final class UpdateCheck {
 
   /// Versionsseite im Browser öffnen (feste Adresse, nichts vom Server).
   static Future<void> openReleasesPage() => Process.run('rundll32', ['url.dll,FileProtocolHandler', releasesPage]);
+}
+
+/// Beim Schließen des Fensters: wartendes Update still installieren, dann beenden.
+class _ExitInstaller with WindowListener {
+  @override
+  void onWindowClose() async {
+    final installer = UpdateCheck._pendingInstaller;
+    if (installer != null && installer.existsSync()) {
+      await UpdateCheck.runInstaller(installer, relaunch: false);
+    }
+    await windowManager.destroy();
+  }
 }
 
 /// Eine veröffentlichte Version mit (optional) Installer und Signatur.
