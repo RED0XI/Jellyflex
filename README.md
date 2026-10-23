@@ -51,6 +51,12 @@ flutter test integration_test/downloads_test.dart -d windows
 ```
 
 Je Datei ein eigener Aufruf – mehrere Dateien in einem Lauf scheitern unter Windows.
+
+**Alle Tests auf einmal** (startet den Demo-Server bei Bedarf selbst, Zusammenfassung am Ende):
+
+```bash
+powershell -ExecutionPolicy Bypass -File tool/run_all_tests.ps1
+```
 Bildschirmfotos landen in `build/screenshots/`.
 
 ## Funktionen
