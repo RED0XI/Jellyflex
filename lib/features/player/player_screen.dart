@@ -10,6 +10,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:window_manager/window_manager.dart' show DragToMoveArea;
 
+import '../../core/app_lock.dart';
 import '../../core/downloads.dart';
 import '../../core/format.dart';
 import '../../core/gamepad_input.dart';
@@ -257,6 +258,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// Controller im Player: ←/→ spulen, A/Start Pause, B zurück, X Spuren-Panel.
   /// In offenen Panels steuert das Steuerkreuz die Auswahl.
   bool _onPad(PadAction action) {
+    // Gesperrt: Eingaben gehören dem Sperrbildschirm.
+    if (appLocked.value) return false;
     if (_anyPanelOpen) {
       if (action == PadAction.back || action == PadAction.menu) {
         _closePanels();
@@ -288,6 +291,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   /// Fernsteuerung (z. B. vom Handy über Jellyfin).
   void _onRemotePlaystate(String command, Json data) {
+    if (appLocked.value) return;
     switch (command) {
       case 'Stop':
         _close();
@@ -311,6 +315,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   bool _onRemoteGeneral(String name, Map<String, dynamic> args) {
+    if (appLocked.value) return true;
     final volume = _player.state.volume;
     switch (name) {
       case 'SetVolume':
@@ -349,6 +354,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   /// Medientasten der Tastatur bzw. Windows-Medienanzeige.
   void _onMediaButton(String button) {
+    if (appLocked.value) return;
     switch (button) {
       case 'play':
         _player.play();
@@ -382,6 +388,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    playerPlaying.value = false;
     // Gemerktes erst nach dem Abbau speichern – während des Abbaus des
     // Widget-Baums dürfen Provider nicht geändert werden.
     final saveVolume = _volumeSaveTimer?.isActive ?? false;
@@ -530,9 +537,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       }
       // Inzwischen geschlossen? Dann keinen Timer mehr anlegen.
       if (!mounted || _closing) return;
-      _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-        _reportProgress();
-        _saveLocalPlayback(synced: _reportedStart);
+      _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+        // Lokal nur als "beim Server" merken, wenn diese Meldung wirklich ankam –
+        // sonst würde offline Geschautes nie nachgemeldet.
+        final synced = await _reportProgressConfirmed();
+        if (mounted && !_closing) _saveLocalPlayback(synced: synced);
       });
     } catch (e) {
       if (mounted) setState(() => _error = redactSecrets('$e'.replaceFirst('Exception: ', '')));
@@ -657,6 +666,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _api.reportPlaybackProgress(_progressBody()).ignore();
   }
 
+  /// Fortschritt melden und abwarten, ob der Server ihn bekommen hat.
+  Future<bool> _reportProgressConfirmed() async {
+    if (!_reportedStart || _closing) return false;
+    try {
+      await _api.reportPlaybackProgress(_progressBody()).timeout(const Duration(seconds: 5));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Heruntergeladene Titel: Stelle auch lokal merken – für offline und zum
   /// späteren Nachmelden, falls der Server gerade nicht erreichbar ist.
   void _saveLocalPlayback({required bool synced}) => _localPlaybackSaver(synced: synced)?.call();
@@ -673,6 +693,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   void _onPlayingChanged(bool playing) {
+    playerPlaying.value = playing;
     // Per Medientaste o. Ä. weitergespielt → "Gute Nacht" ausblenden.
     if (playing && _sleeping && mounted) setState(() => _sleeping = false);
     _reportProgress();

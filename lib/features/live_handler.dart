@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../core/app_lock.dart';
 import '../core/app_shell.dart';
 import '../core/auto_refresh.dart';
 import '../core/downloads.dart';
@@ -136,6 +137,7 @@ class _LiveHandlerState extends ConsumerState<LiveHandler> with WindowListener {
   void _general(String name, Map<String, dynamic> args) {
     // Zuerst darf der Player (falls offen) den Befehl übernehmen.
     if (RemoteControl.onGeneral?.call(name, args) ?? false) return;
+    if (appLocked.value && name != 'DisplayMessage') return;
     final router = widget.router;
     switch (name) {
       case 'DisplayMessage':
@@ -193,6 +195,8 @@ class _LiveHandlerState extends ConsumerState<LiveHandler> with WindowListener {
   /// so liegt nie ein Player unsichtbar unter einer anderen Seite und es entsteht
   /// kein zweiter Player.
   void _open(String location) {
+    // Gesperrt (PIN nach Inaktivität): nichts von außen öffnen oder abspielen.
+    if (appLocked.value) return;
     final router = widget.router;
     final inPlayer = router.routerDelegate.currentConfiguration.isNotEmpty && router.state.uri.path.startsWith('/play');
     if (inPlayer) {

@@ -184,14 +184,14 @@ void main() {
     PlayerScreen.debugBeforeOpen = (p) async => player = p;
     try {
       final manager = container.read(downloadsProvider.notifier);
-      final movie = (await tester.runAsync(() => container.read(apiProvider).getItem('movie0')))!;
+      final movie = (await tester.runAsync(() => container.read(apiProvider).getItem('short1')))!;
       await manager.enqueue(
         movie,
-        mediaSourceId: 'movie0-hd',
+        mediaSourceId: 'short1-hd',
         options: const DownloadOptions(maxBitrate: 3000000, audioLanguage: 'eng'),
       );
-      expect(await _waitFor(tester, () => manager.entryFor('movie0')?.isDone ?? false), isTrue);
-      final entry = manager.entryFor('movie0')!;
+      expect(await _waitFor(tester, () => manager.entryFor('short1')?.isDone ?? false), isTrue);
+      final entry = manager.entryFor('short1')!;
       expect(entry.converted, isTrue);
       expect(entry.audioIndex, 2, reason: 'Englische Tonspur');
       expect(entry.mediaFile, endsWith('media.mkv'));
@@ -201,18 +201,29 @@ void main() {
       debugPrint('Angefragt: $stream');
       expect(stream['path'], 'stream.mkv');
       expect(stream['static'], 'false');
-      expect(stream['mediaSourceId'], 'movie0-hd');
+      expect(stream['mediaSourceId'], 'short1-hd');
       expect(stream['audioStreamIndex'], '2');
       expect(stream['maxHeight'], '720');
       expect(int.parse(stream['videoBitRate'] as String), lessThanOrEqualTo(3000000));
 
       // Die kleinere Fassung spielt lokal.
-      container.read(routerProvider).push('/play/movie0');
+      container.read(routerProvider).push('/play/short1');
       expect(await _waitFor(tester, () => (player?.state.duration ?? Duration.zero) > Duration.zero), isTrue);
       await pumpFor(tester, const Duration(seconds: 1));
       expect(find.byType(PlayerScreen), findsOneWidget);
       container.read(routerProvider).pop();
       await pumpFor(tester, const Duration(seconds: 2));
+      await tester.runAsync(() => manager.remove('short1'));
+
+      // Umgerechnet, aber viel zu früh zu Ende (2-Std.-Film, nur 41 MB): nicht "fertig".
+      final long = (await tester.runAsync(() => container.read(apiProvider).getItem('movie0')))!;
+      await manager.enqueue(long, mediaSourceId: 'movie0-hd', options: const DownloadOptions(maxBitrate: 3000000));
+      expect(
+        await _waitFor(tester, () => manager.entryFor('movie0')?.status == DownloadStatus.failed),
+        isTrue,
+        reason: 'Abgebrochene Umrechnung gilt nicht als fertig',
+      );
+      expect(manager.entryFor('movie0')!.mediaFile, isNull);
       await tester.runAsync(() => manager.remove('movie0'));
     } finally {
       PlayerScreen.debugBeforeOpen = null;
@@ -244,11 +255,20 @@ void main() {
           .read(settingsProvider.notifier)
           .update((s) => s.copyWith(smartDownloads: true, smartEpisodes: 2, smartMaxGb: 0));
 
-      // Folge 1 laden und auf dem Server als gesehen markieren.
+      // Folge 1 selbst laden. Auf dem Server als gesehen markiert (z. B. früher am
+      // Fernseher geschaut): bleibt – man hat sie ja bewusst noch einmal geladen.
       final first = (await tester.runAsync(() => container.read(apiProvider).getItem(ids[0])))!;
       await manager.enqueue(first);
       expect(await _waitFor(tester, () => manager.entryFor(ids[0])?.isDone ?? false), isTrue);
       await tester.runAsync(() => setPlayed(ids[0], true));
+      await tester.runAsync(manager.runSmart);
+      await pumpFor(tester, const Duration(milliseconds: 500));
+      expect(manager.entryFor(ids[0]), isNotNull, reason: 'Bewusst geladene, früher gesehene Folge bleibt');
+      expect(manager.entryFor(ids[1])?.auto, isTrue, reason: 'Folge 2 automatisch geladen');
+
+      // Aus dem Download zu Ende geschaut → wird gelöscht.
+      final runtime1 = manager.entryFor(ids[0])!.loadItem()!.runTimeTicks!;
+      manager.savePlayback(ids[0], positionTicks: runtime1, runtimeTicks: runtime1, synced: true);
       await tester.runAsync(manager.runSmart);
       await pumpFor(tester, const Duration(milliseconds: 500));
       expect(manager.entryFor(ids[0]), isNull, reason: 'Gesehene Folge gelöscht');
@@ -260,9 +280,16 @@ void main() {
         isTrue,
       );
 
-      // Folge 2 offline zu Ende geschaut (lokal gesehen) → Folge 4 kommt dazu, Folge 2 geht.
+      // Folge 2 zu Ende geschaut, aber der Server weiß es (noch) nicht → Folge 4 kommt dazu,
+      // Folge 2 bleibt (sonst ginge der Gesehen-Stand verloren).
       final runtime = manager.entryFor(ids[1])!.loadItem()!.runTimeTicks!;
       manager.savePlayback(ids[1], positionTicks: runtime, runtimeTicks: runtime, synced: true);
+      expect(await _waitFor(tester, () => manager.entryFor(ids[3]) != null), isTrue);
+      await pumpFor(tester, const Duration(seconds: 1));
+      expect(manager.entryFor(ids[1]), isNotNull, reason: 'Ohne Bestätigung vom Server nicht löschen');
+      // Server bestätigt → beim nächsten Durchlauf gelöscht.
+      await tester.runAsync(() => setPlayed(ids[1], true));
+      await tester.runAsync(manager.runSmart);
       expect(
         await _waitFor(tester, () => manager.entryFor(ids[3]) != null && manager.entryFor(ids[1]) == null),
         isTrue,
@@ -273,6 +300,7 @@ void main() {
       // Platzgrenze: 1 GB reicht für keine weitere Folge (je ~4 GB laut Server).
       container.read(settingsProvider.notifier).update((s) => s.copyWith(smartMaxGb: 1));
       final runtime3 = manager.entryFor(ids[2])!.loadItem()!.runTimeTicks!;
+      await tester.runAsync(() => setPlayed(ids[2], true));
       manager.savePlayback(ids[2], positionTicks: runtime3, runtimeTicks: runtime3, synced: true);
       expect(await _waitFor(tester, () => manager.entryFor(ids[2]) == null), isTrue);
       await pumpFor(tester, const Duration(seconds: 1));

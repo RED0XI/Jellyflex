@@ -59,9 +59,14 @@ abstract final class DownloadFolder {
     try {
       final dir = Directory(path);
       await dir.create(recursive: true);
-      final probe = File('${dir.path}\\.jellyflex-probe');
-      await probe.writeAsString('ok', flush: true);
-      await probe.delete();
+      // Eindeutiger Name und "exclusive": eine vorhandene Datei wird nie überschrieben.
+      final probe = File('${dir.path}\\.jellyflex-probe-$pid-${DateTime.now().microsecondsSinceEpoch}');
+      await probe.create(exclusive: true);
+      try {
+        await probe.writeAsString('ok', flush: true);
+      } finally {
+        await probe.delete();
+      }
       return null;
     } on FileSystemException catch (e) {
       return e.osError?.message ?? e.message;

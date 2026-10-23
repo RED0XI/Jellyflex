@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/app_lock.dart';
 import '../core/layouts.dart';
 import '../core/route_observer.dart';
 import '../core/settings.dart';
@@ -56,7 +57,8 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
   /// Pfeiltaste am Rand: von der Seite nach links in die Leiste, aus der Leiste
   /// nach rechts zurück auf die Seite. Nie aus offenen Dialogen/Menüs heraus.
   bool _onFocusEdge(TraversalDirection direction) {
-    if (!_sidebarShown || popupTracker.open.value > 0) return false;
+    // Gesperrt: der Fokus darf nicht hinter den Sperrbildschirm wandern.
+    if (appLocked.value || !_sidebarShown || popupTracker.open.value > 0) return false;
     final inSidebar = _sideScope.hasFocus;
     if (direction == TraversalDirection.left && !inSidebar) {
       _sideScope.requestFocus();

@@ -604,7 +604,9 @@ class _DownloadButton extends ConsumerWidget {
           tooltip: tr.cancelDownload,
           size: 44,
           onPressed: () async {
-            if (await confirmCancelDownload(context, item.name)) manager.remove(item.id);
+            if (!await confirmCancelDownload(context, item.name)) return;
+            // Inzwischen fertig geworden? Dann behalten.
+            if (!(manager.entryFor(item.id)?.isDone ?? true)) manager.remove(item.id);
           },
         ),
       ],
@@ -833,8 +835,12 @@ class _SeasonTools extends ConsumerWidget {
             ),
             TextButton.icon(
               onPressed: () async {
-                final unfinished = downloads.where((d) => !d.isDone).toList();
                 if (!await confirmCancelDownload(context, season.name)) return;
+                // Erst nach der Rückfrage auswählen: inzwischen Fertiges bleibt.
+                final unfinished = ref
+                    .read(myDownloadsProvider)
+                    .where((d) => ids.contains(d.itemId) && !d.isDone)
+                    .toList();
                 final manager = ref.read(downloadsProvider.notifier);
                 for (final d in unfinished) {
                   await manager.remove(d.itemId);

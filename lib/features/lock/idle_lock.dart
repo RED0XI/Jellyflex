@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../core/app_lock.dart';
 import '../../core/gamepad_input.dart';
 import '../../core/profile_pin.dart';
 import '../../core/session.dart';
@@ -49,6 +50,7 @@ class _IdleLockState extends ConsumerState<IdleLock> {
   @override
   void dispose() {
     _idle?.cancel();
+    appLocked.value = false;
     HardwareKeyboard.instance.removeHandler(_onAnyKey);
     GamepadInput.activity.removeListener(_onActivity);
     _focus.dispose();
@@ -67,17 +69,20 @@ class _IdleLockState extends ConsumerState<IdleLock> {
     final config = widget.router.routerDelegate.currentConfiguration;
     final path = config.isEmpty ? '' : widget.router.state.uri.path;
     // Beim Filmschauen gibt es keine Eingaben – das ist keine Abwesenheit.
-    if (path.startsWith('/play')) {
+    // Ein pausiertes oder hängengebliebenes Video schützt dagegen nicht.
+    if (path.startsWith('/play') && playerPlaying.value) {
       _restartTimer();
       return;
     }
     if (!mounted || ref.read(sessionProvider).value?.hasPin != true) return;
     setState(() => _locked = true);
+    appLocked.value = true;
     _focus.requestFocus();
   }
 
   void _unlock() {
     if (!mounted) return;
+    appLocked.value = false;
     setState(() => _locked = false);
     _focus.unfocus();
     _restartTimer();

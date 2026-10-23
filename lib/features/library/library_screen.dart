@@ -203,7 +203,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   /// Neue/geänderte Titel auf dem Server: die schon geladenen Einträge still
   /// ersetzen – ohne Ladekreis und ohne die Scrollposition zu verlieren.
   Future<void> _reloadLoaded() async {
-    if (_loading || _items.isEmpty) return;
+    if (_loading) return;
+    // Bisher leer (z. B. Filter ohne Treffer): einfach neu laden.
+    if (_items.isEmpty) {
+      setState(() => _total = null);
+      _loadMore();
+      return;
+    }
     final id = _requestId;
     final count = _items.length;
     try {

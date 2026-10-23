@@ -22,12 +22,23 @@ abstract final class AppShell {
 
   /// Aufrufe weiterer Instanzen empfangen.
   static void listen(ValueChanged<String> onResume) {
+    _onResume = onResume;
     _channel.setMethodCallHandler((call) async {
       if (call.method != 'open' || call.arguments is! String) return;
-      final id = resumeIdFrom(call.arguments as String);
-      if (id != null) onResume(id);
+      _handleOpen(call.arguments as String);
     });
   }
+
+  static ValueChanged<String>? _onResume;
+
+  static void _handleOpen(String commandLine) {
+    final id = resumeIdFrom(commandLine);
+    if (id != null) _onResume?.call(id);
+  }
+
+  /// Nur für Tests: so tun, als käme ein Aufruf aus der Sprungliste.
+  @visibleForTesting
+  static void debugOpen(String commandLine) => _handleOpen(commandLine);
 
   /// Sprungliste "Weiterschauen" setzen (leer = entfernen, z. B. beim Abmelden).
   static Future<void> setJumpList(String category, List<({String id, String title})> items) async {

@@ -14,7 +14,9 @@ import 'package:integration_test/integration_test.dart';
 import 'package:jellyflex/app.dart';
 import 'package:jellyflex/core/session.dart';
 import 'package:jellyflex/core/settings.dart';
+import 'package:jellyflex/core/app_shell.dart';
 import 'package:jellyflex/core/profile_pin.dart';
+import 'package:jellyflex/features/player/player_screen.dart';
 import 'package:jellyflex/features/home/home_screen.dart';
 import 'package:jellyflex/features/lock/idle_lock.dart';
 import 'package:media_kit/media_kit.dart';
@@ -127,11 +129,24 @@ void main() {
       }
       expect(find.text('Gesperrt – weiter mit deiner PIN'), findsNothing);
 
-      // Während ein Video läuft, wird nicht gesperrt.
+      // Während ein Video läuft, wird nicht gesperrt …
+      Player? player;
+      PlayerScreen.debugBeforeOpen = (p) async => player = p;
       container.read(routerProvider).push('/play/movie1');
       await pumpFor(tester, const Duration(seconds: 4));
+      expect(player?.state.playing, isTrue);
       expect(find.text('Gesperrt – weiter mit deiner PIN'), findsNothing);
+      // … ein pausiertes Video schützt aber nicht.
+      await tester.runAsync(() => player!.pause());
+      await pumpFor(tester, const Duration(seconds: 3));
+      expect(find.text('Gesperrt – weiter mit deiner PIN'), findsOneWidget);
+      // Gesperrt: Fernsteuerung/Sprungliste öffnet nichts.
+      final location = container.read(routerProvider).state.uri.toString();
+      AppShell.debugOpen('--resume=movie2');
+      await pumpFor(tester, const Duration(seconds: 1));
+      expect(container.read(routerProvider).state.uri.toString(), location);
     } finally {
+      PlayerScreen.debugBeforeOpen = null;
       IdleLock.debugDelay = null;
       await tester.pumpWidget(const SizedBox());
     }

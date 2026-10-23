@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' show max;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -60,6 +61,7 @@ class DownloadEntry {
     this.converted = false,
     this.audioIndex,
     this.auto = false,
+    this.expectedSize = 0,
   });
 
   final String itemId;
@@ -110,6 +112,9 @@ class DownloadEntry {
 
   /// Von Smart Downloads geladen (zählt zu deren Speichergrenze).
   final bool auto;
+
+  /// Geschätzte Größe beim Vormerken (für die Speichergrenze, solange noch nichts geladen ist).
+  final int expectedSize;
 
   /// Eindeutig je Konto: derselbe Titel kann von zwei Konten geladen sein.
   String get key => '$serverUrl|$userId|$itemId';
@@ -182,6 +187,7 @@ class DownloadEntry {
     converted: converted ?? this.converted,
     audioIndex: audioIndex != null ? audioIndex() : this.audioIndex,
     auto: auto,
+    expectedSize: expectedSize,
   );
 
   Map<String, dynamic> toJson() => {
@@ -211,6 +217,7 @@ class DownloadEntry {
     'converted': converted,
     'audioIndex': audioIndex,
     'auto': auto,
+    'expectedSize': expectedSize,
   };
 
   factory DownloadEntry.fromJson(Map<String, dynamic> j) => DownloadEntry(
@@ -240,15 +247,25 @@ class DownloadEntry {
     converted: j['converted'] == true,
     audioIndex: (j['audioIndex'] as num?)?.toInt(),
     auto: j['auto'] == true,
+    expectedSize: (j['expectedSize'] as num?)?.toInt() ?? 0,
   );
 
   /// Gespeicherte Infos des Titels (für die Anzeige ohne Server) – mit dem
   /// lokal geschauten Fortschritt, falls der neuer ist.
   BaseItem? loadItem() {
     try {
-      final file = File(itemJsonPath);
-      if (!file.existsSync()) return null;
-      final raw = (jsonDecode(file.readAsStringSync()) as Map).cast<String, dynamic>();
+      // Einmal von der Platte lesen (die Downloads-Seite baut sich bei jedem Fortschritt neu).
+      final cached = _itemCache[itemJsonPath];
+      final Map<String, dynamic> stored;
+      if (cached != null) {
+        stored = cached;
+      } else {
+        final file = File(itemJsonPath);
+        if (!file.existsSync()) return null;
+        stored = (jsonDecode(file.readAsStringSync()) as Map).cast<String, dynamic>();
+        _itemCache[itemJsonPath] = stored;
+      }
+      final raw = {...stored};
       if (watchedAt != null) {
         raw['UserData'] = {
           ...((raw['UserData'] as Map?)?.cast<String, dynamic>() ?? const {}),
@@ -261,6 +278,12 @@ class DownloadEntry {
       return null;
     }
   }
+
+  /// Gelesene item.json-Dateien (Pfad → Inhalt).
+  static final _itemCache = <String, Map<String, dynamic>>{};
+
+  /// Nach dem Schreiben oder Löschen neu lesen.
+  static void forgetCachedItem(String itemJsonPath) => _itemCache.remove(itemJsonPath);
 }
 
 /// Bremst einen Datenstrom auf höchstens `limit` Bytes pro Sekunde.
@@ -397,6 +420,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
         } else {
           final map = (decoded as Map).cast<String, dynamic>();
           raw = (map['entries'] as List?) ?? const [];
+          _followedSeries.addAll(((map['followed'] as List?) ?? const []).whereType<String>());
           _roots.addAll(((map['roots'] as List?) ?? const []).whereType<String>());
         }
         final list = raw
@@ -522,11 +546,13 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
         mediaSourceId: mediaSourceId,
         folder: folder,
         maxBitrate: o.maxBitrate,
+        expectedSize: _estimateSize(item, o.maxBitrate, mediaSourceId),
         audioLanguage: o.audioLanguage,
         subtitleLanguages: o.subtitleLanguages,
         auto: auto,
       ),
     ]);
+    _follow(state.last);
     _pump();
   }
 
@@ -562,6 +588,11 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   Future<void> remove(String itemId) async {
     final entry = entryFor(itemId);
     if (entry == null) return;
+    // Von Hand gelöscht und keine Folge der Serie mehr da: Smart Downloads folgen ihr nicht mehr.
+    final seriesId = entry.seriesId;
+    if (seriesId != null && !state.any((e) => e.key != entry.key && isMine(e) && e.seriesId == seriesId)) {
+      _followedSeries.remove('${entry.serverUrl}|${entry.userId}|$seriesId');
+    }
     await _removeEntry(entry);
   }
 
@@ -574,6 +605,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
         await _running;
       } catch (_) {}
     }
+    DownloadEntry.forgetCachedItem(entry.itemJsonPath);
     final dir = Directory(entry.folder);
     // Niemals außerhalb eines Download-Ordners löschen.
     if (!_isKnownFolder(entry)) {
@@ -595,12 +627,19 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   int get usedBytes => state.where(isMine).fold(0, (sum, e) => sum + e.sizeOnDisk);
 
   /// Von Smart Downloads belegter Platz (Bytes).
-  int get smartUsedBytes => state.where((e) => isMine(e) && e.auto).fold(0, (sum, e) => sum + e.sizeOnDisk);
+  /// Unfertige zählen mit ihrer erwarteten Größe – sonst passen mehrere wartende
+  /// Folgen scheinbar gleichzeitig unter die Grenze.
+  int get smartUsedBytes => state
+      .where((e) => isMine(e) && e.auto)
+      .fold(0, (sum, e) => sum + (e.isDone ? e.total : [e.total, e.received, e.expectedSize].reduce(max)));
 
   /// Fertige Downloads, die schon (lokal oder laut Server) gesehen sind.
+  ///
+  /// Nur, was aus dem Download zu Ende geschaut wurde – dass der Server einen Titel
+  /// als gesehen kennt, reicht nicht (wer einen alten Lieblingsfilm lädt, will ihn sehen).
   List<DownloadEntry> watchedDownloads() => [
     for (final e in state)
-      if (isMine(e) && e.isDone && (e.played || (e.watchedAt == null && (e.loadItem()?.userData.played ?? false)))) e,
+      if (isMine(e) && e.isDone && e.played) e,
   ];
 
   /// Alle gesehenen Downloads löschen (Fortschritt, der noch nicht beim Server ist, bleibt).
@@ -698,7 +737,11 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     if (!settings.smartDownloads || _smartRunning || !ref.mounted) return;
     final session = ref.read(sessionProvider).value;
     if (session == null) return;
+    final account = session.accountKey;
+    // Gefolgte Serien: alle mit heruntergeladenen Folgen – und solche, deren letzte
+    // Folge gerade gelöscht wurde (sonst endete die Serie, wenn der Platz kurz knapp war).
     final seriesIds = {
+      ..._followedSeries.where((k) => k.startsWith('$account|')).map((k) => k.substring(account.length + 1)),
       for (final e in state)
         if (isMine(e) && e.type == 'Episode' && e.seriesId != null) e.seriesId!,
     };
@@ -706,6 +749,8 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     _smartRunning = true;
     final api = ref.read(apiProvider);
     final limit = settings.smartMaxGb * 1024 * 1024 * 1024;
+    // Nach jeder Wartezeit: noch dasselbe Konto? Sonst nichts mehr anfassen.
+    bool stillMine() => ref.mounted && ref.read(sessionProvider).value?.accountKey == account;
     try {
       for (final seriesId in seriesIds) {
         final List<BaseItem> episodes;
@@ -716,24 +761,31 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
           debugPrint('Smart Downloads: Server nicht erreichbar ($e)');
           return;
         }
-        if (!ref.mounted || ref.read(sessionProvider).value?.accountKey != session.accountKey) return;
+        if (!stillMine()) return;
         // Gesehen – laut Server oder offline (noch nicht gemeldet).
         bool watched(BaseItem ep) => ep.userData.played || (entryFor(ep.id)?.played ?? false);
+
+        // Erst aufräumen (macht Platz für die nächsten Folgen). Gelöscht wird nur, was der
+        // Server als gesehen kennt – so geht nie Fortschritt verloren, der dort nicht ankam.
+        // Selbst geladene Folgen nur, wenn sie aus dem Download zu Ende geschaut wurden
+        // (wer eine schon gesehene Folge bewusst lädt, will sie noch einmal sehen).
+        for (final ep in episodes.where((e) => e.userData.played)) {
+          if (!stillMine()) return;
+          final entry = entryFor(ep.id);
+          if (entry == null || entry.needsSync || !entry.isDone) continue;
+          if (!entry.played && !entry.auto) continue;
+          await _removeEntry(entry);
+        }
 
         // Nach der zuletzt gesehenen Folge weiter.
         final lastWatched = episodes.lastIndexWhere(watched);
         final upcoming = episodes.skip(lastWatched + 1).where((e) => !watched(e)).take(settings.smartEpisodes);
         for (final ep in upcoming) {
+          if (!stillMine()) return;
           if (entryFor(ep.id) != null) continue;
           final size = _estimateSize(ep, settings.downloadQuality);
           if (limit > 0 && smartUsedBytes + size > limit) break;
           await enqueue(ep, auto: true);
-        }
-        // Gesehene Folgen löschen – aber nie Fortschritt, der noch nicht beim Server ist.
-        for (final ep in episodes.where(watched)) {
-          final entry = entryFor(ep.id);
-          if (entry == null || entry.needsSync || !entry.isDone) continue;
-          await _removeEntry(entry);
         }
       }
     } finally {
@@ -741,9 +793,17 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     }
   }
 
+  /// Serien, denen Smart Downloads folgen ("Konto|Serie"), auch ohne aktuelle Downloads.
+  final _followedSeries = <String>{};
+
+  void _follow(DownloadEntry e) {
+    if (e.type == 'Episode' && e.seriesId != null) _followedSeries.add('${e.serverUrl}|${e.userId}|${e.seriesId}');
+  }
+
   /// Geschätzte Größe eines Downloads (Bytes).
-  static int _estimateSize(BaseItem item, int? maxBitrate) {
-    final source = item.mediaSources.firstOrNull;
+  static int _estimateSize(BaseItem item, int? maxBitrate, [String? mediaSourceId]) {
+    final sources = item.mediaSources;
+    final source = sources.where((s) => s.id == mediaSourceId).firstOrNull ?? sources.firstOrNull;
     final runtime = item.runTimeTicks ?? source?.runTimeTicks ?? 0;
     final seconds = runtime / 10000000;
     if (maxBitrate != null && seconds > 0 && ((source?.bitrate ?? 0) == 0 || source!.bitrate! > maxBitrate)) {
@@ -754,7 +814,8 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   }
 
   /// Geschätzte Größe für die Anzeige vor dem Download.
-  int estimateSize(BaseItem item, DownloadOptions options) => _estimateSize(item, options.maxBitrate);
+  int estimateSize(BaseItem item, DownloadOptions options, {String? mediaSourceId}) =>
+      _estimateSize(item, options.maxBitrate, mediaSourceId);
 
   // --- Netzwerk -------------------------------------------------------------
 
@@ -827,6 +888,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       final source = sources.where((s) => s.id == entry.mediaSourceId).firstOrNull ?? sources.firstOrNull;
       if (source == null) throw Exception(tr.noFileFound);
       await File(entry.itemJsonPath).writeAsString(jsonEncode(item.raw));
+      DownloadEntry.forgetCachedItem(entry.itemJsonPath);
 
       // Kleinere Fassung nur, wenn die Datei wirklich größer ist als gewünscht.
       final maxBitrate = entry.maxBitrate;
@@ -856,7 +918,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       final already = await part.exists() ? await part.length() : 0;
 
       // Genug Platz? (mit Reserve, damit Windows nicht vollläuft)
-      final expected = converted ? _estimateSize(item, maxBitrate) : (source.size ?? 0);
+      final expected = converted ? _estimateSize(item, maxBitrate, source.id) : (source.size ?? 0);
       final free = DownloadFolder.freeBytes(entry.folder);
       if (free != null && expected > 0 && expected - already > free - _reserveBytes) {
         throw Exception(tr.notEnoughSpace(formatBytes(expected - already), formatBytes(free)));
@@ -924,6 +986,12 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       if (total > 0 && received < total) {
         throw Exception(tr.connectionInterrupted(formatBytes(received), formatBytes(total)));
       }
+      // Umgerechnet (ohne Größenangabe): deutlich kleiner als erwartet = abgebrochen,
+      // nicht fertig. Neu laden statt einen halben Film zu behalten.
+      if (converted && total == 0 && expected > 0 && received < expected ~/ 4) {
+        await part.delete();
+        throw Exception(tr.connectionInterrupted(formatBytes(received), formatBytes(expected)));
+      }
       if (await target.exists()) await target.delete();
       await part.rename(target.path);
       _update(
@@ -974,7 +1042,8 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   );
 
   Future<void> _downloadImages(JellyfinApi api, BaseItem item, DownloadEntry entry, CancelToken cancel) async {
-    final dio = Dio(_sideOptions);
+    // Mit Anmeldung – manche Server (bzw. Proxys davor) geben Bilder nur so heraus.
+    final dio = Dio(_sideOptions.copyWith(headers: {'Authorization': api.authorizationHeader}));
     final poster = api.imageUrlOrNull(Images.poster(item), fillWidth: 400, fillHeight: 600);
     final backdrop = api.imageUrlOrNull(Images.landscape(item), maxWidth: 1280);
     for (final (url, path) in [(poster, entry.posterPath), (backdrop, entry.backdropPath)]) {
@@ -1052,6 +1121,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
           'version': 2,
           'roots': [..._roots],
           'entries': [for (final e in state) e.toJson()],
+          'followed': [..._followedSeries],
         }),
         flush: true,
       );

@@ -44,12 +44,12 @@ Future<int> startDownloads(
 
   DownloadOptions? options = manager.defaultOptions;
   if (read(settingsProvider).downloadAskOptions) {
-    options = await showDownloadOptionsDialog(context, read, sample, count: fresh.length);
+    options = await showDownloadOptionsDialog(context, read, sample, count: fresh.length, mediaSourceId: mediaSourceId);
     if (options == null || !context.mounted) return 0;
   }
 
   // Platz grob prüfen (bei Staffeln: erste Folge × Anzahl).
-  final needed = manager.estimateSize(sample, options) * fresh.length;
+  final needed = manager.estimateSize(sample, options, mediaSourceId: mediaSourceId) * fresh.length;
   final free = DownloadFolder.freeBytes(manager.root.path);
   if (free != null && needed > 0 && needed > free) {
     final go = await showDialog<bool>(
@@ -186,19 +186,24 @@ Future<DownloadOptions?> showDownloadOptionsDialog(
   ProviderRead read,
   BaseItem sample, {
   int count = 1,
+  String? mediaSourceId,
 }) {
   return showDialog<DownloadOptions>(
     context: context,
-    builder: (context) => _DownloadOptionsDialog(read: read, sample: sample, count: count),
+    builder: (context) =>
+        _DownloadOptionsDialog(read: read, sample: sample, count: count, mediaSourceId: mediaSourceId),
   );
 }
 
 class _DownloadOptionsDialog extends StatefulWidget {
-  const _DownloadOptionsDialog({required this.read, required this.sample, required this.count});
+  const _DownloadOptionsDialog({required this.read, required this.sample, required this.count, this.mediaSourceId});
 
   final ProviderRead read;
   final BaseItem sample;
   final int count;
+
+  /// Gewählte Fassung (bei mehreren Versionen) – Sprachen und Größe stammen von ihr.
+  final String? mediaSourceId;
 
   @override
   State<_DownloadOptionsDialog> createState() => _DownloadOptionsDialogState();
@@ -211,7 +216,9 @@ class _DownloadOptionsDialogState extends State<_DownloadOptionsDialog> {
   late final Set<String> _subtitles = {..._subtitleLanguages};
   bool _dontAsk = false;
 
-  MediaSource? get _source => widget.sample.mediaSources.firstOrNull;
+  MediaSource? get _source =>
+      widget.sample.mediaSources.where((s) => s.id == widget.mediaSourceId).firstOrNull ??
+      widget.sample.mediaSources.firstOrNull;
 
   /// Sprachen (Schlüssel wie "de"), jeweils mit dem ersten Code, wie der Server ihn liefert.
   static Map<String, String> _languages(Iterable<MediaStream> streams) {
@@ -249,7 +256,7 @@ class _DownloadOptionsDialogState extends State<_DownloadOptionsDialog> {
   @override
   Widget build(BuildContext context) {
     final manager = widget.read(downloadsProvider.notifier);
-    final size = manager.estimateSize(widget.sample, _options) * widget.count;
+    final size = manager.estimateSize(widget.sample, _options, mediaSourceId: widget.mediaSourceId) * widget.count;
     final original = _quality == null;
     final audioLanguages = _audioLanguages;
     final subtitleLanguages = _subtitleLanguages.toList();

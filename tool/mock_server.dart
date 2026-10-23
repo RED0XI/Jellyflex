@@ -388,6 +388,18 @@ void _seed() {
     byId[id] = m;
   }
 
+  // Kurzfilm (nur über die Kennung erreichbar, nicht in der Bibliothek): passt in der
+  // Länge zum Testvideo – für Tests umgerechneter Downloads.
+  byId['short1'] = {
+    ...movies[0],
+    'Id': 'short1',
+    'Name': 'Kurzfilm',
+    'RunTimeTicks': 2 * 60 * 10000000,
+    'Chapters': null,
+    'UserData': _userData(),
+    'MediaSources': _twoVersions('short1', 'Kurzfilm'),
+  };
+
   for (var s = 0; s < _seriesNames.length; s++) {
     final seriesId = 'series$s';
     final ser = <String, dynamic>{

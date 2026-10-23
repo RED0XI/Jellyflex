@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../core/app_lock.dart';
 import '../core/gamepad_input.dart';
 import '../core/route_observer.dart';
 import '../theme.dart';
@@ -132,7 +133,11 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
     final primary = FocusManager.instance.primaryFocus;
     // "?" zeigt überall die Tastenkürzel – außer beim Tippen in ein Textfeld.
     // Nicht über anderen Dialogen/Menüs (z. B. der PIN-Abfrage).
-    if (event is KeyDownEvent && event.character == '?' && !_sheetOpen && popupTracker.open.value == 0) {
+    if (event is KeyDownEvent &&
+        event.character == '?' &&
+        !_sheetOpen &&
+        !appLocked.value &&
+        popupTracker.open.value == 0) {
       final ctx = primary?.context;
       final typing =
           ctx != null && (ctx.widget is EditableText || ctx.findAncestorWidgetOfExactType<EditableText>() != null);
@@ -153,6 +158,8 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
 
   /// Controller außerhalb des Players: Fokus bewegen, auswählen, zurück …
   void _onPadAction(PadAction action) {
+    // Gesperrt: nur auf dem Sperrbildschirm bewegen und auswählen.
+    if (appLocked.value && (action == PadAction.search || action == PadAction.menu)) return;
     final focus = FocusManager.instance.primaryFocus;
     final direction = switch (action) {
       PadAction.up => TraversalDirection.up,
@@ -175,7 +182,7 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
         // Schließt ein offenes Menü bzw. geht eine Seite zurück.
         if (context != null) {
           Navigator.maybeOf(context)?.maybePop();
-        } else if (widget.router.canPop()) {
+        } else if (!appLocked.value && widget.router.canPop()) {
           widget.router.pop();
         }
       case PadAction.search:
