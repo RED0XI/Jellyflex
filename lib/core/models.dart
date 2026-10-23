@@ -255,6 +255,9 @@ class Chapter {
 
   Duration get start => ticksToDuration((raw['StartPositionTicks'] as num?)?.toInt() ?? 0);
   String get name => (raw['Name'] as String?) ?? '';
+
+  /// Kennung des Kapitelbilds (fehlt, wenn der Server keine Bilder erzeugt hat).
+  String? get imageTag => raw['ImageTag'] as String?;
 }
 
 /// Abschnitt einer Folge (Intro, Abspann …) aus der MediaSegments-API.

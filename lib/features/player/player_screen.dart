@@ -27,11 +27,14 @@ import '../../widgets/window_frame.dart';
 import '../details/details_screen.dart';
 import 'player_overlays.dart';
 import '../../widgets/focusable.dart';
+import '../../widgets/jf_image.dart';
+import '../live_handler.dart' show appMessengerKey;
 import '../../l10n/strings.dart';
 import '../../core/system_certs.dart';
 import '../../core/redact.dart';
 
 part 'player_tracks_panel.dart';
+part 'player_extras.dart';
 part 'player_widgets.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
@@ -98,7 +101,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _hoveringControls = false;
   bool _trackPanelOpen = false;
   bool _playbackPanelOpen = false;
-  bool get _anyPanelOpen => _trackPanelOpen || _playbackPanelOpen;
+  bool _chaptersOpen = false;
+  bool get _anyPanelOpen => _trackPanelOpen || _playbackPanelOpen || _chaptersOpen;
+
+  /// Technische Infos (Taste I).
+  bool _statsVisible = false;
   bool _switchingToNext = false;
   bool _closing = false;
   bool _reportedStart = false;
@@ -887,6 +894,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _toggleMute();
     } else if (key == LogicalKeyboardKey.keyP) {
       _toggleMini();
+    } else if (key == LogicalKeyboardKey.keyS) {
+      _saveScreenshot();
+    } else if (key == LogicalKeyboardKey.keyI) {
+      setState(() => _statsVisible = !_statsVisible);
+    } else if (key == LogicalKeyboardKey.keyC && _chapters.length > 1) {
+      _setChaptersPanel(!_chaptersOpen);
     } else if (key == LogicalKeyboardKey.escape) {
       if (_mini) {
         _toggleMini();
@@ -982,6 +995,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   ),
                 ),
               ),
+              if (_statsVisible && !_mini)
+                Positioned(
+                  left: 24,
+                  top: kTitleBarHeight + 78,
+                  child: _StatsOverlay(
+                    player: _player,
+                    playMethod: _localFile != null
+                        ? tr.statsLocalFile
+                        : _transcoding
+                        ? tr.statsTranscoding
+                        : tr.statsDirectPlay,
+                  ),
+                ),
               if (_item != null && !_mini)
                 PlayerSkipOverlay(
                   player: _player,
@@ -1292,6 +1318,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         );
                       },
                     ),
+                    if (_chapters.length > 1)
+                      _PlayerIconButton(
+                        icon: Icons.view_carousel_outlined,
+                        tooltip: tr.chaptersKey,
+                        onPressed: () => _setChaptersPanel(!_chaptersOpen),
+                      ),
                     _PlayerIconButton(
                       icon: Icons.subtitles_rounded,
                       tooltip: tr.audioAndSubtitles,
@@ -1343,6 +1375,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       onAudio: _selectAudio,
                       onSubtitle: _selectSubtitle,
                       onClose: () => _setTrackPanel(false),
+                    ),
+                  )
+                : _chaptersOpen
+                ? _hoverZone(
+                    _ChaptersPanel(
+                      key: const ValueKey('chapters'),
+                      chapters: _chapters,
+                      current: _currentChapterIndex(),
+                      imageUrl: (i) => _api.chapterImageUrl(_item!, _chapters[i], i),
+                      onSelect: (chapter) {
+                        _player.seek(chapter.start);
+                        _setChaptersPanel(false);
+                      },
                     ),
                   )
                 : _playbackPanelOpen
@@ -1454,7 +1499,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _setTrackPanel(bool open) {
     setState(() {
       _trackPanelOpen = open;
-      if (open) _playbackPanelOpen = false;
+      if (open) _playbackPanelOpen = _chaptersOpen = false;
     });
     _afterPanelChange();
   }
@@ -1462,15 +1507,71 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _setPlaybackPanel(bool open) {
     setState(() {
       _playbackPanelOpen = open;
-      if (open) _trackPanelOpen = false;
+      if (open) _trackPanelOpen = _chaptersOpen = false;
     });
     _afterPanelChange();
+  }
+
+  void _setChaptersPanel(bool open) {
+    setState(() {
+      _chaptersOpen = open;
+      if (open) _trackPanelOpen = _playbackPanelOpen = false;
+    });
+    // Fokus bleibt im Kapitel-Panel (Pfeiltasten wählen das Kapitel).
+    if (open) {
+      _showControls(autoHide: false);
+    } else {
+      _afterPanelChange();
+    }
+  }
+
+  /// Index des laufenden Kapitels.
+  int _currentChapterIndex() {
+    final position = _player.state.position;
+    var index = 0;
+    for (var i = 0; i < _chapters.length; i++) {
+      if (_chapters[i].start <= position) index = i;
+    }
+    return index;
+  }
+
+  /// Bildschirmfoto des aktuellen Bildes nach Bilder\Jellyflex (Taste S).
+  Future<void> _saveScreenshot() async {
+    final messenger = appMessengerKey.currentState;
+    try {
+      final bytes = await _player.screenshot(format: 'image/png');
+      if (bytes == null) throw StateError('Kein Bild');
+      final folder =
+          debugScreenshotFolder ??
+          Directory('${Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path}\\Pictures\\Jellyflex');
+      await folder.create(recursive: true);
+      final position = formatTimecode(_player.state.position).replaceAll(':', '-');
+      final file = File('${folder.path}\\${_safeFileName(_item?.name ?? 'Jellyflex')} $position.png');
+      await file.writeAsBytes(bytes);
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(tr.screenshotSaved),
+          behavior: SnackBarBehavior.floating,
+          width: 420,
+          action: SnackBarAction(
+            label: tr.show,
+            onPressed: () => Process.run('explorer.exe', ['/select,${file.path}']),
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Bildschirmfoto fehlgeschlagen: $e');
+      messenger?.showSnackBar(
+        SnackBar(content: Text(tr.screenshotFailed), behavior: SnackBarBehavior.floating, width: 420),
+      );
+    }
   }
 
   void _closePanels() {
     setState(() {
       _trackPanelOpen = false;
       _playbackPanelOpen = false;
+      _chaptersOpen = false;
     });
     _afterPanelChange();
   }

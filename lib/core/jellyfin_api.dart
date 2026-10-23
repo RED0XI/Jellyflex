@@ -683,6 +683,14 @@ class JellyfinApi {
   }
 
   /// Wie [imageUrl], aber `null`-tolerant.
+  /// Vorschaubild eines Kapitels (oder `null`, wenn es keins gibt).
+  String? chapterImageUrl(BaseItem item, Chapter chapter, int index, {int maxWidth = 400}) {
+    final tag = chapter.imageTag;
+    if (tag == null) return null;
+    final query = Uri(queryParameters: {'tag': tag, 'maxWidth': '$maxWidth', 'quality': '90'}).query;
+    return '$baseUrl/Items/${item.id}/Images/Chapter/$index?$query';
+  }
+
   String? imageUrlOrNull(
     ImageRef? ref, {
     int? fillWidth,
