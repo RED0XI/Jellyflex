@@ -57,7 +57,6 @@ class AppSettings {
     this.screensaverMinutes = 5,
     this.imageCacheMb = 300,
     this.layoutId = 'cinema',
-    this.recentSearches = const [],
     this.themeMusic = false,
     this.updateCheck = false,
     this.seasonalThemes = true,
@@ -94,9 +93,6 @@ class AppSettings {
 
   /// Layout (Aufbau der Oberfläche), siehe [appLayouts].
   final String layoutId;
-
-  /// Letzte Suchbegriffe (nur auf diesem Gerät, höchstens 8).
-  final List<String> recentSearches;
 
   /// Titelmusik auf Detailseiten (Standard: aus).
   final bool themeMusic;
@@ -152,7 +148,6 @@ class AppSettings {
     int? screensaverMinutes,
     int? imageCacheMb,
     String? layoutId,
-    List<String>? recentSearches,
     bool? themeMusic,
     bool? updateCheck,
     bool? seasonalThemes,
@@ -176,7 +171,6 @@ class AppSettings {
     screensaverMinutes: screensaverMinutes ?? this.screensaverMinutes,
     imageCacheMb: imageCacheMb ?? this.imageCacheMb,
     layoutId: layoutId ?? this.layoutId,
-    recentSearches: recentSearches ?? this.recentSearches,
     themeMusic: themeMusic ?? this.themeMusic,
     updateCheck: updateCheck ?? this.updateCheck,
     seasonalThemes: seasonalThemes ?? this.seasonalThemes,
@@ -202,7 +196,6 @@ class AppSettings {
     'screensaverMinutes': screensaverMinutes,
     'imageCacheMb': imageCacheMb,
     'layoutId': layoutId,
-    'recentSearches': recentSearches,
     'themeMusic': themeMusic,
     'updateCheck': updateCheck,
     'seasonalThemes': seasonalThemes,
@@ -230,10 +223,6 @@ class AppSettings {
     updateCheck: json['updateCheck'] as bool? ?? false,
     layoutId: json['layoutId'] as String? ?? 'cinema',
     themeMusic: json['themeMusic'] as bool? ?? false,
-    recentSearches: [
-      for (final s in (json['recentSearches'] as List?) ?? const [])
-        if (s is String && s.trim().isNotEmpty) s.trim(),
-    ].take(8).toList(),
     seasonalThemes: json['seasonalThemes'] as bool? ?? true,
     ambilight: AmbilightMode.values.asNameMap()[json['ambilight']] ?? AmbilightMode.window,
     quizHighscore: (json['quizHighscore'] as num?)?.toInt() ?? 0,

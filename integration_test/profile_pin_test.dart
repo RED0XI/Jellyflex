@@ -38,10 +38,7 @@ void main() {
     await windowManager.ensureInitialized();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          sessionProvider.overrideWith(DemoSession.new),
-          settingsProvider.overrideWith(() => testSettings()),
-        ],
+        overrides: [sessionProvider.overrideWith(DemoSession.new), settingsProvider.overrideWith(() => testSettings())],
         child: RepaintBoundary(key: shotKey, child: const JellyflexApp()),
       ),
     );

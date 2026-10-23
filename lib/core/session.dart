@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import 'jellyfin_api.dart';
+import 'profile_pin.dart';
 import 'secure_store.dart';
 
 class AuthSession {
@@ -74,6 +75,15 @@ class AuthSession {
 }
 
 SecureStore get _storage => SecureStore.instance;
+
+/// Anmeldung hat geklappt, aber das Profil ist mit einer PIN geschützt –
+/// erst nach richtiger PIN mit `activate(account, pinChecked: true)` öffnen.
+class PinRequired implements Exception {
+  const PinRequired(this.account);
+
+  final AuthSession account;
+}
+
 const _sessionKey = 'jellyflex.session';
 const _deviceIdKey = 'jellyflex.deviceId';
 const _lastServerKey = 'jellyflex.lastServer';
@@ -102,6 +112,8 @@ final savedAccountsProvider = FutureProvider.autoDispose<List<AuthSession>>((ref
 class SessionController extends AsyncNotifier<AuthSession?> {
   @override
   Future<AuthSession?> build() async {
+    // Fehlversuche bei Profil-PINs (überstehen einen Neustart).
+    await ProfilePin.load();
     final stored = await _storage.read(key: _sessionKey);
     if (stored == null) return null;
     try {
@@ -168,6 +180,7 @@ class SessionController extends AsyncNotifier<AuthSession?> {
     final accounts = [...previous]..removeWhere((a) => a.accountKey == session.accountKey);
     final withPin = session.withPin(pin);
     await _saveAccounts([withPin, ...accounts]);
+    // Auch nach erneuter Anmeldung (z. B. Konto ohne Passwort) gilt die PIN.
     await activate(withPin);
   }
 
@@ -187,8 +200,10 @@ class SessionController extends AsyncNotifier<AuthSession?> {
     ref.invalidate(savedAccountsProvider);
   }
 
-  /// Zu einem gespeicherten Konto wechseln.
-  Future<void> activate(AuthSession session) async {
+  /// Zu einem gespeicherten Konto wechseln. Ein Profil mit PIN öffnet nur mit
+  /// [pinChecked] (sonst [PinRequired]) – die einzige Stelle, die ein Profil öffnet.
+  Future<void> activate(AuthSession session, {bool pinChecked = false}) async {
+    if (session.hasPin && !pinChecked) throw PinRequired(session);
     await _storage.write(key: _sessionKey, value: jsonEncode(session.toJson()));
     state = AsyncData(session);
   }

@@ -94,6 +94,11 @@ class _ThemeMusicState extends ConsumerState<ThemeMusic> with RouteAware {
     await SystemCerts.secure(player);
     if (!mounted || generation != _generation) return;
     await player.open(Media(api.audioStreamUrl(song.id), httpHeaders: {'Authorization': api.authorizationHeader}));
+    // Inzwischen verlassen/geschlossen? Dann nicht einblenden (sonst hebt das das Ausblenden auf).
+    if (!mounted || !_visible || generation != _generation) {
+      if (mounted) await player.stop();
+      return;
+    }
     _fadeTo(_volume, const Duration(milliseconds: 1500));
   }
 
@@ -112,6 +117,7 @@ class _ThemeMusicState extends ConsumerState<ThemeMusic> with RouteAware {
     const steps = 15;
     var step = 0;
     _fade = Timer.periodic(duration ~/ steps, (timer) {
+      if (!mounted) return timer.cancel();
       step++;
       player.setVolume(start + (target - start) * step / steps);
       if (step >= steps) {

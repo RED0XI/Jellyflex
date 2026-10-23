@@ -96,6 +96,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
     try {
       await ref.read(sessionProvider.notifier).loginWithPassword(server, _userCtrl.text.trim(), _passCtrl.text);
+    } on PinRequired catch (e) {
+      // Profil mit PIN: auch nach der Anmeldung erst mit PIN öffnen.
+      await _openProfile(e.account);
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       setState(
@@ -124,7 +127,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           final s = await api.checkQuickConnect(state.secret);
           if (s.authenticated) {
             timer.cancel();
-            await ref.read(sessionProvider.notifier).loginWithQuickConnect(server, state.secret);
+            try {
+              await ref.read(sessionProvider.notifier).loginWithQuickConnect(server, state.secret);
+            } on PinRequired catch (e) {
+              if (mounted) await _openProfile(e.account);
+            }
           }
         } catch (_) {
           timer.cancel();
@@ -213,19 +220,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
+  /// PIN eines Profils abfragen (ohne PIN: sofort `true`).
+  Future<bool> _checkPin(AuthSession account) async {
+    final hash = account.pinHash;
+    if (hash == null) return true;
+    final pin = await showPinDialog(
+      context,
+      title: tr.pinFor(account.userName),
+      accountKey: account.accountKey,
+      check: (pin) => ProfilePin.verify(pin, hash),
+    );
+    return pin != null && mounted;
+  }
+
   /// Profil öffnen – mit PIN-Abfrage, falls eine gesetzt ist.
   Future<void> _openProfile(AuthSession account) async {
-    final hash = account.pinHash;
-    if (hash != null) {
-      final pin = await showPinDialog(
-        context,
-        title: tr.pinFor(account.userName),
-        accountKey: account.accountKey,
-        check: (pin) => ProfilePin.verify(pin, hash),
-      );
-      if (pin == null || !mounted) return;
-    }
-    await ref.read(sessionProvider.notifier).activate(account);
+    if (!await _checkPin(account)) return;
+    await ref.read(sessionProvider.notifier).activate(account, pinChecked: account.hasPin);
+  }
+
+  /// Gespeichertes Profil vergessen – ein Profil mit PIN nur mit PIN.
+  Future<void> _forgetProfile(AuthSession account) async {
+    if (!await _checkPin(account)) return;
+    await ref.read(sessionProvider.notifier).forgetAccount(account);
   }
 
   /// "Wer schaut?" – gespeicherte Konten zum schnellen Wechseln.
@@ -247,7 +264,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 imageUrl: a.userImageUrl,
                 locked: a.hasPin,
                 onTap: () => _openProfile(a),
-                onForget: () => ref.read(sessionProvider.notifier).forgetAccount(a),
+                onForget: () => _forgetProfile(a),
               ),
             _ProfileTile(
               name: tr.addAccount,

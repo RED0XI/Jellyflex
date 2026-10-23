@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models.dart';
 import '../../core/session.dart';
-import '../../core/settings.dart';
+import '../../core/search_history.dart';
 import '../../theme.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/media_cards.dart';
@@ -55,18 +55,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _debounce = Timer(const Duration(milliseconds: 280), () => _search(value.trim()));
   }
 
-  /// Suchbegriff merken (vorne, ohne Doppelte, höchstens 8).
-  void _rememberTerm(String term) {
-    if (term.length < 2) return;
-    ref.read(settingsProvider.notifier).update((s) {
-      final list = [term, ...s.recentSearches.where((t) => t.toLowerCase() != term.toLowerCase())];
-      return s.copyWith(recentSearches: list.take(8).toList());
-    });
-  }
+  void _rememberTerm(String term) => ref.read(searchHistoryProvider.notifier).add(term);
 
-  void _forget(String term) => ref
-      .read(settingsProvider.notifier)
-      .update((s) => s.copyWith(recentSearches: s.recentSearches.where((t) => t != term).toList()));
+  void _forget(String term) => ref.read(searchHistoryProvider.notifier).remove(term);
 
   void _useRecent(String term) {
     _controller.text = term;
@@ -122,7 +113,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final nothing = movies.isEmpty && series.isEmpty && episodes.isEmpty && people.isEmpty;
     final posterHeight = kPosterWidth * 1.5 + kCardTextHeight;
     final landscapeHeight = kLandscapeWidth * 9 / 16 + kCardTextHeight;
-    final recent = ref.watch(settingsProvider.select((s) => s.recentSearches));
+    final recent = ref.watch(searchHistoryProvider);
 
     return Scaffold(
       body: Stack(
@@ -281,8 +272,7 @@ class _RecentSearches extends ConsumerWidget {
               Text(tr.recentSearches, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
               const Spacer(),
               TextButton(
-                onPressed: () =>
-                    ref.read(settingsProvider.notifier).update((s) => s.copyWith(recentSearches: const [])),
+                onPressed: () => ref.read(searchHistoryProvider.notifier).clear(),
                 child: Text(tr.clearHistory),
               ),
             ],

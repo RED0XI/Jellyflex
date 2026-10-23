@@ -7,6 +7,7 @@
 #include <shobjidl.h>
 #include <wrl/client.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -80,10 +81,24 @@ bool SetJumpList(const std::wstring& category, const std::vector<std::pair<std::
     list->AbortList();
     return false;
   }
+  // Vom Benutzer aus der Sprungliste entfernte Einträge dürfen nicht wieder
+  // hinein – sonst schlägt AppendCategory fehl.
+  std::vector<std::wstring> removed_args;
+  UINT removed_count = 0;
+  if (removed && SUCCEEDED(removed->GetCount(&removed_count))) {
+    for (UINT i = 0; i < removed_count; i++) {
+      ComPtr<IShellLinkW> link;
+      if (SUCCEEDED(removed->GetAt(i, IID_PPV_ARGS(&link)))) {
+        wchar_t args[1024] = {};
+        if (SUCCEEDED(link->GetArguments(args, 1024))) removed_args.emplace_back(args);
+      }
+    }
+  }
   const std::wstring exe = ExePath();
   UINT added = 0;
   for (const auto& [title, args] : items) {
     if (added >= max_slots) break;
+    if (std::find(removed_args.begin(), removed_args.end(), args) != removed_args.end()) continue;
     if (auto link = MakeLink(exe, title, args)) {
       collection->AddObject(link.Get());
       added++;

@@ -5,6 +5,8 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
+import 'secure_store.dart';
+
 /// Profil-PIN (4–6 Ziffern): schützt ein Profil auf diesem Gerät vor anderen
 /// Mitbewohnern (z. B. Kindern). Gespeichert wird nur ein gesalzener, langsamer
 /// Hash (PBKDF2-HMAC-SHA256) – zusätzlich liegt er in der mit Windows (DPAPI)
@@ -61,6 +63,34 @@ abstract final class ProfilePin {
 
   static final _failures = <String, int>{};
   static final _lockedUntil = <String, DateTime>{};
+  static const _storeKey = 'jellyflex.pinLock';
+
+  /// Gespeicherte Fehlversuche laden (ein Neustart setzt die Sperre nicht zurück).
+  static Future<void> load() async {
+    try {
+      final raw = await SecureStore.instance.read(key: _storeKey);
+      if (raw == null) return;
+      final map = (jsonDecode(raw) as Map).cast<String, dynamic>();
+      for (final MapEntry(:key, :value) in map.entries) {
+        final entry = (value as Map).cast<String, dynamic>();
+        _failures[key] = (entry['failures'] as num?)?.toInt() ?? 0;
+        final until = DateTime.tryParse(entry['until'] as String? ?? '');
+        if (until != null) _lockedUntil[key] = until;
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> _save() async {
+    try {
+      await SecureStore.instance.write(
+        key: _storeKey,
+        value: jsonEncode({
+          for (final key in {..._failures.keys, ..._lockedUntil.keys})
+            key: {'failures': _failures[key] ?? 0, 'until': ?_lockedUntil[key]?.toIso8601String()},
+        }),
+      );
+    } catch (_) {}
+  }
 
   /// Wie lange das Konto noch gesperrt ist (nach 5 falschen Versuchen 30 s, danach länger).
   static Duration lockedFor(String accountKey) {
@@ -77,10 +107,12 @@ abstract final class ProfilePin {
       final seconds = 30 * (1 << min(failures - 5, 5));
       _lockedUntil[accountKey] = DateTime.now().add(Duration(seconds: seconds));
     }
+    _save();
   }
 
   static void recordSuccess(String accountKey) {
     _failures.remove(accountKey);
     _lockedUntil.remove(accountKey);
+    _save();
   }
 }

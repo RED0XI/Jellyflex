@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:jellyflex/app.dart';
+import 'package:jellyflex/core/search_history.dart';
 import 'package:jellyflex/core/session.dart';
 import 'package:jellyflex/core/settings.dart';
 import 'package:jellyflex/features/person/person_screen.dart';
@@ -29,10 +30,7 @@ void main() {
     await windowManager.ensureInitialized();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          sessionProvider.overrideWith(DemoSession.new),
-          settingsProvider.overrideWith(() => testSettings()),
-        ],
+        overrides: [sessionProvider.overrideWith(DemoSession.new), settingsProvider.overrideWith(() => testSettings())],
         child: RepaintBoundary(key: shotKey, child: const JellyflexApp()),
       ),
     );
@@ -76,11 +74,11 @@ void main() {
     await tester.enterText(find.byType(TextField), '');
     await pumpFor(tester, const Duration(seconds: 1));
     expect(find.text('Letzte Suchen'), findsOneWidget);
-    expect(container.read(settingsProvider).recentSearches, containsAll(['Lena']));
+    expect(container.read(searchHistoryProvider), containsAll(['Lena']));
     await saveShot(tester, 'search_recent');
     await tester.tap(find.text('Verlauf löschen'));
     await pumpFor(tester, const Duration(milliseconds: 600));
-    expect(container.read(settingsProvider).recentSearches, isEmpty);
+    expect(container.read(searchHistoryProvider), isEmpty);
     expect(find.text('Letzte Suchen'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });

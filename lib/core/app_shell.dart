@@ -48,9 +48,17 @@ abstract final class AppShell {
   static String _clip(String text) => text.length > 80 ? '${text.substring(0, 79)}…' : text;
 
   /// "Weiterschauen" vom Server holen und in die Sprungliste schreiben.
-  static Future<void> updateJumpList(JellyfinApi api) async {
+  /// Profile mit PIN erscheinen dort nie (die Liste bleibt nach dem Beenden
+  /// sichtbar). [stillCurrent]: ist das Profil nach dem Laden noch angemeldet?
+  static Future<void> updateJumpList(
+    JellyfinApi api, {
+    required bool protectedProfile,
+    required bool Function() stillCurrent,
+  }) async {
+    if (protectedProfile) return setJumpList(tr.continueWatching, const []);
     try {
       final resume = await api.getResume(limit: 6);
+      if (!stillCurrent()) return;
       await setJumpList(tr.continueWatching, [
         for (final i in resume)
           if (_safeId.hasMatch(i.id))

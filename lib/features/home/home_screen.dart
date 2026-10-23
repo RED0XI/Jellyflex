@@ -42,7 +42,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final home = ref.watch(homeProvider);
     // Startseite (neu) geladen: "Weiterschauen" auch in die Sprungliste der Taskleiste.
     ref.listen(homeProvider, (_, next) {
-      if (next.hasValue && !next.isLoading) AppShell.updateJumpList(ref.read(apiProvider));
+      final session = ref.read(sessionProvider).value;
+      if (session == null || !next.hasValue || next.isLoading) return;
+      final container = ProviderScope.containerOf(context, listen: false);
+      AppShell.updateJumpList(
+        ref.read(apiProvider),
+        protectedProfile: session.hasPin,
+        stillCurrent: () => container.read(sessionProvider).value?.accountKey == session.accountKey,
+      );
     });
     final season = ref.watch(activeSeasonProvider);
     final seasonal = ref.watch(seasonalSectionProvider).value;

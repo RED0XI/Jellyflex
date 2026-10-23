@@ -18,12 +18,22 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // (In Debug-Builds aus, damit Tests parallel zu einer installierten App laufen.)
   HANDLE instance_mutex = ::CreateMutexW(nullptr, FALSE, L"Local\\Jellyflex.SingleInstance");
   if (instance_mutex && ::GetLastError() == ERROR_ALREADY_EXISTS) {
-    if (HWND existing = ::FindWindowW(AppShell::kWindowClass, nullptr)) {
+    // Startet die erste Instanz gerade erst, gibt es ihr Fenster evtl. noch
+    // nicht – bis zu 5 s darauf warten.
+    HWND existing = nullptr;
+    for (int i = 0; i < 50 && !existing; i++) {
+      existing = ::FindWindowW(AppShell::kWindowClass, nullptr);
+      if (!existing) ::Sleep(100);
+    }
+    if (existing) {
       std::wstring args = command_line ? command_line : L"";
       if (args.size() > 1024) args.resize(1024);
       COPYDATASTRUCT data{AppShell::kCopyDataId, static_cast<DWORD>((args.size() + 1) * sizeof(wchar_t)),
                           const_cast<wchar_t*>(args.c_str())};
-      ::SendMessageW(existing, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&data));
+      // Mit Zeitlimit – ein hängendes Fenster soll diesen Start nicht blockieren.
+      DWORD_PTR reply = 0;
+      ::SendMessageTimeoutW(existing, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&data), SMTO_ABORTIFHUNG, 3000,
+                            &reply);
       if (::IsIconic(existing)) ::ShowWindow(existing, SW_RESTORE);
       ::SetForegroundWindow(existing);
     }

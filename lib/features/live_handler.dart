@@ -139,9 +139,11 @@ class _LiveHandlerState extends ConsumerState<LiveHandler> {
       AppShell.pendingResumeId = id;
       return;
     }
+    final account = ref.read(sessionProvider).value?.accountKey;
     try {
       final item = await ref.read(apiProvider).getItem(id);
-      if (!mounted) return;
+      // Inzwischen ein anderes Profil? Dann nichts öffnen.
+      if (!mounted || ref.read(sessionProvider).value?.accountKey != account) return;
       final ticks = item.userData.playbackPositionTicks;
       _open('/play/${item.id}${ticks > 0 ? '?start=$ticks' : ''}');
     } catch (e) {

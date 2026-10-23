@@ -58,6 +58,11 @@ void main() {
       final container = ProviderContainer();
       expect(await container.read(sessionProvider.future), isNull, reason: 'erst über "Wer schaut?" mit PIN');
       expect((await loadSavedAccounts()).single.hasPin, isTrue);
+      // Auch direkt (z. B. nach erneuter Anmeldung) öffnet es nur mit geprüfter PIN.
+      await expectLater(container.read(sessionProvider.notifier).activate(session), throwsA(isA<PinRequired>()));
+      expect(container.read(sessionProvider).value, isNull);
+      await container.read(sessionProvider.notifier).activate(session, pinChecked: true);
+      expect(container.read(sessionProvider).value?.userId, 'kind');
       container.dispose();
     } finally {
       SecureStore.instance = previous;
