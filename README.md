@@ -240,3 +240,11 @@ test/          Fast tests · integration_test/  App tests in a real window
 ```
 
 Images are chosen the same way as in the official Jellyfin web UI (`lib/core/images.dart`).
+
+## License
+
+Jellyflex is free software: you can redistribute it and/or modify it under the terms of the
+**GNU General Public License v3.0** – see [LICENSE](LICENSE). Video playback uses libmpv and
+FFmpeg under the LGPL-3.0; details for all included components are in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and in the app under
+**Settings → About Jellyflex → Licenses**.

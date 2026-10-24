@@ -1347,4 +1347,15 @@ final class _Es extends S {
   @override
   String get hoverPreviewHint =>
       'Al detenerte en un título, la tarjeta pasa por escenas (imágenes de tu servidor, sin vídeo).';
+
+  // --- Lizenz ---
+  @override
+  String get licenseTitle => 'Licencia';
+  @override
+  String get licenseHint =>
+      'Jellyflex es software libre bajo la GNU GPL v3.0. Muestra las licencias de todos los componentes.';
+  @override
+  String get licenses => 'Licencias';
+  @override
+  String get licenseLegalese => 'Software libre bajo la GNU General Public License v3.0.';
 }

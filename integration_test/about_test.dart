@@ -17,6 +17,8 @@ import 'package:jellyflex/features/settings/about_section.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'package:jellyflex/core/licenses.dart';
+
 import 'test_helpers.dart';
 import 'test_settings.dart';
 
@@ -66,6 +68,17 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await pumpFor(tester, const Duration(milliseconds: 500));
     expect(find.text('Tastenkürzel'), findsNothing);
+
+    // Lizenzen: GPL-3.0 und die mitgelieferten Bibliotheken (auch libmpv/FFmpeg).
+    registerThirdPartyLicenses();
+    await tester.ensureVisible(find.text('Lizenzen'));
+    await tester.tap(find.text('Lizenzen'));
+    await pumpFor(tester, const Duration(seconds: 3));
+    expect(find.textContaining('GNU General Public License v3.0'), findsWidgets);
+    expect(find.text('libmpv'), findsWidgets);
+    await saveShot(tester, 'licenses');
+    container.read(routerProvider).routerDelegate.navigatorKey.currentState!.pop();
+    await pumpFor(tester, const Duration(milliseconds: 600));
 
     // Update-Prüfung an → "Updates automatisch installieren" erscheint (standardmäßig an).
     expect(find.text('Updates automatisch installieren'), findsNothing);

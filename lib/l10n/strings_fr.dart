@@ -1351,4 +1351,15 @@ final class _Fr extends S {
   @override
   String get hoverPreviewHint =>
       'Quand vous vous arrêtez sur un titre, la carte fait défiler des scènes (images de votre serveur, pas de vidéo).';
+
+  // --- Lizenz ---
+  @override
+  String get licenseTitle => 'Licence';
+  @override
+  String get licenseHint =>
+      'Jellyflex est un logiciel libre sous GNU GPL v3.0. Affiche les licences de tous les composants.';
+  @override
+  String get licenses => 'Licences';
+  @override
+  String get licenseLegalese => 'Logiciel libre sous GNU General Public License v3.0.';
 }

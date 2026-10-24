@@ -12,6 +12,7 @@ import 'core/redact.dart';
 import 'core/app_log.dart';
 import 'core/download_notify.dart';
 import 'core/app_shell.dart';
+import 'core/licenses.dart';
 import 'core/window_memory.dart';
 
 Future<void> main(List<String> args) async {
@@ -37,6 +38,7 @@ Future<void> main(List<String> args) async {
     return false;
   };
   MediaKit.ensureInitialized();
+  registerThirdPartyLicenses();
   UiSounds.preload();
   // Stammzertifikate für den Video-Player schon beim Start bereitlegen.
   SystemCerts.caFile();

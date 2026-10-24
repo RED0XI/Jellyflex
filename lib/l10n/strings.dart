@@ -1074,4 +1074,17 @@ class S {
     'When you rest on a title, its card flips through scenes (images from your server, no video).',
     'Verweilst du auf einem Titel, blättert die Karte durch Szenen (Bilder von deinem Server, kein Video).',
   );
+
+  // --- Lizenz ---------------------------------------------------------------------
+
+  String get licenseTitle => _t('License', 'Lizenz');
+  String get licenseHint => _t(
+    'Jellyflex is free software under the GNU GPL v3.0. Shows the licenses of all included parts.',
+    'Jellyflex ist freie Software unter der GNU GPL v3.0. Zeigt die Lizenzen aller enthaltenen Teile.',
+  );
+  String get licenses => _t('Licenses', 'Lizenzen');
+  String get licenseLegalese => _t(
+    'Free software under the GNU General Public License v3.0.',
+    'Freie Software unter der GNU General Public License v3.0.',
+  );
 }

@@ -284,6 +284,20 @@ class AboutRows extends ConsumerWidget {
             ),
           ),
         row(
+          title: tr.licenseTitle,
+          subtitle: tr.licenseHint,
+          trailing: TextButton.icon(
+            onPressed: () => showLicensePage(
+              context: context,
+              applicationName: 'Jellyflex',
+              applicationVersion: appVersion,
+              applicationLegalese: tr.licenseLegalese,
+            ),
+            icon: const Icon(Icons.gavel_rounded, size: 18),
+            label: Text(tr.licenses),
+          ),
+        ),
+        row(
           title: tr.errorReport,
           subtitle: tr.errorReportHint,
           trailing: TextButton.icon(

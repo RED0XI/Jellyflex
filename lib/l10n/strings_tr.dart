@@ -1339,4 +1339,14 @@ final class _Tr extends S {
   @override
   String get hoverPreviewHint =>
       'Bir başlıkta durduğunda kart sahneler arasında geçiş yapar (sunucundan resimler, video yok).';
+
+  // --- Lizenz ---
+  @override
+  String get licenseTitle => 'Lisans';
+  @override
+  String get licenseHint => 'Jellyflex, GNU GPL v3.0 altında özgür yazılımdır. Tüm bileşenlerin lisanslarını gösterir.';
+  @override
+  String get licenses => 'Lisanslar';
+  @override
+  String get licenseLegalese => 'GNU General Public License v3.0 altında özgür yazılım.';
 }
