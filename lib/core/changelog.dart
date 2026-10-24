@@ -5,11 +5,19 @@ import '../l10n/strings.dart';
 /// einen Eintrag ergänzen (Versionen ohne Eintrag erscheinen nicht).
 const changelog = <String, ({List<String> en, List<String> de})>{
   '0.3.4': (
-    en: ['After an update, this window shows what’s new.', 'Jellyflex now also runs on macOS.', 'New app icon.'],
+    en: [
+      'After an update, this window shows what’s new.',
+      'Jellyflex now also runs on macOS.',
+      'New app icon.',
+      'On first start, a short setup helps with language, look and options.',
+      'The sign-in page can search your home network for Jellyfin servers – only when you click.',
+    ],
     de: [
       'Nach einem Update zeigt dieses Fenster, was neu ist.',
       'Jellyflex läuft jetzt auch auf macOS.',
       'Neues App-Symbol.',
+      'Beim ersten Start hilft eine kurze Einrichtung bei Sprache, Aussehen und Optionen.',
+      'Die Anmeldung kann im Heimnetz nach Jellyfin-Servern suchen – nur auf Klick.',
     ],
   ),
   '0.3.2': (

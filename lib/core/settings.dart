@@ -81,6 +81,7 @@ class AppSettings {
     this.pinLockMinutes = 0,
     this.autoUpdate = true,
     this.lastSeenVersion,
+    this.setupDone = true,
   });
 
   /// Zuletzt eingestellte Lautstärke im Player (0–100).
@@ -121,6 +122,9 @@ class AppSettings {
 
   /// Version, deren Neuigkeiten zuletzt gezeigt wurden (für "Was ist neu").
   final String? lastSeenVersion;
+
+  /// Ersteinrichtung abgeschlossen (frisch installiert: nein – dann kommt der Assistent).
+  final bool setupDone;
 
   /// Klänge bei "Überrasch mich" und im Quiz.
   final bool soundEffects;
@@ -228,6 +232,7 @@ class AppSettings {
     int? pinLockMinutes,
     bool? autoUpdate,
     String? Function()? lastSeenVersion,
+    bool? setupDone,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -265,6 +270,7 @@ class AppSettings {
     pinLockMinutes: pinLockMinutes ?? this.pinLockMinutes,
     autoUpdate: autoUpdate ?? this.autoUpdate,
     lastSeenVersion: lastSeenVersion != null ? lastSeenVersion() : this.lastSeenVersion,
+    setupDone: setupDone ?? this.setupDone,
   );
 
   Map<String, dynamic> toJson() => {
@@ -304,6 +310,7 @@ class AppSettings {
     'pinLockMinutes': pinLockMinutes,
     'autoUpdate': autoUpdate,
     'lastSeenVersion': lastSeenVersion,
+    'setupDone': setupDone,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -343,6 +350,8 @@ class AppSettings {
     pinLockMinutes: ((json['pinLockMinutes'] as num?)?.toInt() ?? 0).clamp(0, 24 * 60),
     autoUpdate: json['autoUpdate'] as bool? ?? true,
     lastSeenVersion: json['lastSeenVersion'] as String?,
+    // Ältere Versionen kannten den Assistenten nicht – wer schon Einstellungen hat, ist eingerichtet.
+    setupDone: json['setupDone'] as bool? ?? true,
   );
 }
 
@@ -377,8 +386,9 @@ class SettingsController extends Notifier<AppSettings> {
     } catch (_) {
       // Kaputte Datei → Standardwerte.
     }
-    _apply(const AppSettings());
-    return const AppSettings();
+    // Frisch installiert: mit dem Einrichtungs-Assistenten beginnen.
+    _apply(const AppSettings(setupDone: false));
+    return const AppSettings(setupDone: false);
   }
 
   /// Einstellungen, die außerhalb von Widgets gelten (globale Werte).

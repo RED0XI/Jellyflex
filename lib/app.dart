@@ -29,6 +29,7 @@ import 'features/screensaver/screensaver.dart';
 import 'features/search/search_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/splash_screen.dart';
+import 'features/welcome/welcome_screen.dart';
 import 'features/wrapped/wrapped_screen.dart';
 import 'theme.dart';
 import 'widgets/window_frame.dart';
@@ -48,6 +49,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   // Bei jeder An-/Abmeldung die Weiterleitungen neu prüfen.
   final refresh = ValueNotifier<int>(0);
   ref.listen(sessionProvider, (_, _) => refresh.value++);
+  ref.listen(settingsProvider.select((s) => s.setupDone), (_, _) => refresh.value++);
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
@@ -61,12 +63,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         return location == '/splash' ? null : '/splash';
       }
       final loggedIn = session.value != null;
-      if (!loggedIn) return location == '/login' ? null : '/login';
-      if (location == '/login' || location == '/splash') return '/';
+      if (!loggedIn) {
+        // Frisch installiert: erst der Einrichtungs-Assistent, dann die Anmeldung.
+        if (!ref.read(settingsProvider).setupDone) return location == '/welcome' ? null : '/welcome';
+        return location == '/login' ? null : '/login';
+      }
+      if (location == '/login' || location == '/splash' || location == '/welcome') return '/';
       return null;
     },
     routes: [
       _route('/splash', (_) => const SplashScreen()),
+      _route('/welcome', (_) => const WelcomeScreen()),
       _route('/login', (_) => const LoginScreen()),
       _route('/', (_) => const HomeScreen()),
       _route('/search', (_) => const SearchScreen()),

@@ -1292,4 +1292,38 @@ final class _Es extends S {
   String get allReleaseNotes => 'Todas las notas de la versión';
   @override
   String get gotIt => 'Entendido';
+
+  // --- Ersteinrichtung und Heimnetz-Suche ---
+  @override
+  String get welcomeTitle => 'Te damos la bienvenida a Jellyflex';
+  @override
+  String get welcomeHint => 'Unas pocas preguntas y listo. Puedes cambiarlo todo más tarde en los ajustes.';
+  @override
+  String get setupLookTitle => '¿Cómo quieres que se vea Jellyflex?';
+  @override
+  String get setupLookHint => 'Haz clic para probar: el cambio se ve al instante.';
+  @override
+  String get setupOptionsTitle => 'Unas preguntas más';
+  @override
+  String get setupOptionsHint => 'Activa lo que te guste: nada es obligatorio.';
+  @override
+  String get setupLater => 'Más tarde';
+  @override
+  String get setupFinish => 'Empezar';
+  @override
+  String stepOf(int step, int count) => 'Paso $step de $count';
+  @override
+  String get searchNetwork => 'Buscar en la red local';
+  @override
+  String get searchingNetwork => 'Buscando en la red local …';
+  @override
+  String get searchNetworkHint =>
+      'Solo tras tu clic: pregunta una vez en la red local si responde un servidor Jellyfin. Nada sale a internet.';
+  @override
+  String get noServerFound =>
+      'Ningún servidor respondió. Escribe la dirección tú mismo: aparece en el panel de Jellyfin.';
+  @override
+  String get serversFound => 'Encontrado en la red local';
+  @override
+  String get searchAgain => 'Buscar de nuevo';
 }

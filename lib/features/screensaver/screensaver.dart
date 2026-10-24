@@ -80,7 +80,7 @@ class _ScreensaverState extends ConsumerState<Screensaver> {
     final loggedIn = ref.read(sessionProvider).value != null;
     final config = widget.router.routerDelegate.currentConfiguration;
     final path = config.isEmpty ? '' : widget.router.state.uri.path;
-    if (!loggedIn || path.startsWith('/play') || path == '/login' || path == '/splash') {
+    if (!loggedIn || path.startsWith('/play') || path == '/login' || path == '/splash' || path == '/welcome') {
       _restartTimer();
       return;
     }
