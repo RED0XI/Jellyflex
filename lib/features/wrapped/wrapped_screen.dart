@@ -241,8 +241,11 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
   List<Widget> _slides(WrappedStats s, List<int> years) {
     final name = appDisplayName(ref.watch(settingsProvider));
     final hours = s.totalMinutes / 60;
+    final posters = [for (final t in s.titles) ?Images.poster(t)];
+    ImageRef? backdrop(BaseItem? item) => item == null ? null : Images.backdrop(item);
     final intro = _Slide(
       colors: const [Color(0xFF3B1E6E), Color(0xFF0B0B18)],
+      wall: posters,
       children: [
         Text(
           name,
@@ -295,6 +298,7 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
       intro,
       _Slide(
         colors: const [Color(0xFF0E5E6F), Color(0xFF07131A)],
+        background: backdrop(s.titles.firstOrNull),
         children: [
           Text(tr.youWatched, style: TextStyle(fontSize: 26, color: Colors.white70)),
           _CountUp(
@@ -311,6 +315,8 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
       ),
       _Slide(
         colors: const [Color(0xFF7A2E5A), Color(0xFF160A12)],
+        background: backdrop(s.titles.elementAtOrNull(1)),
+        side: _PosterFan(posters: posters),
         children: [
           Text(tr.thatWas, style: TextStyle(fontSize: 26, color: Colors.white70)),
           const SizedBox(height: 18),
@@ -335,6 +341,8 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
       if (topGenre != null)
         _Slide(
           colors: const [Color(0xFF8A4B12), Color(0xFF1A0E05)],
+          background: backdrop(s.genreTitle),
+          side: _PosterFan(posters: [?Images.poster(s.genreTitle ?? s.titles.first)]),
           children: [
             Text(tr.favoriteGenre, style: TextStyle(fontSize: 26, color: Colors.white70)),
             Text(topGenre.$1, style: const TextStyle(fontSize: 84, fontWeight: FontWeight.w900, letterSpacing: -2)),
@@ -346,6 +354,7 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
         _Slide(
           colors: const [Color(0xFF1C2F7A), Color(0xFF070A18)],
           background: Images.backdrop(series),
+          side: _PosterFan(posters: [?Images.poster(series)]),
           children: [
             Text(tr.showOfTheYear, style: TextStyle(fontSize: 26, color: Colors.white70)),
             Text(series.name, style: const TextStyle(fontSize: 76, fontWeight: FontWeight.w900, letterSpacing: -1.5)),
@@ -355,6 +364,7 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
       if (s.topActor case final actor?)
         _Slide(
           colors: const [Color(0xFF1F6B3A), Color(0xFF06140B)],
+          background: backdrop(s.actorTitle),
           children: [
             Text(tr.seenMostOften, style: TextStyle(fontSize: 26, color: Colors.white70)),
             const SizedBox(height: 20),
@@ -393,6 +403,8 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
       if (s.bingeDay case final day? when s.bingeMinutes >= 90)
         _Slide(
           colors: const [Color(0xFF6E1E1E), Color(0xFF160606)],
+          background: backdrop(s.bingeTitles.firstOrNull),
+          side: _PosterFan(posters: [for (final t in s.bingeTitles) ?Images.poster(t)]),
           children: [
             Text(tr.biggestMarathon, style: TextStyle(fontSize: 26, color: Colors.white70)),
             Text(
@@ -408,6 +420,7 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
       if (favHour != null)
         _Slide(
           colors: const [Color(0xFF2C2366), Color(0xFF09071A)],
+          background: backdrop(s.hourTitle),
           children: [
             Text(_watcherType(favHour), style: const TextStyle(fontSize: 64, fontWeight: FontWeight.w900)),
             Text(tr.favoriteHourText(favHour), style: const TextStyle(fontSize: 24, color: Colors.white70)),
@@ -417,10 +430,11 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
         ),
       _Slide(
         colors: const [Color(0xFF3B1E6E), Color(0xFF0B0B18)],
+        wall: posters,
         children: [
           RepaintBoundary(
             key: _summaryKey,
-            child: _SummaryCard(stats: s, appName: name),
+            child: _SummaryCard(stats: s, appName: name, posters: posters.take(6).toList()),
           ),
         ],
       ),
@@ -443,16 +457,27 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
   };
 }
 
+/// Eine Karte: Farbverlauf, darüber ein Bild aus dem eigenen Jahr (langsam zoomend) oder
+/// eine Posterwand, dann die Farbe der Karte (links dichter, damit der Text lesbar bleibt).
 class _Slide extends ConsumerWidget {
-  const _Slide({required this.colors, required this.children, this.background});
+  const _Slide({required this.colors, required this.children, this.background, this.wall = const [], this.side});
 
   final List<Color> colors;
   final List<Widget> children;
+
+  /// Großes Hintergrundbild.
   final ImageRef? background;
+
+  /// Posterwand im Hintergrund (wenn es kein Hintergrundbild gibt).
+  final List<ImageRef> wall;
+
+  /// Bild rechts neben dem Text (z. B. Poster) – nur in breiten Fenstern.
+  final Widget? side;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final api = ref.watch(apiProvider);
+    final [base, deep] = colors;
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors),
@@ -461,28 +486,249 @@ class _Slide extends ConsumerWidget {
         fit: StackFit.expand,
         children: [
           if (background != null)
-            Opacity(
-              opacity: 0.35,
-              child: JfImage(url: api.imageUrlOrNull(background, maxWidth: 1920), blurHash: background!.blurHash),
+            _KenBurns(
+              child: Opacity(
+                opacity: 0.7,
+                child: JfImage(url: api.imageUrlOrNull(background, maxWidth: 1920), blurHash: background!.blurHash),
+              ),
+            )
+          else if (wall.isNotEmpty)
+            _PosterWall(posters: wall),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [deep.withValues(alpha: 0.94), base.withValues(alpha: 0.6), base.withValues(alpha: 0.2)],
+                stops: const [0, 0.55, 1],
+              ),
             ),
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [deep.withValues(alpha: 0.9), deep.withValues(alpha: 0)],
+                stops: const [0, 0.45],
+              ),
+            ),
+          ),
+          _Glow(color: base),
           Padding(
             padding: const EdgeInsets.fromLTRB(kPageGutter * 1.5, kTitleBarHeight + 40, kPageGutter * 1.5, 110),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: 1),
-              duration: const Duration(milliseconds: 700),
-              curve: Curves.easeOutCubic,
-              builder: (context, t, child) => Opacity(
-                opacity: t,
-                child: Transform.translate(offset: Offset(0, 30 * (1 - t)), child: child),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: children,
+            child: _Rise(
+              child: LayoutBuilder(
+                builder: (context, box) {
+                  final text = Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: children,
+                  );
+                  final side = this.side;
+                  if (side == null || box.maxWidth < 1050) return text;
+                  return Row(
+                    children: [
+                      Expanded(child: text),
+                      const SizedBox(width: 40),
+                      _Rise(delay: 0.25, child: side),
+                    ],
+                  );
+                },
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Einblenden von unten (beim Erscheinen der Karte); [delay] als Anteil der Dauer.
+class _Rise extends StatelessWidget {
+  const _Rise({required this.child, this.delay = 0});
+
+  final Widget child;
+  final double delay;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: (700 * (1 + delay)).round()),
+      curve: Interval(delay / (1 + delay), 1, curve: Curves.easeOutCubic),
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(offset: Offset(0, 30 * (1 - t)), child: child),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Langsames Heranzoomen und Schwenken ("Ken Burns") über die Zeit einer Karte.
+class _KenBurns extends StatelessWidget {
+  const _KenBurns({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: WrappedScreen.slideTime + const Duration(seconds: 2),
+        builder: (context, t, child) =>
+            Transform.scale(scale: 1.04 + 0.1 * t, alignment: Alignment(0.4 - 0.5 * t, -0.2), child: child),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// Schräge Wand aus Postern des Jahres, die langsam nach oben wandert.
+class _PosterWall extends ConsumerWidget {
+  const _PosterWall({required this.posters});
+
+  final List<ImageRef> posters;
+
+  static const _width = 150.0;
+  static const _gap = 14.0;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final api = ref.watch(apiProvider);
+    return LayoutBuilder(
+      builder: (context, box) {
+        // Größer als das Fenster, damit auch gedreht keine Ecke frei bleibt.
+        final width = box.maxWidth * 1.5;
+        final height = box.maxHeight * 1.7;
+        final columns = (width / (_width + _gap)).ceil();
+        final rows = (height / (_width * 1.5 + _gap)).ceil();
+        return ClipRect(
+          child: Opacity(
+            opacity: 0.5,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: WrappedScreen.slideTime + const Duration(seconds: 2),
+              builder: (context, t, child) => Transform.translate(offset: Offset(0, -80 * t), child: child),
+              child: OverflowBox(
+                maxWidth: width,
+                maxHeight: height,
+                child: Transform.rotate(
+                  angle: -0.16,
+                  child: Wrap(
+                    spacing: _gap,
+                    runSpacing: _gap,
+                    children: [
+                      for (var i = 0; i < columns * rows; i++)
+                        // Versetzt wiederholen, damit gleiche Poster nicht untereinander stehen.
+                        _PosterImage(
+                          ref: posters[(i + (i ~/ columns) * 3) % posters.length],
+                          url: api.imageUrlOrNull(
+                            posters[(i + (i ~/ columns) * 3) % posters.length],
+                            fillWidth: 300,
+                            fillHeight: 450,
+                          ),
+                          width: _width,
+                          shadow: false,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Fächer aus bis zu vier Postern (rechts neben dem Text).
+class _PosterFan extends ConsumerWidget {
+  const _PosterFan({required this.posters});
+
+  final List<ImageRef> posters;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final api = ref.watch(apiProvider);
+    final shown = posters.take(4).toList();
+    if (shown.isEmpty) return const SizedBox.shrink();
+    const width = 210.0;
+    const step = 64.0;
+    return SizedBox(
+      width: width + step * (shown.length - 1) + 30,
+      height: width * 1.5 + 60,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Das wichtigste Poster liegt oben.
+          for (var i = shown.length - 1; i >= 0; i--)
+            Positioned(
+              left: step * (shown.length - 1 - i) + 15,
+              top: 30 + i * 8.0,
+              child: Transform.rotate(
+                angle: (i - (shown.length - 1) / 2) * -0.07,
+                child: _PosterImage(
+                  ref: shown[i],
+                  url: api.imageUrlOrNull(shown[i], fillWidth: 420, fillHeight: 630),
+                  width: width - i * 12,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Ein Poster mit runden Ecken (und Schatten).
+class _PosterImage extends StatelessWidget {
+  const _PosterImage({required this.ref, required this.url, required this.width, this.shadow = true});
+
+  final ImageRef ref;
+  final String? url;
+  final double width;
+  final bool shadow;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: width * 1.5,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: Colors.white10,
+        borderRadius: BorderRadius.circular(width * 0.07),
+        boxShadow: shadow ? const [BoxShadow(color: Colors.black54, blurRadius: 30, offset: Offset(0, 14))] : null,
+      ),
+      child: JfImage(url: url, blurHash: ref.blurHash),
+    );
+  }
+}
+
+/// Weicher Lichtfleck in der Farbe der Karte, der langsam wandert.
+class _Glow extends StatelessWidget {
+  const _Glow({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: WrappedScreen.slideTime,
+        curve: Curves.easeInOut,
+        builder: (context, t, _) => DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment(-0.9 + 0.5 * t, -0.8 + 0.3 * t),
+              radius: 1.2,
+              colors: [Color.lerp(color, Colors.white, 0.15)!.withValues(alpha: 0.55), color.withValues(alpha: 0)],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -619,14 +865,18 @@ class _HourChart extends StatelessWidget {
 }
 
 /// Abschlusskarte (auch als Bild speicherbar).
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.stats, required this.appName});
+class _SummaryCard extends ConsumerWidget {
+  const _SummaryCard({required this.stats, required this.appName, this.posters = const []});
 
   final WrappedStats stats;
   final String appName;
 
+  /// Die meistgeschauten Titel als kleine Poster-Reihe.
+  final List<ImageRef> posters;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final api = ref.watch(apiProvider);
     Widget stat(String value, String label) => Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -662,6 +912,23 @@ class _SummaryCard extends StatelessWidget {
           if (stats.topSeries case final series?) _line(tr.showOfTheYearShort, series.name),
           if (stats.topActor case final actor?) _line(tr.seenMostOften, actor.name),
           if (stats.favoriteHour case final hour?) _line(tr.favoriteTime, tr.timeOfDay(hour)),
+          if (posters.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                for (final p in posters)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: _PosterImage(
+                      ref: p,
+                      url: api.imageUrlOrNull(p, fillWidth: 180, fillHeight: 270),
+                      width: 82,
+                      shadow: false,
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );

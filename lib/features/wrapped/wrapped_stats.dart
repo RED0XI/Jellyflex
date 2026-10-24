@@ -33,6 +33,11 @@ class WrappedStats {
     required this.hourHistogram,
     required this.longestMovie,
     this.markedOnly = 0,
+    this.titles = const [],
+    this.genreTitle,
+    this.bingeTitles = const [],
+    this.hourTitle,
+    this.actorTitle,
   });
 
   final int year;
@@ -58,17 +63,36 @@ class WrappedStats {
   /// Titel des Jahres, die nur als gesehen markiert wurden (nicht mitgezählt).
   final int markedOnly;
 
+  // --- Für die Bilder der Karten (Filme bzw. die Serie zu Folgen) ---
+
+  /// Titel des Jahres, meistgeschaut zuerst (höchstens 30).
+  final List<BaseItem> titles;
+
+  /// Meistgeschauter Titel im Lieblingsgenre.
+  final BaseItem? genreTitle;
+
+  /// Titel des Marathon-Tags, meistgeschaut zuerst.
+  final List<BaseItem> bingeTitles;
+
+  /// Meistgeschauter Titel zur Lieblingsstunde.
+  final BaseItem? hourTitle;
+
+  /// Meistgeschauter Titel mit dem häufigsten Schauspieler.
+  final BaseItem? actorTitle;
+
   bool get isEmpty => movies + episodes == 0;
 
   /// Stunde, zu der am meisten geschaut wurde.
-  int? get favoriteHour {
-    if (hourHistogram.every((n) => n == 0)) return null;
-    var best = 0;
-    for (var h = 1; h < 24; h++) {
-      if (hourHistogram[h] > hourHistogram[best]) best = h;
-    }
-    return best;
+  int? get favoriteHour => _favoriteHour(hourHistogram);
+}
+
+int? _favoriteHour(List<int> histogram) {
+  if (histogram.every((n) => n == 0)) return null;
+  var best = 0;
+  for (var h = 1; h < 24; h++) {
+    if (histogram[h] > histogram[best]) best = h;
   }
+  return best;
 }
 
 DateTime? _lastPlayed(BaseItem item) {
@@ -184,6 +208,24 @@ WrappedStats computeWrapped({
   }
   final binge = (perDay.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).firstOrNull;
 
+  // Bilder: Folgen zeigen ihre Serie; je Titel die geschauten Minuten.
+  BaseItem titleOf(BaseItem item) => item.isEpisode ? (seriesById[item.seriesId] ?? item) : item;
+  List<BaseItem> ranked(Iterable<BaseItem> items) {
+    final minutes = <String, int>{};
+    final byId = <String, BaseItem>{};
+    for (final item in items) {
+      final title = titleOf(item);
+      minutes[title.id] = (minutes[title.id] ?? 0) + _minutes(item);
+      byId[title.id] = title;
+    }
+    final ids = minutes.keys.toList()..sort((a, b) => minutes[b]!.compareTo(minutes[a]!));
+    return [for (final id in ids) byId[id]!];
+  }
+
+  final topGenre = topGenres.firstOrNull?.$1;
+  final favoriteHour = _favoriteHour(hours);
+  bool hasActor(BaseItem title) => topActor != null && title.people.any((p) => p.id == topActor.id);
+
   final longest = movies.isEmpty
       ? null
       : (movies.toList()..sort((a, b) => (b.runTimeTicks ?? 0).compareTo(a.runTimeTicks ?? 0))).first;
@@ -203,5 +245,19 @@ WrappedStats computeWrapped({
     hourHistogram: hours,
     longestMovie: longest,
     markedOnly: marked.length,
+    titles: ranked(all).take(30).toList(),
+    genreTitle: topGenre == null
+        ? null
+        : ranked(all.where((i) => (i.genres.isNotEmpty ? i.genres : titleOf(i).genres).contains(topGenre))).firstOrNull,
+    bingeTitles: binge == null
+        ? const []
+        : ranked(
+            all.where((i) {
+              final played = _lastPlayed(i)!;
+              return DateTime(played.year, played.month, played.day) == binge.key;
+            }),
+          ).take(5).toList(),
+    hourTitle: favoriteHour == null ? null : ranked(all.where((i) => _lastPlayed(i)!.hour == favoriteHour)).firstOrNull,
+    actorTitle: ranked(all).where(hasActor).firstOrNull,
   );
 }
