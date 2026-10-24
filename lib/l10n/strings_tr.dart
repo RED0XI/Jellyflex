@@ -1285,4 +1285,37 @@ final class _Tr extends S {
   String get allReleaseNotes => 'Tüm sürüm notları';
   @override
   String get gotIt => 'Anladım';
+
+  // --- Ersteinrichtung und Heimnetz-Suche ---
+  @override
+  String get welcomeTitle => 'Jellyflex’e hoş geldin';
+  @override
+  String get welcomeHint => 'Birkaç kısa seçim, sonra başlıyoruz. Her şeyi daha sonra ayarlardan değiştirebilirsin.';
+  @override
+  String get setupLookTitle => 'Jellyflex nasıl görünsün?';
+  @override
+  String get setupLookHint => 'Denemek için tıkla – değişiklik hemen görünür.';
+  @override
+  String get setupOptionsTitle => 'Birkaç soru daha';
+  @override
+  String get setupOptionsHint => 'Beğendiklerini aç – hiçbiri zorunlu değil.';
+  @override
+  String get setupLater => 'Sonra ayarla';
+  @override
+  String get setupFinish => 'Başlayalım';
+  @override
+  String stepOf(int step, int count) => 'Adım $step / $count';
+  @override
+  String get searchNetwork => 'Ev ağında ara';
+  @override
+  String get searchingNetwork => 'Ev ağında aranıyor …';
+  @override
+  String get searchNetworkHint =>
+      'Yalnızca tıkladığında: ev ağında bir kez Jellyfin sunucusu olup olmadığını sorar. İnternete hiçbir şey gitmez.';
+  @override
+  String get noServerFound => 'Hiçbir sunucu yanıt vermedi. Adresi kendin gir – Jellyfin kontrol panelinde yazar.';
+  @override
+  String get serversFound => 'Ev ağında bulundu';
+  @override
+  String get searchAgain => 'Tekrar ara';
 }

@@ -771,10 +771,27 @@ Object? _handle(HttpRequest req) {
   return null;
 }
 
+/// Heimnetz-Suche wie bei Jellyfin (UDP 7359) – nur auf localhost, für die Tests.
+Future<void> _answerDiscovery() async {
+  try {
+    final socket = await RawDatagramSocket.bind(InternetAddress.loopbackIPv4, 7359);
+    socket.listen((event) {
+      if (event != RawSocketEvent.read) return;
+      final datagram = socket.receive();
+      if (datagram == null || utf8.decode(datagram.data, allowMalformed: true) != 'who is JellyfinServer?') return;
+      final answer = {'Address': 'http://localhost:$port', 'Id': 'mock-server', 'Name': 'Demo-Server'};
+      socket.send(utf8.encode(jsonEncode(answer)), datagram.address, datagram.port);
+    });
+  } on SocketException catch (e) {
+    stdout.writeln('Heimnetz-Suche nicht verfügbar: ${e.message}');
+  }
+}
+
 Future<void> main() async {
   _seed();
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
   stdout.writeln('Jellyfin-Demo-Server läuft auf http://localhost:$port');
+  await _answerDiscovery();
 
   await for (final req in server) {
     final res = req.response;

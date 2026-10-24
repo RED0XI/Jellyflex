@@ -76,6 +76,12 @@ void main() {
     expect(stats.bingeDay?.day, 4);
     expect(stats.longestMovie?.id, 'a');
     expect(stats.isEmpty, isFalse);
+    // Bilder: Folgen zeigen ihre Serie, meistgeschaut zuerst, jeder Titel einmal.
+    expect(stats.titles.map((t) => t.id), ['nordlicht', 'a', 'b', 'signal']);
+    expect(stats.genreTitle?.id, 'nordlicht');
+    expect(stats.bingeTitles.map((t) => t.id), ['nordlicht']);
+    expect(stats.actorTitle?.id, 'nordlicht', reason: 'lena spielt auch in Nordlicht');
+    expect(stats.hourTitle, isNotNull);
   });
 
   test('Leeres Jahr', () {

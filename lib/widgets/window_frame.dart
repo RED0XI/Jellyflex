@@ -242,7 +242,7 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
     final path = _currentPath();
     final showBack = widget.router.canPop() && !path.startsWith('/play');
 
-    final loggedInArea = path != '/login' && path != '/splash';
+    final loggedInArea = path != '/login' && path != '/splash' && path != '/welcome';
 
     void openSearch() {
       if (loggedInArea && !path.startsWith('/play') && path != '/search') widget.router.push('/search');

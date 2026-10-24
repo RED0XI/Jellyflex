@@ -1025,4 +1025,35 @@ class S {
   String versionLabelShort(String version) => _t('Version $version', 'Version $version');
   String get allReleaseNotes => _t('All release notes', 'Alle Versionshinweise');
   String get gotIt => _t('Got it', 'Alles klar');
+
+  // --- Ersteinrichtung und Heimnetz-Suche -----------------------------------
+
+  String get welcomeTitle => _t('Welcome to Jellyflex', 'Willkommen bei Jellyflex');
+  String get welcomeHint => _t(
+    'A few quick choices, then you’re ready to go. You can change everything later in the settings.',
+    'Ein paar kurze Fragen, dann geht’s los. Alles lässt sich später in den Einstellungen ändern.',
+  );
+  String get setupLookTitle => _t('How should Jellyflex look?', 'Wie soll Jellyflex aussehen?');
+  String get setupLookHint =>
+      _t('Click to try – the change shows right away.', 'Einfach anklicken – die Änderung ist sofort zu sehen.');
+  String get setupOptionsTitle => _t('A few more questions', 'Noch ein paar Fragen');
+  String get setupOptionsHint => _t(
+    'Switch on what you like – nothing here is required.',
+    'Schalte ein, was dir gefällt – nichts davon ist Pflicht.',
+  );
+  String get setupLater => _t('Set up later', 'Später einrichten');
+  String get setupFinish => _t('Let’s go', 'Los geht’s');
+  String stepOf(int step, int count) => _t('Step $step of $count', 'Schritt $step von $count');
+  String get searchNetwork => _t('Search home network', 'Im Heimnetz suchen');
+  String get searchingNetwork => _t('Searching home network …', 'Suche im Heimnetz …');
+  String get searchNetworkHint => _t(
+    'Only after you click: asks once in your home network whether a Jellyfin server answers. Nothing goes to the internet.',
+    'Erst nach deinem Klick: fragt einmal im Heimnetz, ob ein Jellyfin-Server antwortet. Nichts geht ins Internet.',
+  );
+  String get noServerFound => _t(
+    'No server answered. Enter the address yourself – you’ll find it in the Jellyfin dashboard.',
+    'Kein Server hat geantwortet. Gib die Adresse selbst ein – sie steht im Jellyfin-Dashboard.',
+  );
+  String get serversFound => _t('Found in your home network', 'Im Heimnetz gefunden');
+  String get searchAgain => _t('Search again', 'Erneut suchen');
 }

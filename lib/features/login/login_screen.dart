@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/jellyfin_api.dart';
 import '../../core/models.dart';
+import '../../core/server_discovery.dart';
 import '../../core/session.dart';
 import '../../theme.dart';
+import '../../widgets/ambient_background.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/focusable.dart';
@@ -43,6 +45,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   /// Benutzer, die der Server öffentlich anzeigt (Klick füllt den Namen aus).
   List<Json> _publicUsers = const [];
+
+  /// Heimnetz-Suche: läuft gerade / Ergebnis (`null` = noch nicht gesucht).
+  bool _searching = false;
+  List<DiscoveredServer>? _found;
 
   @override
   void initState() {
@@ -85,6 +91,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Nur auf Klick: im Heimnetz nach Jellyfin-Servern fragen.
+  Future<void> _searchNetwork() async {
+    setState(() {
+      _searching = true;
+      _error = null;
+    });
+    List<DiscoveredServer> found;
+    try {
+      found = await ServerDiscovery.search();
+    } catch (_) {
+      found = const [];
+    }
+    if (!mounted) return;
+    setState(() {
+      _searching = false;
+      _found = found;
+    });
+  }
+
+  void _pickFound(DiscoveredServer server) {
+    _serverCtrl.text = server.address;
+    _connect();
   }
 
   Future<void> _login() async {
@@ -176,7 +206,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          const Positioned.fill(child: _AmbientBackground()),
+          const Positioned.fill(child: AmbientBackground()),
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(vertical: 48),
@@ -308,6 +338,80 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _ErrorText(_error),
         const SizedBox(height: 24),
         PrimaryButton(label: tr.connect, onPressed: _connect, loading: _busy),
+        const SizedBox(height: 22),
+        _buildNetworkSearch(),
+      ],
+    );
+  }
+
+  /// "Im Heimnetz suchen" – mit Hinweis, was dabei passiert; Funde zum Anklicken.
+  Widget _buildNetworkSearch() {
+    final found = _found;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
+        const SizedBox(height: 18),
+        if (found == null || found.isEmpty || _searching) ...[
+          Center(
+            child: _searching
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2)),
+                      const SizedBox(width: 12),
+                      Text(tr.searchingNetwork, style: TextStyle(color: AppColors.textSecondary)),
+                    ],
+                  )
+                : GlassButton(label: tr.searchNetwork, icon: Icons.wifi_find_rounded, onPressed: _searchNetwork),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            found != null && found.isEmpty && !_searching ? tr.noServerFound : tr.searchNetworkHint,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+          ),
+        ] else ...[
+          Text(
+            tr.serversFound,
+            style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          for (final server in found)
+            Focusable(
+              onTap: () => _pickFound(server),
+              semanticLabel: server.name,
+              builder: (context, hovered) => AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: hovered ? 0.12 : 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: hovered ? Colors.white : Colors.transparent, width: 1.5),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.dns_rounded, color: AppColors.accent),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(server.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          Text(server.address, style: TextStyle(color: AppColors.textMuted, fontSize: 12.5)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded),
+                  ],
+                ),
+              ),
+            ),
+          Center(
+            child: TextButton(onPressed: _searchNetwork, child: Text(tr.searchAgain)),
+          ),
+        ],
       ],
     );
   }
@@ -461,50 +565,6 @@ class _ErrorText extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Langsam wandernde Farbflächen im Hintergrund.
-class _AmbientBackground extends StatefulWidget {
-  const _AmbientBackground();
-
-  @override
-  State<_AmbientBackground> createState() => _AmbientBackgroundState();
-}
-
-class _AmbientBackgroundState extends State<_AmbientBackground> with SingleTickerProviderStateMixin {
-  late final _anim = AnimationController(vsync: this, duration: const Duration(seconds: 18))..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _anim.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (context, _) {
-        final t = Curves.easeInOut.transform(_anim.value);
-        return Container(
-          decoration: BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment(-0.8 + t * 0.5, -0.7 + t * 0.3),
-              radius: 1.1,
-              colors: [AppColors.accent.withValues(alpha: 0.28), AppColors.background.withValues(alpha: 0)],
-            ),
-          ),
-          foregroundDecoration: BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment(0.9 - t * 0.4, 0.8 - t * 0.3),
-              radius: 1.0,
-              colors: [AppColors.accentAlt.withValues(alpha: 0.20), AppColors.background.withValues(alpha: 0)],
-            ),
-          ),
-        );
-      },
     );
   }
 }
