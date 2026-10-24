@@ -6,6 +6,22 @@ A modern, smooth [Jellyfin](https://jellyfin.org) client for Windows and macOS �
 > **Made with Claude.** Jellyflex was written with [Claude Code](https://claude.com/claude-code),
 > Anthropic's AI coding assistant; Claude wrote the code, the tests and this README.
 
+![Jellyflex home screen with the big banner and Continue watching](docs/screenshots/home.jpg)
+
+| | |
+|---|---|
+| ![Movie details with logo, ratings and backdrop](docs/screenshots/details.jpg) | ![Series page with episodes and cast](docs/screenshots/series.jpg) |
+| **Details** – logo, ratings, versions, everything in one place | **Series** – seasons, episodes, shuffle, download a whole season |
+| ![Movie library; the selected card flips through scenes](docs/screenshots/library.jpg) | ![Player with a trickplay preview while seeking](docs/screenshots/player.jpg) |
+| **Library** – filters, A–Z, and a scene preview when you rest on a card | **Player** – Direct Play through mpv, scene previews while seeking |
+| ![Magazine layout in the Noir Gold theme](docs/screenshots/layout_magazine.jpg) | ![Library layout with sidebar in the Emerald theme](docs/screenshots/layout_library.jpg) |
+| **Magazine** layout · Noir Gold theme | **Library** layout · Emerald theme |
+| ![Couch layout with large tiles](docs/screenshots/layout_couch.jpg) | ![First-start setup: choose theme and layout](docs/screenshots/welcome.jpg) |
+| **Couch** layout – large tiles for TV and controller | **First start** – pick language, look and a few options |
+
+<sub>Screenshots: Jellyflex connected to the public [Jellyfin demo server](https://demo.jellyfin.org)
+(public-domain and Creative Commons titles).</sub>
+
 ## Quick start
 
 **You need:** Windows 10 or 11 (64-bit) or macOS 12 or newer (Apple silicon or Intel), and a
@@ -13,7 +29,8 @@ Jellyfin server you can sign in to.
 
 1. Open the [latest release](https://github.com/RED0XI/Jellyflex/releases/latest) and download
    - **Windows:** **`Jellyflex-Setup-<version>.exe`**
-   - **macOS:** **`Jellyflex-<version>.dmg`**
+   - **macOS:** **`Jellyflex-<version>.dmg`** – *signed Mac downloads are coming; until then,
+     [build it yourself](#build-from-source)*
 
    (The `.sig` files and the `-macOS.zip` are only for the app's own update check.)
 2. Install:
@@ -38,12 +55,15 @@ Applications to the Trash.
 ### Features
 
 **Watching**
+- **Scene preview on cards**: rest on a title and its card flips through scenes (images from your server, no video)
 - **Direct Play** of practically every format through mpv (HEVC, AV1, HDR, DTS/TrueHD, ASS/PGS subtitles)
 - Audio/subtitle choice from your Jellyfin settings; the language you pick is **remembered per series**
 - **Skip intro/recap** (Media Segments, e.g. from the Intro Skipper plugin), **next episode** countdown
 - **Trickplay** previews while seeking, **chapters** with pictures (`C`) and a **Scenes** row on the details page
 - Quality limit (the server converts on the fly), playback speed, audio/subtitle delay
-- Volume is remembered; progress is reported to the server continuously
+- Volume is remembered (up to 150 % and with the mouse wheel); resuming starts a few seconds earlier;
+  **"Still watching?"** after several episodes in a row; **shuffle play** for series, seasons and libraries
+- Progress is reported to the server continuously
 - Media overlay and media keys (Windows overlay, macOS Now Playing), **mini player** (`P`),
   **sleep timer**, **Ambilight**
 
@@ -170,7 +190,9 @@ powershell -ExecutionPolicy Bypass -File tool/run_all_tests.ps1  # everything, w
 ```
 
 Run app tests one file at a time – several files in one run fail on Windows.
-Screenshots end up in `build/screenshots/`.
+Screenshots end up in `build/screenshots/`. The README pictures come from
+`integration_test/readme_shots_test.dart` (against a real server, see the comment at the top) and
+`python tool/readme_shots.py`.
 
 ### Publishing a release (maintainers)
 
