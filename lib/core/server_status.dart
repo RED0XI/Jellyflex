@@ -34,6 +34,9 @@ class ServerStatus extends Notifier<bool> {
 
     connection.connected.addListener(onChange);
     ref.onDispose(() => connection.connected.removeListener(onChange));
+    // Kaltstart ohne erreichbaren Server: Die Live-Verbindung kommt nie zustande, es gibt also
+    // auch keinen Abbruch, der die Prüfung auslöst – deshalb nach kurzer Zeit selbst nachsehen.
+    if (!connection.connected.value) _timer = Timer(const Duration(seconds: 3), _startChecking);
     return true;
   }
 

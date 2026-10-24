@@ -224,10 +224,13 @@ class JellyfinApi {
   /// Ist der Server erreichbar? (Kurze Anfrage ohne Daten.)
   Future<bool> ping() async {
     try {
-      final res = await dio.get<dynamic>(
-        '/System/Ping',
-        options: Options(sendTimeout: const Duration(seconds: 5), receiveTimeout: const Duration(seconds: 5)),
-      );
+      // Insgesamt höchstens 5 s – auch wenn der Verbindungsaufbau ins Leere läuft (Server/VPN aus).
+      final res = await dio
+          .get<dynamic>(
+            '/System/Ping',
+            options: Options(sendTimeout: const Duration(seconds: 5), receiveTimeout: const Duration(seconds: 5)),
+          )
+          .timeout(const Duration(seconds: 5));
       return res.statusCode == 200;
     } catch (_) {
       return false;
