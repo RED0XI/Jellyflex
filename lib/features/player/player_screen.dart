@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter/gestures.dart' show PointerScrollEvent;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +21,7 @@ import '../../core/jellyfin_api.dart';
 import '../../core/live_connection.dart';
 import '../../core/media_session.dart';
 import '../../core/models.dart';
+import '../../core/play_queue.dart';
 import '../../core/session.dart';
 import '../../core/series_tracks.dart';
 import '../../core/settings.dart';
@@ -41,10 +44,32 @@ part 'player_extras.dart';
 part 'player_widgets.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
-  const PlayerScreen({super.key, required this.itemId, this.startTicks, this.restoreFullscreen, this.mediaSourceId});
+  const PlayerScreen({
+    super.key,
+    required this.itemId,
+    this.startTicks,
+    this.restoreFullscreen,
+    this.mediaSourceId,
+    this.autoPlayed = false,
+    this.fromQueue = false,
+  });
 
   final String itemId;
   final int? startTicks;
+
+  /// Von selbst als nächste Folge gestartet (nicht vom Benutzer).
+  final bool autoPlayed;
+
+  /// Teil von "Zufällig abspielen" (siehe [PlayQueue]) – sonst wird die Warteschlange beendet.
+  final bool fromQueue;
+
+  /// So viele Folgen liefen nacheinander von selbst, ohne dass jemand etwas bedient hat.
+  /// Ab [stillWatchingAfter] fragt der Player "Schaust du noch?", statt weiterzuspielen.
+  static int autoPlayedInARow = 0;
+  static const stillWatchingAfter = 3;
+
+  /// Lauter als 100 % verstärkt mpv in Software (für leise Filme); gemerkt werden höchstens 100 %.
+  static const maxVolume = 150.0;
 
   /// Gewählte Fassung bei mehreren Versionen; `null` = Standard (erste).
   final String? mediaSourceId;
@@ -126,8 +151,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _closing = false;
   bool _reportedStart = false;
   bool _tracksApplied = false;
-  late double _volumeBeforeMute = ref.read(settingsProvider).playerVolume.clamp(1, 100).toDouble();
+  late double _volumeBeforeMute = ref.read(settingsProvider).playerVolume.clamp(1, PlayerScreen.maxVolume).toDouble();
   Timer? _volumeSaveTimer;
+
+  /// Zuletzt eingestellte Lautstärke, bis mpv sie bestätigt – sonst gingen bei schnellem
+  /// Mausrad Schritte verloren (der Player meldet den neuen Wert erst etwas später).
+  double? _pendingVolume;
+  double get _volume => _pendingVolume ?? _player.state.volume;
+
+  /// Kurze Lautstärke-Anzeige in der Bildmitte (Mausrad, Pfeiltasten); `null` = ausgeblendet.
+  final _volumeOsd = ValueNotifier<double?>(null);
+  Timer? _volumeOsdTimer;
   Timer? _hideTimer;
   Timer? _progressTimer;
 
@@ -137,6 +171,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   final _sleepLeft = ValueNotifier<Duration?>(null);
   double? _sleepVolumeBase;
   bool _sleeping = false;
+
+  /// "Schaust du noch?" wird gerade gefragt.
+  bool _askingStillWatching = false;
 
   /// Vollbild ist ein gemeinsamer Zustand des Fensters (auch F11 außerhalb des Players).
   bool get _fullscreen => windowFullscreen.value;
@@ -150,6 +187,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    if (!widget.autoPlayed) PlayerScreen.autoPlayedInARow = 0;
+    if (!widget.fromQueue) PlayQueue.clear();
     _settings;
     _start();
     _scheduleHide();
@@ -203,6 +242,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     SleepTimer.instance.cancel();
     _reportProgress();
     if (mounted) setState(() {});
+  }
+
+  /// "Schaust du noch?" → ja: nächste Folge.
+  void _continueWatching() {
+    _userActive();
+    setState(() => _askingStillWatching = false);
+    _playNext();
   }
 
   void _wakeUp() {
@@ -317,7 +363,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   bool _onRemoteGeneral(String name, Map<String, dynamic> args) {
     if (appLocked.value) return true;
-    final volume = _player.state.volume;
+    final volume = _volume;
     switch (name) {
       case 'SetVolume':
         _setVolume(double.tryParse('${args['Volume']}') ?? volume);
@@ -417,6 +463,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     SleepTimer.instance.removeListener(_onSleepTimerChanged);
     _sleepTick?.cancel();
     _sleepLeft.dispose();
+    _volumeOsdTimer?.cancel();
+    _volumeOsd.dispose();
     if (MediaSession.onButton == _onMediaButton) {
       MediaSession.onButton = null;
       // Bei "Nächste Folge" übernimmt gleich der neue Player die Anzeige.
@@ -491,7 +539,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _api.getMediaSegments(item.id).then((s) {
         if (mounted) setState(() => _segments = s);
       });
-      if (item.isEpisode) {
+      if (PlayQueue.contains(item.id)) {
+        // Zufallswiedergabe: der nächste gemischte Titel statt der nächsten Folge.
+        final nextId = PlayQueue.after(item.id);
+        if (nextId != null) {
+          _api.getItem(nextId).then((next) {
+            if (mounted) setState(() => _nextEpisode = next);
+            _updateMediaSession();
+          }, onError: (_) {});
+        }
+      } else if (item.isEpisode) {
         _api.getNextEpisode(item).then((next) {
           // Ohne Server: nächste heruntergeladene Folge.
           next ??= _downloads.nextDownloadedEpisode(item);
@@ -503,6 +560,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _subscriptions
         ..add(_player.stream.tracks.listen((_) => _applyDefaultTracks()))
         ..add(_player.stream.playing.listen(_onPlayingChanged))
+        // Lautstärke von mpv bestätigt → wieder den echten Wert lesen.
+        ..add(
+          _player.stream.volume.listen((v) {
+            if (_pendingVolume != null && (v - _pendingVolume!).abs() < 0.01) _pendingVolume = null;
+          }),
+        )
         ..add(
           _player.stream.completed.listen((done) {
             if (!done) return;
@@ -511,7 +574,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               return;
             }
             if (_nextEpisode != null && ref.read(settingsProvider).nextEpisodeCountdown) {
-              _playNext();
+              _playNext(automatic: true);
             } else {
               _close();
             }
@@ -519,11 +582,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         )
         ..add(_player.stream.error.listen(_onPlayerError));
 
-      final start = widget.startTicks != null ? ticksToDuration(widget.startTicks!) : null;
+      final start = _resumePoint(widget.startTicks);
       // Zertifikate prüfen, bevor mit dem Anmelde-Token gestreamt wird.
       await SystemCerts.secure(_player);
       await PlayerScreen.debugBeforeOpen?.call(_player);
-      // Zuletzt eingestellte Lautstärke (stumm wird nicht übernommen).
+      // Zuletzt eingestellte Lautstärke (stumm wird nicht übernommen); bis 150 % erlauben.
+      final native = _player.platform;
+      if (native is NativePlayer) await native.setProperty('volume-max', '${PlayerScreen.maxVolume.round()}');
       await _player.setVolume(_volumeBeforeMute);
       await _openStream(start);
 
@@ -876,10 +941,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     context.pop();
   }
 
-  /// Wechselt direkt zur nächsten Folge (Vollbild bleibt erhalten).
-  Future<void> _playNext() async {
+  /// Beim Fortsetzen ein paar Sekunden früher einsteigen, damit man wieder hineinfindet.
+  static Duration? _resumePoint(int? ticks) {
+    if (ticks == null) return null;
+    final position = ticksToDuration(ticks);
+    return position > const Duration(seconds: 30) ? position - const Duration(seconds: 5) : position;
+  }
+
+  /// Jemand bedient den Player – "Schaust du noch?" fängt wieder bei null an.
+  void _userActive() => PlayerScreen.autoPlayedInARow = 0;
+
+  /// Wechselt direkt zur nächsten Folge (Vollbild bleibt erhalten). [automatic]: von selbst
+  /// (Countdown/Ende) – nach einigen Folgen ohne Bedienung wird erst nachgefragt.
+  Future<void> _playNext({bool automatic = false}) async {
     final next = _nextEpisode;
-    if (next == null || _closing) return;
+    if (next == null || _closing || _askingStillWatching) return;
+    if (automatic && PlayerScreen.autoPlayedInARow >= PlayerScreen.stillWatchingAfter) {
+      await _player.pause();
+      if (mounted) setState(() => _askingStillWatching = true);
+      return;
+    }
+    PlayerScreen.autoPlayedInARow = automatic ? PlayerScreen.autoPlayedInARow + 1 : 0;
     _closing = true;
     _switchingToNext = true;
     _progressTimer?.cancel();
@@ -897,7 +979,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final item = _item;
     if (item != null) refreshItemData(ref, item);
     final ticks = next.userData.playbackPositionTicks;
-    final query = Uri(queryParameters: {if (ticks > 0) 'start': '$ticks', 'rf': _restoreFullscreen ? '1' : '0'}).query;
+    final query = Uri(
+      queryParameters: {
+        if (ticks > 0) 'start': '$ticks',
+        'rf': _restoreFullscreen ? '1' : '0',
+        if (automatic) 'auto': '1',
+        if (PlayQueue.contains(next.id)) 'queue': '1',
+      },
+    ).query;
     context.pushReplacement('/play/${next.id}?$query');
   }
 
@@ -945,24 +1034,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _player.seek(target);
   }
 
-  void _setVolume(double v) {
-    _player.setVolume(v.clamp(0, 100).toDouble());
+  void _setVolume(double v, {bool osd = false}) {
+    final volume = v.clamp(0, PlayerScreen.maxVolume).toDouble();
+    _pendingVolume = volume;
+    _player.setVolume(volume);
+    if (osd) {
+      _volumeOsd.value = volume;
+      _volumeOsdTimer?.cancel();
+      _volumeOsdTimer = Timer(const Duration(milliseconds: 1200), () => _volumeOsd.value = null);
+    }
     // Gebündelt speichern (Pfeiltaste gedrückt halten = viele Änderungen).
     _volumeSaveTimer?.cancel();
     _volumeSaveTimer = Timer(const Duration(milliseconds: 800), _saveVolume);
   }
 
   /// Lautstärke für den nächsten Start merken – Stummschalten zählt nicht.
-  void _saveVolume() => _saveVolumeValue(_player.state.volume);
+  void _saveVolume() => _saveVolumeValue(_volume);
 
   void _saveVolumeValue(double volume) {
-    final v = volume.roundToDouble();
+    // Verstärkung über 100 % gilt nur für diesen Film – nicht beim nächsten Start überraschen.
+    final v = volume.clamp(0, 100).roundToDouble();
     if (v <= 0 || v == _settings.current.playerVolume) return;
     _settings.update((s) => s.copyWith(playerVolume: v));
   }
 
   void _toggleMute() {
-    final v = _player.state.volume;
+    final v = _volume;
     if (v > 0) {
       _volumeBeforeMute = v;
       _setVolume(0);
@@ -976,6 +1073,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final isRepeat = event is KeyRepeatEvent;
     if (!isDown && !isRepeat) return KeyEventResult.ignored;
     final key = event.logicalKey;
+    _userActive();
+
+    if (_askingStillWatching && isDown) {
+      if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.enter) {
+        _continueWatching();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.escape) {
+        _close();
+        return KeyEventResult.handled;
+      }
+    }
 
     if (_sleeping && isDown) {
       if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.keyK) {
@@ -1005,9 +1114,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     } else if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.keyL) {
       _seekBy(_seekStep);
     } else if (key == LogicalKeyboardKey.arrowUp) {
-      _setVolume(_player.state.volume + 5);
+      _setVolume(_volume + 5, osd: !_controlsVisible);
     } else if (key == LogicalKeyboardKey.arrowDown) {
-      _setVolume(_player.state.volume - 5);
+      _setVolume(_volume - 5, osd: !_controlsVisible);
     } else if (isRepeat) {
       return KeyEventResult.ignored;
     } else if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.keyK) {
@@ -1061,100 +1170,129 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         onKeyEvent: _onKey,
         child: MouseRegion(
           cursor: _controlsVisible ? SystemMouseCursors.basic : SystemMouseCursors.none,
-          onHover: (_) => _showControls(autoHide: _player.state.playing),
-          child: Stack(
-            children: [
-              // Ambilight: unscharfe, vergrößerte Kopie des Bildes hinter dem Video – leuchtet in
-              // den Balken. Platz bleibt immer bestehen (sonst verlieren Elemente den Fokus).
-              Positioned.fill(
-                child: switch (settings.ambilight) {
-                  _ when _mini => const SizedBox.shrink(),
-                  AmbilightMode.always => _Ambilight(controller: _video),
-                  AmbilightMode.window when !_fullscreen => _Ambilight(controller: _video),
-                  _ => const SizedBox.shrink(),
-                },
-              ),
-              Positioned.fill(
-                child: Video(controller: _video, controls: NoVideoControls, fill: Colors.transparent),
-              ),
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    _focus.requestFocus();
-                    if (_anyPanelOpen) {
-                      _closePanels();
-                    } else {
-                      _player.playOrPause();
-                    }
+          onHover: (_) {
+            _userActive();
+            _showControls(autoHide: _player.state.playing);
+          },
+          // Mausrad über dem Bild (auch über der Leiste): lauter/leiser – nicht in offenen Menüs.
+          child: Listener(
+            onPointerSignal: (event) {
+              if (event is! PointerScrollEvent || _anyPanelOpen || event.scrollDelta.dy == 0) return;
+              _userActive();
+              _setVolume(_volume + (event.scrollDelta.dy < 0 ? 5 : -5), osd: true);
+            },
+            child: Stack(
+              children: [
+                // Ambilight: unscharfe, vergrößerte Kopie des Bildes hinter dem Video – leuchtet in
+                // den Balken. Platz bleibt immer bestehen (sonst verlieren Elemente den Fokus).
+                Positioned.fill(
+                  child: switch (settings.ambilight) {
+                    _ when _mini => const SizedBox.shrink(),
+                    AmbilightMode.always => _Ambilight(controller: _video),
+                    AmbilightMode.window when !_fullscreen => _Ambilight(controller: _video),
+                    _ => const SizedBox.shrink(),
                   },
-                  // Im Mini-Player holt ein Doppelklick das große Fenster zurück.
-                  onDoubleTap: () => _mini ? _toggleMini() : _toggleFullscreen(),
                 ),
-              ),
-              if (_error == null)
-                Center(
-                  child: StreamBuilder<bool>(
-                    stream: _player.stream.buffering,
-                    initialData: true,
-                    builder: (context, snap) => AnimatedOpacity(
-                      opacity: (snap.data ?? false) ? 1 : 0,
-                      duration: const Duration(milliseconds: 200),
-                      child: const SizedBox(
-                        width: 56,
-                        height: 56,
-                        child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+                Positioned.fill(
+                  child: Video(controller: _video, controls: NoVideoControls, fill: Colors.transparent),
+                ),
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      _userActive();
+                      _focus.requestFocus();
+                      if (_anyPanelOpen) {
+                        _closePanels();
+                      } else {
+                        _player.playOrPause();
+                      }
+                    },
+                    // Im Mini-Player holt ein Doppelklick das große Fenster zurück.
+                    onDoubleTap: () => _mini ? _toggleMini() : _toggleFullscreen(),
+                  ),
+                ),
+                Center(child: _VolumeOsd(volume: _volumeOsd)),
+                if (_error == null)
+                  Center(
+                    child: StreamBuilder<bool>(
+                      stream: _player.stream.buffering,
+                      initialData: true,
+                      builder: (context, snap) => AnimatedOpacity(
+                        opacity: (snap.data ?? false) ? 1 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: const SizedBox(
+                          width: 56,
+                          height: 56,
+                          child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              if (_error != null) Center(child: _buildError()),
-              Positioned.fill(
-                child: IgnorePointer(
-                  ignoring: !_controlsVisible,
-                  child: AnimatedOpacity(
-                    opacity: _controlsVisible ? 1 : 0,
-                    duration: const Duration(milliseconds: 250),
-                    child: _mini ? _buildMiniControls() : _buildControls(),
-                  ),
-                ),
-              ),
-              if (_statsVisible && !_mini)
-                Positioned(
-                  left: 24,
-                  top: kTitleBarHeight + 78,
-                  child: _StatsOverlay(
-                    player: _player,
-                    playMethod: _localFile != null
-                        ? tr.statsLocalFile
-                        : _transcoding
-                        ? tr.statsTranscoding
-                        : tr.statsDirectPlay,
-                  ),
-                ),
-              if (_item != null && !_mini)
-                PlayerSkipOverlay(
-                  player: _player,
-                  segments: _segments,
-                  nextEpisode: _nextEpisode,
-                  nextEpisodeImageUrl: _nextEpisode == null
-                      ? null
-                      : _api.imageUrlOrNull(Images.landscape(_nextEpisode!), fillWidth: 760, fillHeight: 428),
-                  controlsVisible: _controlsVisible,
-                  autoSkip: settings.autoSkipIntro,
-                  // Schlaf-Timer "am Ende dieser Folge": keine nächste Folge starten.
-                  autoPlayNext: settings.nextEpisodeCountdown && SleepTimer.instance.mode != SleepMode.endOfItem,
-                  onSeek: (target) {
-                    _player.seek(target);
-                    _focus.requestFocus();
-                  },
-                  onPlayNext: _playNext,
-                ),
-              if (_sleeping)
+                if (_error != null) Center(child: _buildError()),
                 Positioned.fill(
-                  child: _SleepOverlay(onContinue: _wakeUp, onClose: _close),
+                  child: IgnorePointer(
+                    ignoring: !_controlsVisible,
+                    child: AnimatedOpacity(
+                      opacity: _controlsVisible ? 1 : 0,
+                      duration: const Duration(milliseconds: 250),
+                      child: _mini ? _buildMiniControls() : _buildControls(),
+                    ),
+                  ),
                 ),
-            ],
+                if (_statsVisible && !_mini)
+                  Positioned(
+                    left: 24,
+                    top: kTitleBarHeight + 78,
+                    child: _StatsOverlay(
+                      player: _player,
+                      playMethod: _localFile != null
+                          ? tr.statsLocalFile
+                          : _transcoding
+                          ? tr.statsTranscoding
+                          : tr.statsDirectPlay,
+                    ),
+                  ),
+                if (_item != null && !_mini)
+                  PlayerSkipOverlay(
+                    player: _player,
+                    segments: _segments,
+                    nextEpisode: _nextEpisode,
+                    nextEpisodeImageUrl: _nextEpisode == null
+                        ? null
+                        : _api.imageUrlOrNull(Images.landscape(_nextEpisode!), fillWidth: 760, fillHeight: 428),
+                    controlsVisible: _controlsVisible,
+                    autoSkip: settings.autoSkipIntro,
+                    // Schlaf-Timer "am Ende dieser Folge": keine nächste Folge starten.
+                    autoPlayNext: settings.nextEpisodeCountdown && SleepTimer.instance.mode != SleepMode.endOfItem,
+                    onSeek: (target) {
+                      _player.seek(target);
+                      _focus.requestFocus();
+                    },
+                    onPlayNext: _playNext,
+                    onAutoPlayNext: () => _playNext(automatic: true),
+                  ),
+                if (_sleeping)
+                  Positioned.fill(
+                    child: _SleepOverlay(
+                      onContinue: _wakeUp,
+                      onClose: _close,
+                      title: tr.goodNight,
+                      message: tr.sleepTimerPaused,
+                    ),
+                  ),
+                if (_askingStillWatching)
+                  Positioned.fill(
+                    child: _SleepOverlay(
+                      onContinue: _continueWatching,
+                      onClose: _close,
+                      icon: Icons.visibility_rounded,
+                      title: tr.stillWatching,
+                      message: tr.stillWatchingHint(_nextEpisode?.name ?? ''),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

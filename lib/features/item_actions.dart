@@ -11,6 +11,7 @@ import 'details/details_screen.dart';
 import 'downloads/download_flow.dart';
 import 'downloads/downloads_screen.dart';
 import 'lists/list_actions.dart';
+import '../widgets/media_cards.dart' show playShuffled;
 import '../l10n/strings.dart';
 
 import 'package:flutter/scheduler.dart';
@@ -18,6 +19,7 @@ import 'package:flutter/scheduler.dart';
 enum _ItemAction {
   play,
   playFromStart,
+  shuffle,
   details,
   series,
   markPlayed,
@@ -75,6 +77,8 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
       ),
       if (canPlay) entry(_ItemAction.play, Icons.play_arrow_rounded, data.hasResumePosition ? tr.resume : tr.play),
       if (canPlay && data.hasResumePosition) entry(_ItemAction.playFromStart, Icons.replay_rounded, tr.playFromStart),
+      if (item.isSeries || item.isSeason || item.isCollection)
+        entry(_ItemAction.shuffle, Icons.shuffle_rounded, tr.shufflePlay),
       entry(_ItemAction.details, Icons.info_outline_rounded, tr.details),
       if (item.isEpisode && item.seriesId != null) entry(_ItemAction.series, Icons.tv_rounded, tr.goToSeries),
       const PopupMenuDivider(),
@@ -121,6 +125,9 @@ Future<void> showItemContextMenu(BuildContext context, BaseItem item, Offset glo
       router.push('/play/${item.id}${ticks > 0 ? '?start=$ticks' : ''}');
     case _ItemAction.playFromStart:
       router.push('/play/${item.id}');
+    case _ItemAction.shuffle:
+      if (!context.mounted) return;
+      await playShuffled(context, parentId: item.id, includeItemTypes: item.isCollection ? 'Movie,Episode' : 'Episode');
     case _ItemAction.details:
       router.push('/item/${item.id}');
     case _ItemAction.series:

@@ -46,11 +46,22 @@ class _Ambilight extends StatelessWidget {
 }
 
 /// "Gute Nacht": erscheint, wenn der Schlaf-Timer die Wiedergabe angehalten hat.
+/// Abgedunkelter Bildschirm mit Frage und "Weiterschauen"/"Beenden" – für den Schlaf-Timer
+/// ("Gute Nacht") und "Schaust du noch?".
 class _SleepOverlay extends StatefulWidget {
-  const _SleepOverlay({required this.onContinue, required this.onClose});
+  const _SleepOverlay({
+    required this.onContinue,
+    required this.onClose,
+    required this.title,
+    required this.message,
+    this.icon = Icons.bedtime_rounded,
+  });
 
   final VoidCallback onContinue;
   final VoidCallback onClose;
+  final String title;
+  final String message;
+  final IconData icon;
 
   @override
   State<_SleepOverlay> createState() => _SleepOverlayState();
@@ -79,11 +90,15 @@ class _SleepOverlayState extends State<_SleepOverlay> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.bedtime_rounded, size: 64, color: Color(0xFFFACC15)),
+              Icon(widget.icon, size: 64, color: const Color(0xFFFACC15)),
               const SizedBox(height: 18),
-              Text(tr.goodNight, style: TextStyle(fontSize: 40, fontWeight: FontWeight.w800)),
+              Text(widget.title, style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w800)),
               const SizedBox(height: 6),
-              Text(tr.sleepTimerPaused, style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+              Text(
+                widget.message,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+              ),
               const SizedBox(height: 28),
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -340,12 +355,83 @@ class _VolumeControl extends StatelessWidget {
                   overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
                   thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                 ),
-                child: Slider(value: volume.clamp(0, 100), max: 100, onChanged: onChanged),
+                // Über 100 % (Verstärkung) färbt sich die Leiste in der Akzentfarbe.
+                child: Slider(
+                  value: volume.clamp(0, PlayerScreen.maxVolume),
+                  max: PlayerScreen.maxVolume,
+                  activeColor: volume > 100 ? AppColors.accent : Colors.white,
+                  label: '${volume.round()} %',
+                  onChanged: onChanged,
+                ),
               ),
             ),
           ],
         );
       },
+    );
+  }
+}
+
+/// Lautstärke kurz in der Bildmitte zeigen (Mausrad, Pfeiltasten bei ausgeblendeter Leiste).
+class _VolumeOsd extends StatelessWidget {
+  const _VolumeOsd({required this.volume});
+
+  final ValueListenable<double?> volume;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: ValueListenableBuilder<double?>(
+        valueListenable: volume,
+        builder: (context, v, _) {
+          final shown = v ?? 0;
+          return AnimatedOpacity(
+            opacity: v == null ? 0 : 1,
+            duration: const Duration(milliseconds: 180),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    shown == 0
+                        ? Icons.volume_off_rounded
+                        : shown < 50
+                        ? Icons.volume_down_rounded
+                        : Icons.volume_up_rounded,
+                    size: 30,
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 140,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: shown / PlayerScreen.maxVolume,
+                        minHeight: 6,
+                        backgroundColor: Colors.white24,
+                        color: shown > 100 ? AppColors.accent : Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 56,
+                    child: Text(
+                      '${shown.round()} %',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

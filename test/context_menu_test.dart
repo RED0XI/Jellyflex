@@ -83,13 +83,13 @@ void main() {
     expect(find.text('Von vorne abspielen'), findsOneWidget);
     expect(find.text('Zur Serie'), findsOneWidget);
     expect(find.text('Bereits angeschaut'), findsOneWidget);
-    expect(find.text('Vergessen'), findsOneWidget);
+    expect(find.text('Aus Weiterschauen entfernen'), findsOneWidget);
   });
 
-  testWidgets('"Vergessen" setzt den Fortschritt zurück', (tester) async {
+  testWidgets('"Aus Weiterschauen entfernen" setzt den Fortschritt zurück', (tester) async {
     final api = await pumpCard(tester);
     await rightClickCard(tester);
-    await tester.tap(find.text('Vergessen'));
+    await tester.tap(find.text('Aus Weiterschauen entfernen'));
     await tester.pumpAndSettle();
     expect(api.calls, ['forget:ep1']);
     expect(find.text('Aus „Weiterschauen“ entfernt'), findsOneWidget);

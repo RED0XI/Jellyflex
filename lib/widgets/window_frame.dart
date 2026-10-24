@@ -11,6 +11,7 @@ import 'package:window_manager/window_manager.dart';
 import '../core/app_lock.dart';
 import '../core/gamepad_input.dart';
 import '../core/route_observer.dart';
+import '../core/window_memory.dart';
 import '../theme.dart';
 import 'focus_navigation.dart';
 import 'focusable.dart';
@@ -232,10 +233,22 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
   }
 
   @override
-  void onWindowMaximize() => setState(() => _maximized = true);
+  void onWindowMaximize() {
+    setState(() => _maximized = true);
+    WindowMemory.scheduleSave();
+  }
 
   @override
-  void onWindowUnmaximize() => setState(() => _maximized = false);
+  void onWindowUnmaximize() {
+    setState(() => _maximized = false);
+    WindowMemory.scheduleSave();
+  }
+
+  @override
+  void onWindowResized() => WindowMemory.scheduleSave();
+
+  @override
+  void onWindowMoved() => WindowMemory.scheduleSave();
 
   @override
   Widget build(BuildContext context) {

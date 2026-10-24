@@ -31,6 +31,7 @@ class PlayerSkipOverlay extends StatefulWidget {
     required this.nextEpisodeImageUrl,
     required this.onSeek,
     required this.onPlayNext,
+    this.onAutoPlayNext,
     this.controlsVisible = false,
     this.autoSkip = false,
     this.autoPlayNext = true,
@@ -48,6 +49,9 @@ class PlayerSkipOverlay extends StatefulWidget {
   final String? nextEpisodeImageUrl;
   final ValueChanged<Duration> onSeek;
   final VoidCallback onPlayNext;
+
+  /// Countdown abgelaufen (nicht geklickt); sonst wie [onPlayNext].
+  final VoidCallback? onAutoPlayNext;
 
   /// Wenn die Bedienleiste sichtbar ist, rutscht das Overlay etwas höher.
   final bool controlsVisible;
@@ -131,6 +135,7 @@ class _PlayerSkipOverlayState extends State<PlayerSkipOverlay> {
                 countdown: widget.autoPlayNext,
                 imageUrl: widget.nextEpisodeImageUrl,
                 onPlay: widget.onPlayNext,
+                onAutoPlay: widget.onAutoPlayNext ?? widget.onPlayNext,
                 onDismiss: () => setState(() => _nextUpDismissed = true),
               )
             : skip != null
@@ -195,6 +200,7 @@ class _NextEpisodeCard extends StatefulWidget {
     required this.episode,
     required this.imageUrl,
     required this.onPlay,
+    required this.onAutoPlay,
     required this.onDismiss,
     this.countdown = true,
   });
@@ -203,6 +209,7 @@ class _NextEpisodeCard extends StatefulWidget {
   final BaseItem episode;
   final String? imageUrl;
   final VoidCallback onPlay;
+  final VoidCallback onAutoPlay;
   final VoidCallback onDismiss;
 
   @override
@@ -212,7 +219,7 @@ class _NextEpisodeCard extends StatefulWidget {
 class _NextEpisodeCardState extends State<_NextEpisodeCard> with SingleTickerProviderStateMixin {
   late final _countdown = AnimationController(vsync: this, duration: const Duration(seconds: 12))
     ..addStatusListener((status) {
-      if (status == AnimationStatus.completed) widget.onPlay();
+      if (status == AnimationStatus.completed) widget.onAutoPlay();
     });
 
   @override
@@ -286,7 +293,7 @@ class _NextEpisodeCardState extends State<_NextEpisodeCard> with SingleTickerPro
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  tr.nextEpisodeCaps,
+                  ep.isEpisode ? tr.nextEpisodeCaps : tr.upNextCaps,
                   style: TextStyle(
                     fontSize: 11.5,
                     letterSpacing: 1.2,

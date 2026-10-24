@@ -554,7 +554,7 @@ final class _Fr extends S {
   @override
   String get alreadyWatched => 'Déjà vu';
   @override
-  String get forget => 'Oublier';
+  String get forget => 'Retirer de « Reprendre »';
   @override
   String get download => 'Télécharger';
   @override
@@ -1330,4 +1330,25 @@ final class _Fr extends S {
   String get serversFound => 'Trouvé sur le réseau local';
   @override
   String get searchAgain => 'Chercher à nouveau';
+
+  // --- Player: Lautstärke, Schaust du noch?, Zufällig ---
+  @override
+  String get stillWatching => 'Vous regardez toujours ?';
+  @override
+  String stillWatchingHint(String next) => 'Plusieurs épisodes à la suite. Ensuite : $next';
+  @override
+  String get shuffle => 'Aléatoire';
+  @override
+  String get shufflePlay => 'Lecture aléatoire';
+  @override
+  String get nothingToShuffle => 'Rien à lire ici';
+  @override
+  String get upNextCaps => 'À SUIVRE';
+
+  // --- Szenen-Vorschau auf Karten ---
+  @override
+  String get hoverPreview => 'Aperçu des scènes sur les cartes';
+  @override
+  String get hoverPreviewHint =>
+      'Quand vous vous arrêtez sur un titre, la carte fait défiler des scènes (images de votre serveur, pas de vidéo).';
 }

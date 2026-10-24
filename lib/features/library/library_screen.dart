@@ -354,6 +354,23 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           runSpacing: 10,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
+                            // Mischt die ganze Bibliothek (Filme bzw. Folgen) – mit "Ungesehen" und Genre.
+                            _ToggleChip(
+                              label: tr.shufflePlay,
+                              icon: Icons.shuffle_rounded,
+                              active: false,
+                              onTap: () => playShuffled(
+                                context,
+                                parentId: widget.libraryId,
+                                includeItemTypes: switch (widget.collectionType) {
+                                  'movies' => 'Movie',
+                                  'tvshows' => 'Episode',
+                                  _ => 'Movie,Episode',
+                                },
+                                unplayedOnly: f.unplayed,
+                                genre: f.genre,
+                              ),
+                            ),
                             _PillMenu<LibrarySort>(
                               icon: Icons.sort_rounded,
                               label: f.sort.label,

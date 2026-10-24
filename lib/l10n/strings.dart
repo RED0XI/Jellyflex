@@ -537,7 +537,7 @@ class S {
   String get playFromStart => _t('Play from the start', 'Von vorne abspielen');
   String get goToSeries => _t('Go to series', 'Zur Serie');
   String get alreadyWatched => _t('Already watched', 'Bereits angeschaut');
-  String get forget => _t('Forget', 'Vergessen');
+  String get forget => _t('Remove from Continue watching', 'Aus Weiterschauen entfernen');
   String get download => _t('Download', 'Herunterladen');
   String get deleteDownload => _t('Delete download', 'Download löschen');
   String markedWatched(String name) => _t('“$name” marked as watched', '„$name“ als angeschaut markiert');
@@ -1056,4 +1056,22 @@ class S {
   );
   String get serversFound => _t('Found in your home network', 'Im Heimnetz gefunden');
   String get searchAgain => _t('Search again', 'Erneut suchen');
+
+  // --- Player: Lautstärke, Schaust du noch?, Zufällig -----------------------
+
+  String get stillWatching => _t('Still watching?', 'Schaust du noch?');
+  String stillWatchingHint(String next) =>
+      _t('Several episodes played in a row. Next up: $next', 'Es liefen mehrere Folgen am Stück. Als Nächstes: $next');
+  String get shuffle => _t('Shuffle', 'Zufällig');
+  String get shufflePlay => _t('Shuffle play', 'Zufällig abspielen');
+  String get nothingToShuffle => _t('Nothing to play here', 'Hier gibt es nichts abzuspielen');
+  String get upNextCaps => _t('UP NEXT', 'ALS NÄCHSTES');
+
+  // --- Szenen-Vorschau auf Karten ------------------------------------------------
+
+  String get hoverPreview => _t('Scene preview on cards', 'Szenen-Vorschau auf Karten');
+  String get hoverPreviewHint => _t(
+    'When you rest on a title, its card flips through scenes (images from your server, no video).',
+    'Verweilst du auf einem Titel, blättert die Karte durch Szenen (Bilder von deinem Server, kein Video).',
+  );
 }

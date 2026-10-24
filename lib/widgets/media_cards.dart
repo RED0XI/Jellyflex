@@ -6,11 +6,14 @@ import '../core/format.dart';
 import '../core/images.dart';
 import '../core/layouts.dart';
 import '../core/models.dart';
+import '../core/play_queue.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import '../features/item_actions.dart';
+import '../l10n/strings.dart';
 import '../theme.dart';
 import 'focusable.dart';
+import 'hover_preview.dart';
 import 'jf_image.dart';
 
 /// Kartengrößen – abhängig vom Layout (siehe [AppLayout.cardScale]).
@@ -35,6 +38,35 @@ void playItem(BuildContext context, BaseItem item, {bool fromStart = false, Stri
   final ticks = item.userData.playbackPositionTicks;
   final query = Uri(queryParameters: {if (!fromStart && ticks > 0) 'start': '$ticks', 'source': ?mediaSourceId}).query;
   context.push('/play/${item.id}${query.isEmpty ? '' : '?$query'}');
+}
+
+/// "Zufällig abspielen": Titel unterhalb von [parentId] mischen und nacheinander abspielen.
+Future<void> playShuffled(
+  BuildContext context, {
+  required String parentId,
+  required String includeItemTypes,
+  bool unplayedOnly = false,
+  String? genre,
+}) async {
+  final api = ProviderScope.containerOf(context).read(apiProvider);
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  final router = GoRouter.of(context);
+  try {
+    final items = await api.getShuffled(
+      parentId,
+      includeItemTypes: includeItemTypes,
+      unplayedOnly: unplayedOnly,
+      genre: genre,
+    );
+    if (items.isEmpty) {
+      messenger?.showSnackBar(SnackBar(content: Text(tr.nothingToShuffle), behavior: SnackBarBehavior.floating));
+      return;
+    }
+    PlayQueue.start([for (final i in items) i.id]);
+    router.push('/play/${items.first.id}?queue=1');
+  } catch (_) {
+    messenger?.showSnackBar(SnackBar(content: Text(tr.didNotWork), behavior: SnackBarBehavior.floating));
+  }
 }
 
 /// Gemeinsame Hover-Logik: leicht vergrößern, Schatten, Rahmen.
@@ -356,6 +388,7 @@ class PosterCard extends ConsumerWidget {
                     blurHash: poster?.blurHash,
                     fallback: _TitleFallback(item.name),
                   ),
+                  HoverPreview(item: item, active: hovered),
                   _Badge(item),
                   if (progressOf(item) case final p?) _ProgressBar(p),
                 ],
@@ -411,6 +444,7 @@ class LandscapeCard extends ConsumerWidget {
                     blurHash: image?.blurHash,
                     fallback: _TitleFallback(cardTitle(item)),
                   ),
+                  HoverPreview(item: item, active: hovered),
                   AnimatedOpacity(
                     opacity: hovered ? 1 : 0,
                     duration: const Duration(milliseconds: 200),
