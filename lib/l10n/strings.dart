@@ -1099,4 +1099,8 @@ class S {
     'Any device in the network can answer – only choose servers you know.',
     'Antworten kann jedes Gerät im Netz – wähle nur Server, die du kennst.',
   );
+
+  // --- Fensterleiste im Vollbild ---
+
+  String get leaveFullscreen => _t('Exit fullscreen (F11)', 'Vollbild beenden (F11)');
 }

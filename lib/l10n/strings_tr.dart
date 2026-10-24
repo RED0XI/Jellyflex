@@ -1357,4 +1357,8 @@ final class _Tr extends S {
   String get outsideHomeNetwork => 'Bu adres ev ağının dışına işaret ediyor – yalnızca tanıyorsan seç.';
   @override
   String get onlyKnownServers => 'Ağdaki her cihaz yanıt verebilir – yalnızca tanıdığın sunucuları seç.';
+
+  // --- Fensterleiste im Vollbild ---
+  @override
+  String get leaveFullscreen => 'Tam ekrandan çık (F11)';
 }

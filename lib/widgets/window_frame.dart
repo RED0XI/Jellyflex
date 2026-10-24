@@ -310,7 +310,7 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
               onPointerDown: (e) {
                 if (e.buttons == kBackMouseButton && showBack) widget.router.pop();
               },
-              child: _buildFrame(showBack),
+              child: _buildFrame(showBack, inPlayer: path.startsWith('/play')),
             ),
           ),
         ),
@@ -318,7 +318,7 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
     );
   }
 
-  Widget _buildFrame(bool showBack) {
+  Widget _buildFrame(bool showBack, {required bool inPlayer}) {
     return Stack(
       children: [
         Positioned.fill(child: widget.child),
@@ -329,61 +329,86 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
           height: kTitleBarHeight,
           child: ListenableBuilder(
             listenable: _chromeVisibility,
-            builder: (context, child) {
-              // Im Vollbild und im Mini-Player keine Fensterknöpfe.
-              final visible = _chromeShown;
-              return AnimatedOpacity(
+            builder: (context, _) {
+              // Leiste ganz weg nur, wenn der Player sie ausblendet oder im Mini-Player.
+              final barVisible = windowChromeVisible.value && !windowMiniPlayer.value;
+              // Im Vollbild bleiben Zurück und "Vollbild beenden" – nur die Fensterknöpfe gehen.
+              final fullscreen = windowFullscreen.value;
+              Widget fade(bool visible, Widget child) => AnimatedOpacity(
                 opacity: visible ? 1 : 0,
                 duration: const Duration(milliseconds: 250),
                 child: IgnorePointer(ignoring: !visible, child: child),
               );
-            },
-            child: Material(
-              type: MaterialType.transparency,
-              child: Row(
-                children: [
-                  // macOS: Platz für die Ampelknöpfe (zum Verschieben des Fensters nutzbar).
-                  if (isMacOS) const DragToMoveArea(child: SizedBox(width: kMacTrafficLightsWidth)),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: showBack
-                        ? _TitleBarButton(
-                            key: const ValueKey('back'),
-                            icon: Icons.arrow_back_rounded,
-                            tooltip: tr.back,
-                            onPressed: () => widget.router.pop(),
-                          )
-                        : const SizedBox(key: ValueKey('none'), width: 8),
-                  ),
-                  const Expanded(child: DragToMoveArea(child: SizedBox.expand())),
-                  if (!isMacOS) ...[
-                    _TitleBarButton(
-                      icon: Icons.remove_rounded,
-                      tooltip: tr.minimize,
-                      onPressed: () => windowManager.minimize(),
+              return Material(
+                type: MaterialType.transparency,
+                child: Row(
+                  children: [
+                    // macOS: Platz für die Ampelknöpfe (zum Verschieben des Fensters nutzbar).
+                    if (isMacOS && !fullscreen) const DragToMoveArea(child: SizedBox(width: kMacTrafficLightsWidth)),
+                    fade(
+                      barVisible,
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: showBack
+                            ? _TitleBarButton(
+                                key: const ValueKey('back'),
+                                icon: Icons.arrow_back_rounded,
+                                tooltip: tr.back,
+                                onPressed: () => widget.router.pop(),
+                              )
+                            : const SizedBox(key: ValueKey('none'), width: 8),
+                      ),
                     ),
-                    _TitleBarButton(
-                      icon: _maximized ? Icons.filter_none_rounded : Icons.crop_square_rounded,
-                      iconSize: _maximized ? 14 : 16,
-                      tooltip: _maximized ? tr.restore : tr.maximize,
-                      onPressed: () async {
-                        if (await windowManager.isMaximized()) {
-                          await windowManager.unmaximize();
-                        } else {
-                          await windowManager.maximize();
-                        }
-                      },
+                    Expanded(
+                      child: fullscreen ? const SizedBox.expand() : const DragToMoveArea(child: SizedBox.expand()),
                     ),
-                    _TitleBarButton(
-                      icon: Icons.close_rounded,
-                      tooltip: tr.close,
-                      hoverColor: const Color(0xFFE81123),
-                      onPressed: () => windowManager.close(),
-                    ),
+                    // Der Player hat seinen eigenen Vollbild-Knopf.
+                    if (fullscreen && !inPlayer)
+                      fade(
+                        barVisible,
+                        _TitleBarButton(
+                          icon: Icons.fullscreen_exit_rounded,
+                          iconSize: 20,
+                          tooltip: tr.leaveFullscreen,
+                          onPressed: () => setWindowFullscreen(false),
+                        ),
+                      )
+                    else if (!isMacOS && !fullscreen)
+                      fade(
+                        _chromeShown,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _TitleBarButton(
+                              icon: Icons.remove_rounded,
+                              tooltip: tr.minimize,
+                              onPressed: () => windowManager.minimize(),
+                            ),
+                            _TitleBarButton(
+                              icon: _maximized ? Icons.filter_none_rounded : Icons.crop_square_rounded,
+                              iconSize: _maximized ? 14 : 16,
+                              tooltip: _maximized ? tr.restore : tr.maximize,
+                              onPressed: () async {
+                                if (await windowManager.isMaximized()) {
+                                  await windowManager.unmaximize();
+                                } else {
+                                  await windowManager.maximize();
+                                }
+                              },
+                            ),
+                            _TitleBarButton(
+                              icon: Icons.close_rounded,
+                              tooltip: tr.close,
+                              hoverColor: const Color(0xFFE81123),
+                              onPressed: () => windowManager.close(),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ),
       ],

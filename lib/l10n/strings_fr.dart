@@ -1372,4 +1372,8 @@ final class _Fr extends S {
   @override
   String get onlyKnownServers =>
       'Tout appareil du réseau peut répondre – ne choisissez que des serveurs que vous connaissez.';
+
+  // --- Fensterleiste im Vollbild ---
+  @override
+  String get leaveFullscreen => 'Quitter le plein écran (F11)';
 }

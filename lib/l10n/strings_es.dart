@@ -1366,4 +1366,8 @@ final class _Es extends S {
   String get outsideHomeNetwork => 'Esta dirección apunta fuera de tu red local; elígela solo si la conoces.';
   @override
   String get onlyKnownServers => 'Cualquier dispositivo de la red puede responder; elige solo servidores que conozcas.';
+
+  // --- Fensterleiste im Vollbild ---
+  @override
+  String get leaveFullscreen => 'Salir de pantalla completa (F11)';
 }
