@@ -37,14 +37,15 @@ Jellyfin server you can sign in to.
    - **Windows:** run the installer. No admin rights needed.
      If Windows shows *"Windows protected your PC"*, click **More info → Run anyway**
      (the installer isn't signed with a paid Microsoft certificate).
-   - **macOS:** open the `.dmg` and drag **Jellyflex** into **Applications**. The app is signed
-     and notarized by Apple, so it opens without warnings.
+   - **macOS:** open the `.dmg` and drag **Jellyflex** into **Applications**. Once Mac releases
+     are published they will be signed and notarized by Apple. A version you build yourself is
+     not – macOS warns the first time, so right-click the app → **Open**.
 3. Start Jellyflex, enter your server address (for example `https://jellyfin.example.com`)
    and sign in – with your password or **Quick Connect**.
 
 That's it. To get new versions automatically offered, turn on
-**Settings → About Jellyflex → Look for updates**. Both versions are released together, so
-Windows and macOS always get the same features and fixes at the same time.
+**Settings → About Jellyflex → Look for updates**. Windows and macOS share the same code, so
+both get the same features and fixes.
 To uninstall: Windows Settings → Apps → Jellyflex, or on macOS drag Jellyflex from
 Applications to the Trash.
 
