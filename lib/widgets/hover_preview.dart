@@ -158,7 +158,8 @@ class _ScenePreview extends _Preview {
   @override
   int get length => frames.length;
 
-  ImageProvider _tile(JellyfinApi api, int tile) => NetworkImage(
+  // Wie alle Bilder: mit Größengrenze, ohne Weiterleitung zu fremden Servern, auf der Platte gemerkt.
+  ImageProvider _tile(JellyfinApi api, int tile) => CachedNetworkImage(
     api.trickplayTileUrl(itemId, sourceId, info.width, tile),
     headers: {'Authorization': api.authorizationHeader},
   );

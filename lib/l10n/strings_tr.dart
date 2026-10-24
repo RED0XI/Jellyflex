@@ -1349,4 +1349,12 @@ final class _Tr extends S {
   String get licenses => 'Lisanslar';
   @override
   String get licenseLegalese => 'GNU General Public License v3.0 altında özgür yazılım.';
+
+  // --- Heimnetz-Suche: Hinweise ---
+  @override
+  String answeredBy(String ip) => 'Yanıt veren: $ip';
+  @override
+  String get outsideHomeNetwork => 'Bu adres ev ağının dışına işaret ediyor – yalnızca tanıyorsan seç.';
+  @override
+  String get onlyKnownServers => 'Ağdaki her cihaz yanıt verebilir – yalnızca tanıdığın sunucuları seç.';
 }

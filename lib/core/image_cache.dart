@@ -40,13 +40,14 @@ class ImageDiskCache {
   Future<void>? _trimming;
 
   /// Bild laden: von der Festplatte, sonst vom Server (und dann speichern).
-  Future<Uint8List> load(String url) async {
+  /// [headers] z. B. für die Anmeldung bei Bildern, die sie verlangen (Trickplay).
+  Future<Uint8List> load(String url, {Map<String, String> headers = const {}}) async {
     final file = _fileFor(url);
     if (maxBytes > 0) {
       final cached = await _read(file, url);
       if (cached != null) return cached;
     }
-    final bytes = await _download(url);
+    final bytes = await _download(url, headers);
     if (maxBytes > 0) unawaited(_write(file, url, bytes));
     return bytes;
   }
@@ -121,9 +122,26 @@ class ImageDiskCache {
     } catch (_) {}
   }
 
-  Future<Uint8List> _download(String url) async {
-    final request = await _client.getUrl(Uri.parse(url));
-    final response = await request.close().timeout(const Duration(seconds: 30));
+  Future<Uint8List> _download(String url, Map<String, String> headers) async {
+    final origin = Uri.parse(url);
+    var uri = origin;
+    HttpClientResponse response;
+    // Weiterleitungen nur innerhalb desselben Servers – Bilder sollen nie bei anderen Diensten
+    // landen (die so erfahren könnten, was man sich gerade ansieht).
+    for (var hops = 0; ; hops++) {
+      final request = await _client.getUrl(uri);
+      request.followRedirects = false;
+      headers.forEach(request.headers.set);
+      response = await request.close().timeout(const Duration(seconds: 30));
+      if (!response.isRedirect) break;
+      final location = response.headers.value(HttpHeaders.locationHeader);
+      await response.drain<void>().catchError((_) {});
+      final next = location == null ? null : uri.resolve(location);
+      if (next == null || hops >= 3 || !_sameOrigin(next, origin)) {
+        throw NetworkImageLoadException(statusCode: response.statusCode, uri: uri);
+      }
+      uri = next;
+    }
     if (response.statusCode != HttpStatus.ok) {
       await response.drain<void>().catchError((_) {});
       throw NetworkImageLoadException(statusCode: response.statusCode, uri: Uri.parse(url));
@@ -139,6 +157,8 @@ class ImageDiskCache {
     }
     return builder.takeBytes();
   }
+
+  static bool _sameOrigin(Uri a, Uri b) => a.scheme == b.scheme && a.host == b.host && a.port == b.port;
 
   Future<void> _write(File file, String url, Uint8List bytes) async {
     try {
@@ -195,9 +215,12 @@ class ImageDiskCache {
 /// direkt von der Festplatte kommen.
 @immutable
 class CachedNetworkImage extends ImageProvider<CachedNetworkImage> {
-  const CachedNetworkImage(this.url);
+  const CachedNetworkImage(this.url, {this.headers = const {}});
 
   final String url;
+
+  /// Zusätzliche Kopfzeilen (z. B. Anmeldung); gehören nicht zum Schlüssel des Bildes.
+  final Map<String, String> headers;
 
   @override
   Future<CachedNetworkImage> obtainKey(ImageConfiguration configuration) => SynchronousFuture(this);
@@ -208,7 +231,7 @@ class CachedNetworkImage extends ImageProvider<CachedNetworkImage> {
 
   Future<ui.Codec> _load(CachedNetworkImage key, ImageDecoderCallback decode) async {
     try {
-      final bytes = await ImageDiskCache.instance.load(url);
+      final bytes = await ImageDiskCache.instance.load(url, headers: headers);
       if (bytes.isEmpty) throw StateError('Leeres Bild');
       return await decode(await ui.ImmutableBuffer.fromUint8List(bytes));
     } catch (_) {

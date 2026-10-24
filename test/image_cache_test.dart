@@ -23,6 +23,20 @@ void main() {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((req) async {
       requests++;
+      // Weiterleitungen: auf denselben Server bzw. zu einem fremden (localhost ≠ 127.0.0.1).
+      if (req.uri.path == '/same') {
+        await req.response.redirect(Uri.parse('/target?size=10'));
+        return;
+      }
+      if (req.uri.path == '/foreign') {
+        await req.response.redirect(Uri.parse('http://localhost:${server.port}/target?size=10'));
+        return;
+      }
+      if (req.uri.path == '/auth' && req.headers.value('authorization') != 'Token x') {
+        req.response.statusCode = 401;
+        await req.response.close();
+        return;
+      }
       final size = int.tryParse(req.uri.queryParameters['size'] ?? '') ?? 1000;
       if (req.uri.path == '/missing') req.response.statusCode = 404;
       if (req.uri.path != '/missing') req.response.add(Uint8List(size)..fillRange(0, size, req.uri.path.length));
@@ -74,6 +88,13 @@ void main() {
     await expectLater(cache.load(url('/riesig', ImageDiskCache.maxImageBytes + 10)), throwsA(anything));
     await settle();
     expect(await cache.sizeBytes(), 0);
+  });
+
+  test('Weiterleitung nur auf denselben Server; Anmeldung wird mitgeschickt', () async {
+    expect(await cache.load(url('/same')), hasLength(10));
+    await expectLater(cache.load(url('/foreign')), throwsA(isA<Exception>()));
+    await expectLater(cache.load(url('/auth')), throwsA(isA<Exception>()));
+    expect(await cache.load(url('/auth', 7), headers: {'Authorization': 'Token x'}), hasLength(7));
   });
 
   test('Leeren löscht alles', () async {

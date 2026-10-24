@@ -1087,4 +1087,16 @@ class S {
     'Free software under the GNU General Public License v3.0.',
     'Freie Software unter der GNU General Public License v3.0.',
   );
+
+  // --- Heimnetz-Suche: Hinweise ------------------------------------------------
+
+  String answeredBy(String ip) => _t('Answered by $ip', 'Geantwortet hat $ip');
+  String get outsideHomeNetwork => _t(
+    'This address points outside your home network – only choose it if you know it.',
+    'Diese Adresse zeigt aus dem Heimnetz hinaus – nur wählen, wenn du sie kennst.',
+  );
+  String get onlyKnownServers => _t(
+    'Any device in the network can answer – only choose servers you know.',
+    'Antworten kann jedes Gerät im Netz – wähle nur Server, die du kennst.',
+  );
 }

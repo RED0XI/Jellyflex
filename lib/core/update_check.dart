@@ -34,6 +34,20 @@ abstract final class UpdateCheck {
   /// Downloads nur von hier (die Signatur ist trotzdem die eigentliche Prüfung).
   static const _assetPrefix = 'https://github.com/RED0XI/Jellyflex/releases/download/';
 
+  /// macOS: Kennung und Apple-Team der echten Jellyflex-App. Ein Update muss genau damit
+  /// signiert sein – irgendeine gültig signierte App reicht nicht. Team-ID eintragen, sobald
+  /// die Mac-Releases mit dem eigenen Entwicklerkonto signiert werden.
+  static const macBundleId = 'io.github.red0xi.jellyflex';
+  static const macTeamId = '';
+
+  /// Anforderung für `codesign --verify -R`.
+  @visibleForTesting
+  static String get macCodeRequirement => [
+    'anchor apple generic',
+    'identifier "$macBundleId"',
+    if (macTeamId.isNotEmpty) 'certificate leaf[subject.OU] = "$macTeamId"',
+  ].join(' and ');
+
   /// Neueste veröffentlichte Version (z. B. "0.3.0") oder `null`, falls
   /// nicht ermittelbar.
   static Future<String?> latestVersion({String url = feedUrl}) async => (await latestRelease(url: url))?.version;
@@ -155,6 +169,8 @@ abstract final class UpdateCheck {
       final data = await fetch(installerUrl, 500 * 1024 * 1024, progress: true);
       if (!await verify(data, signature, publicKey: publicKey)) return null;
       await file.writeAsBytes(data, flush: true);
+      // Signatur daneben behalten: vor dem Ausführen wird noch einmal geprüft.
+      await File('${file.path}.sig').writeAsString(signature, flush: true);
       return file;
     } catch (_) {
       return null;
@@ -163,10 +179,27 @@ abstract final class UpdateCheck {
     }
   }
 
+  /// Datei noch einmal gegen die beim Download gespeicherte Signatur prüfen.
+  @visibleForTesting
+  static Future<bool> stillVerified(File package, {String publicKey = signingPublicKey}) async {
+    try {
+      final signature = await File('${package.path}.sig').readAsString();
+      return await verify(await package.readAsBytes(), signature, publicKey: publicKey);
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Geprüften Installer still (ohne Fragen) starten; die App beendet sich gleich danach.
   /// [relaunch]: Jellyflex nach dem Update wieder öffnen (sonst bleibt sie zu – z. B.
   /// beim Installieren während des Beendens).
   static Future<void> runInstaller(File installer, {bool relaunch = true}) async {
+    // Zwischen Download und Installation (z. B. erst beim Beenden) könnte die Datei
+    // ausgetauscht worden sein – deshalb unmittelbar davor noch einmal prüfen.
+    if (!await stillVerified(installer)) {
+      debugPrint('Update verworfen: Signatur passt nicht mehr');
+      return;
+    }
     if (Platform.isMacOS) return _replaceMacApp(installer, relaunch: relaunch);
     final script = File(AppPaths.join(installer.parent.path, 'run_update.cmd'));
     await script.writeAsString(installScript(installer.path, relaunch: relaunch, allUsers: _installedForAllUsers));
@@ -192,7 +225,13 @@ abstract final class UpdateCheck {
       return;
     }
     // Zweite Sicherung neben der Ed25519-Signatur: die App selbst muss unverändert signiert sein.
-    final codesign = await Process.run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app]);
+    final codesign = await Process.run('/usr/bin/codesign', [
+      '--verify',
+      '--deep',
+      '--strict',
+      '-R=$macCodeRequirement',
+      app,
+    ]);
     if (codesign.exitCode != 0) {
       debugPrint('Update-Signatur der App ungültig: ${codesign.stderr}');
       return;

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../../core/format.dart';
+import '../../core/image_cache.dart';
 import '../../core/models.dart';
 import '../../core/settings.dart';
 import '../../theme.dart';
@@ -393,7 +394,7 @@ class TrickplayPreview extends StatelessWidget {
             child: Transform.translate(
               offset: Offset(-col * width, -row * height),
               child: Image(
-                image: NetworkImage(tileUrl(tile), headers: headers),
+                image: CachedNetworkImage(tileUrl(tile), headers: headers),
                 width: width * info.tileWidth,
                 height: height * info.tileHeight,
                 fit: BoxFit.fill,

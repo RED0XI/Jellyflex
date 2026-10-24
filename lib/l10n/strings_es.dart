@@ -1358,4 +1358,12 @@ final class _Es extends S {
   String get licenses => 'Licencias';
   @override
   String get licenseLegalese => 'Software libre bajo la GNU General Public License v3.0.';
+
+  // --- Heimnetz-Suche: Hinweise ---
+  @override
+  String answeredBy(String ip) => 'Respondió $ip';
+  @override
+  String get outsideHomeNetwork => 'Esta dirección apunta fuera de tu red local; elígela solo si la conoces.';
+  @override
+  String get onlyKnownServers => 'Cualquier dispositivo de la red puede responder; elige solo servidores que conozcas.';
 }

@@ -1362,4 +1362,14 @@ final class _Fr extends S {
   String get licenses => 'Licences';
   @override
   String get licenseLegalese => 'Logiciel libre sous GNU General Public License v3.0.';
+
+  // --- Heimnetz-Suche: Hinweise ---
+  @override
+  String answeredBy(String ip) => 'Réponse de $ip';
+  @override
+  String get outsideHomeNetwork =>
+      'Cette adresse mène hors de votre réseau local – ne la choisissez que si vous la connaissez.';
+  @override
+  String get onlyKnownServers =>
+      'Tout appareil du réseau peut répondre – ne choisissez que des serveurs que vous connaissez.';
 }

@@ -376,6 +376,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             tr.serversFound,
             style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
           ),
+          Text(tr.onlyKnownServers, style: TextStyle(color: AppColors.textMuted, fontSize: 12.5)),
           const SizedBox(height: 8),
           for (final server in found)
             Focusable(
@@ -400,6 +401,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         children: [
                           Text(server.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                           Text(server.address, style: TextStyle(color: AppColors.textMuted, fontSize: 12.5)),
+                          if (server.responder.isNotEmpty)
+                            Text(
+                              tr.answeredBy(server.responder),
+                              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                            ),
+                          // Adresse im Internet, obwohl ein Gerät im Heimnetz geantwortet hat.
+                          if (!server.inHomeNetwork)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFFFC14D)),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      tr.outsideHomeNetwork,
+                                      style: const TextStyle(color: Color(0xFFFFC14D), fontSize: 12),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -472,6 +495,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     '${server.name} · Jellyfin ${server.version}',
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                   ),
+                  // Die echte Adresse – der Name oben kommt vom Server selbst und beweist nichts.
+                  Text(server.url, style: TextStyle(color: AppColors.textMuted, fontSize: 12.5)),
                 ],
               ),
             ),

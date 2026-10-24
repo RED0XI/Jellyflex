@@ -67,6 +67,11 @@ void main() {
     expect(quiet, isNot(contains('open ')), reason: 'Beim Beenden nicht wieder öffnen');
   });
 
+  test('macOS: Update muss von Apple signiert sein und die Kennung von Jellyflex tragen', () {
+    expect(UpdateCheck.macCodeRequirement, contains('anchor apple generic'));
+    expect(UpdateCheck.macCodeRequirement, contains('identifier "io.github.red0xi.jellyflex"'));
+  });
+
   test('Paketname je Betriebssystem', () {
     expect(UpdateCheck.packageName('1.2.3', macOS: false), 'Jellyflex-Setup-1.2.3.exe');
     expect(UpdateCheck.packageName('1.2.3', macOS: true), 'Jellyflex-1.2.3-macOS.zip');
@@ -90,6 +95,10 @@ void main() {
       final ok = await UpdateCheck.downloadVerified(release, publicKey: publicKey);
       expect(ok, isNotNull);
       expect(ok!.readAsBytesSync(), installer);
+      // Vor dem Installieren wird noch einmal geprüft – ausgetauscht ist sie wertlos.
+      expect(await UpdateCheck.stillVerified(ok, publicKey: publicKey), isTrue);
+      ok.writeAsBytesSync([...installer, 9], flush: true);
+      expect(await UpdateCheck.stillVerified(ok, publicKey: publicKey), isFalse);
       ok.deleteSync();
 
       // Ausgetauschter Installer (Signatur passt nicht mehr) → nichts.
