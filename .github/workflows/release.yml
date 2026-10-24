@@ -1,0 +1,142 @@
+# Veröffentlicht eine neue Version für Windows UND macOS in einem GitHub-Release.
+#
+# Ablauf:  Version in pubspec.yaml und lib/core/version.dart erhöhen, committen, dann
+#            git tag v0.4.0 && git push origin v0.4.0
+#          → beide Versionen werden gebaut, getestet, signiert (macOS auch von Apple
+#            notarisiert) und zusammen veröffentlicht. Die App bietet das Update dann
+#            auf beiden Systemen an.
+#
+# Benötigte Secrets (Settings → Secrets and variables → Actions):
+#   JELLYFLEX_UPDATE_SIGNING_KEY  Inhalt von update_signing_key.json (Ed25519, tool/sign_update.dart)
+#   MACOS_CERTIFICATE             "Developer ID Application"-Zertifikat als .p12, base64-kodiert
+#   MACOS_CERTIFICATE_PASSWORD    Passwort der .p12-Datei
+#   APPLE_ID                      Apple-ID des Developer-Accounts
+#   APPLE_TEAM_ID                 Team-ID (10 Zeichen, developer.apple.com → Membership)
+#   APPLE_APP_PASSWORD            App-spezifisches Passwort (appleid.apple.com)
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  # Probelauf ohne Veröffentlichung: baut beide Pakete und legt sie als Artefakte ab.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.47.8'
+
+jobs:
+  version:
+    name: Version prüfen
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version:[[:space:]]*\([0-9.]*\).*/\1/p' pubspec.yaml)
+          grep -q "appVersion = '$version'" lib/core/version.dart \
+            || { echo "::error::lib/core/version.dart passt nicht zu pubspec.yaml ($version)"; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME passt nicht zur Version $version in pubspec.yaml"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  windows:
+    name: Windows
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter test
+      - name: Inno Setup installieren
+        run: choco install innosetup --no-progress -y
+      - name: Installer bauen und signieren
+        env:
+          JELLYFLEX_UPDATE_SIGNING_KEY: ${{ secrets.JELLYFLEX_UPDATE_SIGNING_KEY }}
+        run: powershell -ExecutionPolicy Bypass -File tool/build_installer.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+          if-no-files-found: error
+
+  macos:
+    name: macOS
+    needs: version
+    runs-on: macos-latest
+    env:
+      HAS_MAC_CERT: ${{ secrets.MACOS_CERTIFICATE != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter test
+      - name: Developer-ID-Zertifikat in einen temporären Schlüsselbund laden
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        if: env.HAS_MAC_CERT == 'true'
+        run: |
+          keychain="$RUNNER_TEMP/build.keychain-db"
+          password=$(openssl rand -base64 24)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          identity=$(security find-identity -v -p codesigning "$keychain" | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -1)
+          [ -n "$identity" ] || { echo "::error::Kein 'Developer ID Application'-Zertifikat gefunden"; exit 1; }
+          echo "MACOS_SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+      - name: App bauen, signieren, notarisieren
+        env:
+          JELLYFLEX_UPDATE_SIGNING_KEY: ${{ secrets.JELLYFLEX_UPDATE_SIGNING_KEY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: tool/build_macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Veröffentlichen
+    if: github.ref_type == 'tag'
+    needs: [version, windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Release mit beiden Versionen anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          ls -l dist
+          # Ohne Signaturen könnte die App die Updates nicht selbst installieren.
+          for f in "dist/Jellyflex-Setup-$VERSION.exe.sig" "dist/Jellyflex-$VERSION-macOS.zip.sig"; do
+            [ -f "$f" ] || { echo "::error::$f fehlt (Secret JELLYFLEX_UPDATE_SIGNING_KEY gesetzt?)"; exit 1; }
+          done
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "Jellyflex $VERSION" --generate-notes

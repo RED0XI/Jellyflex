@@ -19,7 +19,8 @@ const _session = AuthSession(
 
 void main() {
   test('Fehlerbericht enthält keine persönlichen Angaben', () {
-    final profile = Platform.environment['USERPROFILE'] ?? r'C:\Users\Test';
+    // Echter Benutzerordner dieses Rechners (Windows: %USERPROFILE%, macOS: $HOME).
+    final profile = Platform.environment[Platform.isWindows ? 'USERPROFILE' : 'HOME']!;
     final report = buildErrorReport(
       settings: const AppSettings(),
       session: _session,
@@ -45,7 +46,7 @@ void main() {
       expect(report.contains(secret), isFalse, reason: secret);
     }
     expect(report, contains('App version: $appVersion'));
-    expect(report, contains('%USERPROFILE%'));
+    expect(report, contains(Platform.isWindows ? '%USERPROFILE%' : '~'));
     expect(report, contains('<server>'));
   });
 

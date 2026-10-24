@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/scheduler.dart';
@@ -81,8 +83,15 @@ Future<Rect> _workAreaAround(Offset point) async {
   }
 }
 
+/// Läuft die App unter macOS? (Dort gibt es die Ampelknöpfe des Systems und ⌘-Kürzel.)
+final bool isMacOS = Platform.isMacOS;
+
+/// Platz links für die Ampelknöpfe von macOS (Schließen, Minimieren, Zoomen).
+const double kMacTrafficLightsWidth = 76;
+
 /// Legt eine schlanke, transparente Titelleiste über jede Seite:
 /// links ein Zurück-Pfeil, rechts Minimieren/Maximieren/Schließen.
+/// Unter macOS übernehmen die Ampelknöpfe links diese Aufgabe.
 class WindowFrame extends StatefulWidget {
   const WindowFrame({super.key, required this.router, required this.child});
 
@@ -115,10 +124,25 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
     windowManager.isMaximized().then((v) {
       if (mounted) setState(() => _maximized = v);
     });
+    if (isMacOS) _chromeVisibility.addListener(_syncMacButtons);
+  }
+
+  /// Ob die Fensterleiste gerade zu sehen ist (nicht im Player, Vollbild, Mini-Player).
+  late final _chromeVisibility = Listenable.merge([windowChromeVisible, windowFullscreen, windowMiniPlayer]);
+  bool get _chromeShown => windowChromeVisible.value && !windowFullscreen.value && !windowMiniPlayer.value;
+
+  /// macOS: Ampelknöpfe mit der übrigen Fensterleiste ein- und ausblenden.
+  bool? _macButtonsShown;
+  void _syncMacButtons() {
+    final show = _chromeShown;
+    if (show == _macButtonsShown) return;
+    _macButtonsShown = show;
+    windowManager.setTitleBarStyle(TitleBarStyle.hidden, windowButtonVisibility: show).catchError((_) {});
   }
 
   @override
   void dispose() {
+    if (isMacOS) _chromeVisibility.removeListener(_syncMacButtons);
     windowManager.removeListener(this);
     widget.router.routerDelegate.removeListener(_onRouteChanged);
     GamepadInput.stop();
@@ -220,25 +244,32 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
 
     final loggedInArea = path != '/login' && path != '/splash';
 
+    void openSearch() {
+      if (loggedInArea && !path.startsWith('/play') && path != '/search') widget.router.push('/search');
+    }
+
+    void openSettings() {
+      if (loggedInArea && !path.startsWith('/play') && path != '/settings') widget.router.push('/settings');
+    }
+
     return CallbackShortcuts(
       bindings: {
-        // Strg+F öffnet überall (außer im Player) die Suche.
-        const SingleActivator(LogicalKeyboardKey.keyF, control: true): () {
-          if (loggedInArea && !path.startsWith('/play') && path != '/search') widget.router.push('/search');
-        },
-        // Strg+, öffnet die Einstellungen.
-        const SingleActivator(LogicalKeyboardKey.comma, control: true): () {
-          if (loggedInArea && !path.startsWith('/play') && path != '/settings') widget.router.push('/settings');
-        },
-        // F11 schaltet überall Vollbild um.
+        // Strg+F (macOS: ⌘F) öffnet überall (außer im Player) die Suche.
+        SingleActivator(LogicalKeyboardKey.keyF, control: !isMacOS, meta: isMacOS): openSearch,
+        // Strg+, (macOS: ⌘,) öffnet die Einstellungen.
+        SingleActivator(LogicalKeyboardKey.comma, control: !isMacOS, meta: isMacOS): openSettings,
+        // F11 (macOS: ⌃⌘F wie überall auf dem Mac) schaltet überall Vollbild um.
         const SingleActivator(LogicalKeyboardKey.f11): toggleWindowFullscreen,
+        if (isMacOS) const SingleActivator(LogicalKeyboardKey.keyF, control: true, meta: true): toggleWindowFullscreen,
       },
       // Esc und Alt+← nur abfangen, wenn sie hier etwas bewirken – sonst bleiben sie
       // für Menüs, Dialoge usw. (z. B. Esc schließt ein Kontextmenü).
       child: Shortcuts(
-        shortcuts: const {
-          SingleActivator(LogicalKeyboardKey.escape): _ExitFullscreenIntent(),
-          SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): _GoBackIntent(),
+        shortcuts: {
+          const SingleActivator(LogicalKeyboardKey.escape): const _ExitFullscreenIntent(),
+          const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): const _GoBackIntent(),
+          // macOS-üblich: ⌘[ geht zurück.
+          if (isMacOS) const SingleActivator(LogicalKeyboardKey.bracketLeft, meta: true): const _GoBackIntent(),
         },
         child: Actions(
           actions: {
@@ -284,10 +315,10 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
           right: 0,
           height: kTitleBarHeight,
           child: ListenableBuilder(
-            listenable: Listenable.merge([windowChromeVisible, windowFullscreen, windowMiniPlayer]),
+            listenable: _chromeVisibility,
             builder: (context, child) {
               // Im Vollbild und im Mini-Player keine Fensterknöpfe.
-              final visible = windowChromeVisible.value && !windowFullscreen.value && !windowMiniPlayer.value;
+              final visible = _chromeShown;
               return AnimatedOpacity(
                 opacity: visible ? 1 : 0,
                 duration: const Duration(milliseconds: 250),
@@ -298,6 +329,8 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
               type: MaterialType.transparency,
               child: Row(
                 children: [
+                  // macOS: Platz für die Ampelknöpfe (zum Verschieben des Fensters nutzbar).
+                  if (isMacOS) const DragToMoveArea(child: SizedBox(width: kMacTrafficLightsWidth)),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
                     child: showBack
@@ -310,29 +343,31 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
                         : const SizedBox(key: ValueKey('none'), width: 8),
                   ),
                   const Expanded(child: DragToMoveArea(child: SizedBox.expand())),
-                  _TitleBarButton(
-                    icon: Icons.remove_rounded,
-                    tooltip: tr.minimize,
-                    onPressed: () => windowManager.minimize(),
-                  ),
-                  _TitleBarButton(
-                    icon: _maximized ? Icons.filter_none_rounded : Icons.crop_square_rounded,
-                    iconSize: _maximized ? 14 : 16,
-                    tooltip: _maximized ? tr.restore : tr.maximize,
-                    onPressed: () async {
-                      if (await windowManager.isMaximized()) {
-                        await windowManager.unmaximize();
-                      } else {
-                        await windowManager.maximize();
-                      }
-                    },
-                  ),
-                  _TitleBarButton(
-                    icon: Icons.close_rounded,
-                    tooltip: tr.close,
-                    hoverColor: const Color(0xFFE81123),
-                    onPressed: () => windowManager.close(),
-                  ),
+                  if (!isMacOS) ...[
+                    _TitleBarButton(
+                      icon: Icons.remove_rounded,
+                      tooltip: tr.minimize,
+                      onPressed: () => windowManager.minimize(),
+                    ),
+                    _TitleBarButton(
+                      icon: _maximized ? Icons.filter_none_rounded : Icons.crop_square_rounded,
+                      iconSize: _maximized ? 14 : 16,
+                      tooltip: _maximized ? tr.restore : tr.maximize,
+                      onPressed: () async {
+                        if (await windowManager.isMaximized()) {
+                          await windowManager.unmaximize();
+                        } else {
+                          await windowManager.maximize();
+                        }
+                      },
+                    ),
+                    _TitleBarButton(
+                      icon: Icons.close_rounded,
+                      tooltip: tr.close,
+                      hoverColor: const Color(0xFFE81123),
+                      onPressed: () => windowManager.close(),
+                    ),
+                  ],
                 ],
               ),
             ),

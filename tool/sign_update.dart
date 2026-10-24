@@ -1,22 +1,42 @@
-// Signiert einen Installer, damit die App ein Update vor dem Starten prüfen kann.
+// Signiert ein Update-Paket (Windows-Installer oder macOS-Zip), damit die App es vor
+// dem Installieren prüfen kann.
 //
 // Einmalig einen Schlüssel anlegen:   dart run tool/sign_update.dart --new-key
-//   → legt den geheimen Schlüssel unter %APPDATA%\JellyflexRelease ab und zeigt den
+//   → legt den geheimen Schlüssel unter %APPDATA%\JellyflexRelease (macOS:
+//     ~/Library/Application Support/JellyflexRelease) ab und zeigt den
 //     öffentlichen Schlüssel, der in lib/core/update_check.dart (signingPublicKey) gehört.
 //     Den geheimen Schlüssel sichern (z. B. USB-Stick) und NIE weitergeben oder einchecken:
 //     Ohne ihn lassen sich keine Updates mehr signieren, mit ihm könnte jeder "Updates" bauen.
 //
 // Installer signieren:                dart run tool/sign_update.dart dist\Jellyflex-Setup-0.3.0.exe
 //   → schreibt dist\Jellyflex-Setup-0.3.0.exe.sig (gehört mit in das GitHub-Release).
-//   (tool/build_installer.ps1 macht das automatisch, wenn ein Schlüssel da ist.)
+//   (tool/build_installer.ps1 und tool/build_macos.sh machen das automatisch, wenn ein
+//   Schlüssel da ist.)
+//
+// GitHub Actions: Inhalt der Schlüsseldatei als Secret JELLYFLEX_UPDATE_SIGNING_KEY –
+//   die Umgebungsvariable hat Vorrang vor der Datei.
 
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:cryptography/cryptography.dart';
 
-File get _keyFile =>
-    File('${Platform.environment['APPDATA'] ?? Directory.systemTemp.path}\\JellyflexRelease\\update_signing_key.json');
+const _keyEnv = 'JELLYFLEX_UPDATE_SIGNING_KEY';
+
+File get _keyFile {
+  final sep = Platform.pathSeparator;
+  final base = Platform.isWindows
+      ? Platform.environment['APPDATA']
+      : '${Platform.environment['HOME']}/Library/Application Support';
+  return File('${base ?? Directory.systemTemp.path}${sep}JellyflexRelease${sep}update_signing_key.json');
+}
+
+/// Schlüssel (JSON mit "seed") aus der Umgebung oder der Datei; `null` = keiner da.
+String? _readKey() {
+  final env = Platform.environment[_keyEnv];
+  if (env != null && env.trim().isNotEmpty) return env;
+  return _keyFile.existsSync() ? _keyFile.readAsStringSync() : null;
+}
 
 Future<void> main(List<String> args) async {
   final algorithm = Ed25519();
@@ -37,16 +57,19 @@ Future<void> main(List<String> args) async {
     return;
   }
   if (args.length != 1 || !File(args.first).existsSync()) {
-    stderr.writeln('Aufruf: dart run tool/sign_update.dart <Installer.exe>  |  --new-key');
+    stderr.writeln('Aufruf: dart run tool/sign_update.dart <Paket (.exe/.zip)>  |  --new-key');
     exitCode = 2;
     return;
   }
-  if (!_keyFile.existsSync()) {
-    stderr.writeln('Kein Schlüssel gefunden (${_keyFile.path}). Erst: dart run tool/sign_update.dart --new-key');
+  final raw = _readKey();
+  if (raw == null) {
+    stderr.writeln(
+      'Kein Schlüssel gefunden ($_keyEnv oder ${_keyFile.path}). Erst: dart run tool/sign_update.dart --new-key',
+    );
     exitCode = 1;
     return;
   }
-  final key = jsonDecode(_keyFile.readAsStringSync()) as Map<String, dynamic>;
+  final key = jsonDecode(raw) as Map<String, dynamic>;
   final pair = await algorithm.newKeyPairFromSeed(base64Decode(key['seed'] as String));
   final installer = File(args.first);
   final signature = await algorithm.sign(await installer.readAsBytes(), keyPair: pair);

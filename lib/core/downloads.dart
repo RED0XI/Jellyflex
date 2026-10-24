@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_shell.dart';
 import 'download_folder.dart';
+import 'platform/app_paths.dart';
 import 'images.dart';
 import 'jellyfin_api.dart';
 import 'models.dart';
@@ -358,7 +359,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       _rootOverride ??
       Directory(
         _settings.downloadFolder ??
-            (testDirectory != null ? '${testDirectory!.path}\\Jellyflex' : null) ??
+            (testDirectory != null ? AppPaths.join(testDirectory!.path, 'Jellyflex') : null) ??
             DownloadFolder.defaultPath,
       );
 
@@ -367,10 +368,10 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   static Directory? testDirectory;
 
   /// Liste der Downloads – im App-Datenordner (in Tests im Testordner).
-  File get _indexFile => File('${(_rootOverride ?? testDirectory ?? appDataDir).path}\\downloads.json');
+  File get _indexFile => File(AppPaths.join((_rootOverride ?? testDirectory ?? appDataDir).path, 'downloads.json'));
 
   /// Frühere Versionen speicherten die Liste im Download-Ordner.
-  File get _legacyIndexFile => File('${DownloadFolder.defaultPath}\\downloads.json');
+  File get _legacyIndexFile => File(AppPaths.join(DownloadFolder.defaultPath, 'downloads.json'));
 
   @override
   List<DownloadEntry> build() {
@@ -477,7 +478,10 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   static String _folderName(String itemId, String serverUrl, String userId) =>
       '$itemId-${_ownerTag(serverUrl, userId)}';
 
-  static String _norm(String p) => Directory(p).absolute.path.toLowerCase().replaceAll('/', '\\');
+  static String _norm(String p) {
+    final s = Directory(p).absolute.path.toLowerCase();
+    return Platform.isWindows ? s.replaceAll('/', '\\') : s;
+  }
 
   /// Gespeicherter Eintrag plausibel? Kennung harmlos, Ordner heißt wie erwartet und
   /// liegt direkt in einem bekannten Download-Ordner, Videodatei in diesem Ordner.
@@ -492,7 +496,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
   bool _isKnownFolder(DownloadEntry e) {
     final folder = _norm(e.folder);
     final name = _folderName(e.itemId, e.serverUrl, e.userId).toLowerCase();
-    if (!folder.endsWith('\\$name')) return false;
+    if (!folder.endsWith('${AppPaths.sep}$name')) return false;
     final parent = folder.substring(0, folder.length - name.length - 1);
     return _roots.any((r) => _norm(r) == parent);
   }
@@ -512,7 +516,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
 
   /// Liegt [path] innerhalb von [base] (Groß-/Kleinschreibung und / bzw. \ egal)?
   static bool _isInside(String base, String path) {
-    final prefix = '${_norm(base)}\\';
+    final prefix = '${_norm(base)}${AppPaths.sep}';
     final target = _norm(path);
     return target.startsWith(prefix) && !target.substring(prefix.length).contains('..');
   }
@@ -530,7 +534,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     if (session == null || !_safeId.hasMatch(item.id)) return;
     final o = options ?? defaultOptions;
     _roots.add(root.path);
-    final folder = '${root.path}\\${_folderName(item.id, session.serverUrl, session.userId)}';
+    final folder = AppPaths.join(root.path, _folderName(item.id, session.serverUrl, session.userId));
     _set([
       ...state,
       DownloadEntry(
@@ -911,13 +915,13 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       // Dateiendung vom Server nur übernehmen, wenn sie harmlos ist.
       final container = converted ? 'mkv' : (source.container ?? '').split(',').first.toLowerCase();
       final ext = _safeExt.hasMatch(container) ? container : 'mkv';
-      final target = File('${entry.folder}\\media.$ext');
+      final target = File(AppPaths.join(entry.folder, 'media.$ext'));
       final part = File('${target.path}.part');
       // Umgerechnete Fassungen lassen sich nicht fortsetzen – dann von vorn.
       if (converted && await part.exists()) await part.delete();
       final already = await part.exists() ? await part.length() : 0;
 
-      // Genug Platz? (mit Reserve, damit Windows nicht vollläuft)
+      // Genug Platz? (mit Reserve, damit das Laufwerk nicht vollläuft)
       final expected = converted ? _estimateSize(item, maxBitrate, source.id) : (source.size ?? 0);
       final free = DownloadFolder.freeBytes(entry.folder);
       if (free != null && expected > 0 && expected - already > free - _reserveBytes) {
@@ -1085,7 +1089,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       final ext = Uri.parse(url).path.split('.').last.toLowerCase();
       if (!_safeExt.hasMatch(ext)) continue;
       try {
-        await dio.download(url, '${entry.folder}\\subtitle_${s.index}.$ext', cancelToken: cancel);
+        await dio.download(url, AppPaths.join(entry.folder, 'subtitle_${s.index}.$ext'), cancelToken: cancel);
       } catch (_) {}
     }
   }

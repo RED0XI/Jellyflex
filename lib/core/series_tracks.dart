@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'settings.dart';
+import 'platform/app_paths.dart';
 
 /// Merkt sich je Serie (und Konto) die zuletzt gewählte Ton- und Untertitelsprache –
 /// wer eine Serie auf Japanisch mit Untertiteln schaut, bekommt die nächste Folge
@@ -21,7 +22,7 @@ class SeriesTracks {
   final File? _fileOverride;
   Map<String, Map<String, String>>? _cache;
 
-  File get _file => _fileOverride ?? File('${appDataDir.path}\\series_tracks.json');
+  File get _file => _fileOverride ?? File(AppPaths.join(appDataDir.path, 'series_tracks.json'));
 
   Map<String, Map<String, String>> _load() {
     if (_cache != null) return _cache!;

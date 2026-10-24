@@ -1,6 +1,6 @@
 # Jellyflex
 
-A modern, smooth [Jellyfin](https://jellyfin.org) client for Windows – built with Flutter and
+A modern, smooth [Jellyfin](https://jellyfin.org) client for Windows and macOS – built with Flutter and
 [media_kit](https://github.com/media-kit/media-kit) (mpv). Inspired by Wholphin.
 
 > **Made with Claude.** Jellyflex was written with [Claude Code](https://claude.com/claude-code),
@@ -8,19 +8,28 @@ A modern, smooth [Jellyfin](https://jellyfin.org) client for Windows – built w
 
 ## Quick start
 
-**You need:** Windows 10 or 11 (64-bit) and a Jellyfin server you can sign in to.
+**You need:** Windows 10 or 11 (64-bit) or macOS 12 or newer (Apple silicon or Intel), and a
+Jellyfin server you can sign in to.
 
 1. Open the [latest release](https://github.com/RED0XI/Jellyflex/releases/latest) and download
-   **`Jellyflex-Setup-<version>.exe`** (the `.sig` file next to it is only for the app's update check).
-2. Run the installer. No admin rights needed.
-   If Windows shows *"Windows protected your PC"*, click **More info → Run anyway**
-   (the installer isn't signed with a paid Microsoft certificate).
+   - **Windows:** **`Jellyflex-Setup-<version>.exe`**
+   - **macOS:** **`Jellyflex-<version>.dmg`**
+
+   (The `.sig` files and the `-macOS.zip` are only for the app's own update check.)
+2. Install:
+   - **Windows:** run the installer. No admin rights needed.
+     If Windows shows *"Windows protected your PC"*, click **More info → Run anyway**
+     (the installer isn't signed with a paid Microsoft certificate).
+   - **macOS:** open the `.dmg` and drag **Jellyflex** into **Applications**. The app is signed
+     and notarized by Apple, so it opens without warnings.
 3. Start Jellyflex, enter your server address (for example `https://jellyfin.example.com`)
    and sign in – with your password or **Quick Connect**.
 
 That's it. To get new versions automatically offered, turn on
-**Settings → About Jellyflex → Look for updates**.
-To uninstall: Windows Settings → Apps → Jellyflex.
+**Settings → About Jellyflex → Look for updates**. Both versions are released together, so
+Windows and macOS always get the same features and fixes at the same time.
+To uninstall: Windows Settings → Apps → Jellyflex, or on macOS drag Jellyflex from
+Applications to the Trash.
 
 ---
 
@@ -35,7 +44,8 @@ To uninstall: Windows Settings → Apps → Jellyflex.
 - **Trickplay** previews while seeking, **chapters** with pictures (`C`) and a **Scenes** row on the details page
 - Quality limit (the server converts on the fly), playback speed, audio/subtitle delay
 - Volume is remembered; progress is reported to the server continuously
-- Windows media overlay and media keys, **mini player** (`P`), **sleep timer**, **Ambilight**
+- Media overlay and media keys (Windows overlay, macOS Now Playing), **mini player** (`P`),
+  **sleep timer**, **Ambilight**
 
 **Browsing**
 - Home with rotating banner, Continue watching, Next up, New in …, Favorites – rows can be
@@ -67,14 +77,19 @@ To uninstall: Windows Settings → Apps → Jellyflex.
 Jellyflex talks **only to your own Jellyfin server** – no telemetry, no ads, no fonts or images from
 other services. Highlights (full list in [SECURITY.md](SECURITY.md)):
 
-- Your login token is stored encrypted with Windows DPAPI and removed from logs and error reports.
+- Your login token is stored encrypted (Windows: DPAPI; macOS: AES-256 with the key in your
+  Keychain) and removed from logs and error reports.
 - HTTPS certificates are checked, also for video streams; plain http only in your home network and with a warning.
 - Downloads can't be placed in system folders, and the app only ever deletes its own download folders.
 - **Updates:** the update check (off by default) only asks GitHub for the newest version number. When you
-  click *Download & install*, the installer's **digital signature (Ed25519)** is checked before it runs –
-  a modified or damaged file is never started.
+  click *Download & install*, the package's **digital signature (Ed25519)** is checked before it runs –
+  a modified or damaged file is never started. On macOS the new app's Apple code signature is
+  checked as well.
 
 ### Keyboard & controller
+
+On macOS, use `⌘` instead of `Ctrl` (`⌘F` search, `⌘,` settings), `⌃⌘F` for fullscreen and
+`⌘[` to go back. Continue watching is in the Dock menu (right-click the Jellyflex icon).
 
 | Where | Key | Action |
 |---|---|---|
@@ -108,12 +123,21 @@ Without a mouse, the arrow keys move the selection like on a TV, Enter opens, an
 
 ### Build from source
 
-You need the [Flutter SDK](https://docs.flutter.dev/get-started/install/windows) and Visual Studio
-2022 Build Tools ("Desktop development with C++").
+You need the [Flutter SDK](https://docs.flutter.dev/get-started/install) and
+- **Windows:** Visual Studio 2022 Build Tools ("Desktop development with C++")
+- **macOS:** Xcode and CocoaPods (`brew install --cask flutter && brew install cocoapods`)
 
 ```bash
-flutter run -d windows                 # run in debug mode
+flutter run -d windows                 # run in debug mode (Windows)
+flutter run -d macos                   # run in debug mode (macOS)
 flutter build windows --release        # build → build\windows\x64\runner\Release\
+flutter build macos --release          # build → build/macos/Build/Products/Release/Jellyflex.app
+```
+
+**macOS packages** (`.dmg` for downloading, `-macOS.zip` + `.sig` for the in-app update):
+
+```bash
+tool/build_macos.sh
 ```
 
 **Installer** (needs [Inno Setup 6](https://jrsoftware.org/isinfo.php)): creates
@@ -132,14 +156,16 @@ dart run tool/mock_server.dart
 ```
 
 Enter `http://localhost:8097` in the app, any user name and password. As video for all titles it
-uses `%TEMP%\jellyflex_test.mkv` (any video file with two audio and two subtitle tracks, see
-`lib/dev/player_harness.dart`).
+uses `%TEMP%\jellyflex_test.mkv` (macOS: `$TMPDIR/jellyflex_test.mkv`) – any video file with two
+audio and two subtitle tracks, see `lib/dev/player_harness.dart`. `tool/make_test_video.sh` creates
+one with ffmpeg.
 
 ### Tests
 
 ```bash
 flutter test                                                   # fast tests
 flutter test integration_test/downloads_test.dart -d windows   # one app test (needs the demo server)
+flutter test integration_test/downloads_test.dart -d macos     # the same on macOS
 powershell -ExecutionPolicy Bypass -File tool/run_all_tests.ps1  # everything, with a summary
 ```
 
@@ -148,25 +174,45 @@ Screenshots end up in `build/screenshots/`.
 
 ### Publishing a release (maintainers)
 
-1. Raise the version in `pubspec.yaml` and `lib/core/version.dart`.
-2. Commit, then build with `powershell -ExecutionPolicy Bypass -File tool/build_release.ps1`.
-   It builds in a neutral folder (`C:\JellyflexBuild`) so no path with your Windows user name ends up
-   in the program, checks every file for it, and signs the installer. The secret key lives only on the
-   maintainer's PC (`%APPDATA%\JellyflexRelease`, created once with `dart run tool/sign_update.dart --new-key`)
-   and must never be committed.
-3. Create a GitHub release with tag `v<version>` and attach **both** `Jellyflex-Setup-<version>.exe`
-   and `Jellyflex-Setup-<version>.exe.sig`.
+Windows and macOS are released together by GitHub Actions (`.github/workflows/release.yml`):
+
+1. Raise the version in `pubspec.yaml` and `lib/core/version.dart`, commit and push.
+2. Tag and push: `git tag v<version> && git push origin v<version>`.
+3. The workflow tests and builds both versions, signs the update packages (Ed25519), signs and
+   notarizes the Mac app with Apple, and creates the GitHub release with all files:
+   `Jellyflex-Setup-<version>.exe` (+ `.sig`), `Jellyflex-<version>.dmg` and
+   `Jellyflex-<version>-macOS.zip` (+ `.sig`).
+
+Every push and pull request also builds and tests both systems (`.github/workflows/ci.yml`), so a
+change that only works on one of them shows up right away.
+
+**One-time setup** (repository → Settings → Secrets and variables → Actions):
+
+| Secret | What |
+|---|---|
+| `JELLYFLEX_UPDATE_SIGNING_KEY` | Contents of `update_signing_key.json` (created once with `dart run tool/sign_update.dart --new-key`; on the maintainer's PC under `%APPDATA%\JellyflexRelease`) |
+| `MACOS_CERTIFICATE` | "Developer ID Application" certificate exported as `.p12`, base64-encoded (`base64 -i cert.p12 \| pbcopy`) |
+| `MACOS_CERTIFICATE_PASSWORD` | Password of that `.p12` |
+| `APPLE_ID` | Apple ID of the developer account |
+| `APPLE_TEAM_ID` | Team ID (developer.apple.com → Membership) |
+| `APPLE_APP_PASSWORD` | App-specific password (appleid.apple.com → Sign-In and Security) |
+
+The secret update key must never be committed. Builds on GitHub run in a neutral folder, so no
+personal path ends up in the program. Building by hand still works: `tool/build_release.ps1`
+(Windows) and `tool/build_macos.sh` (macOS).
 
 ### Project structure
 
 ```
 lib/
   core/        Server connection, data models, downloads, settings, storage
+  core/platform/  Per-system folders and file manager (Windows and macOS)
   features/    Screens: login, home, details, library, search, player, downloads, settings …
   widgets/     Building blocks: cards, rows, buttons, title bar, images, scrolling
   l10n/        All UI texts (English/German in strings.dart, others in strings_fr/es/tr.dart)
 windows/       Windows runner (native taskbar, media overlay, network checks)
-tool/          Demo server, installer build, update signing
+macos/         macOS runner (Dock menu, Now Playing, Keychain, network checks)
+tool/          Demo server, installer/DMG build, update signing, icons
 test/          Fast tests · integration_test/  App tests in a real window
 ```
 

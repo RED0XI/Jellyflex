@@ -29,7 +29,8 @@ import '../l10n/strings.dart';
 final harnessTranscodeRequests = <int>[];
 
 String get _testVideo =>
-    Platform.environment['JELLYFLEX_TEST_VIDEO'] ?? '${Directory.systemTemp.path}\\jellyflex_test.mkv';
+    Platform.environment['JELLYFLEX_TEST_VIDEO'] ??
+    '${Directory.systemTemp.path}${Platform.pathSeparator}jellyflex_test.mkv';
 
 class _FakeApi extends JellyfinApi {
   // Leere baseUrl: so wird die "umgerechnete" Adresse direkt zum Dateipfad.
@@ -146,7 +147,7 @@ class _HarnessSession extends SessionController {
 /// Auch Downloads und die je Serie gemerkten Sprachen liegen in einem Temp-Ordner.
 Widget buildHarnessApp({AppSettings? settings}) {
   final temp = Directory.systemTemp.createTempSync('jellyflex_harness_');
-  SeriesTracks.instance = SeriesTracks.forFile(File('${temp.path}\\series_tracks.json'));
+  SeriesTracks.instance = SeriesTracks.forFile(File('${temp.path}${Platform.pathSeparator}series_tracks.json'));
   final router = GoRouter(
     routes: [
       GoRoute(
@@ -168,11 +169,13 @@ Widget buildHarnessApp({AppSettings? settings}) {
     overrides: [
       apiProvider.overrideWithValue(_FakeApi()),
       sessionProvider.overrideWith(_HarnessSession.new),
-      downloadsProvider.overrideWith(() => DownloadManager(Directory('${temp.path}\\downloads'), () async => false)),
+      downloadsProvider.overrideWith(
+        () => DownloadManager(Directory('${temp.path}${Platform.pathSeparator}downloads'), () async => false),
+      ),
       // Immer eigene Einstellungen (nie die echte Datei); Tests prüfen deutsche Texte.
       settingsProvider.overrideWith(() {
         final file = File(
-          '${Directory.systemTemp.createTempSync('jellyflex_settings').path}\\settings.json',
+          '${Directory.systemTemp.createTempSync('jellyflex_settings').path}${Platform.pathSeparator}settings.json',
         )..writeAsStringSync(jsonEncode((settings ?? const AppSettings()).copyWith(language: AppLanguage.de).toJson()));
         return SettingsController(file);
       }),

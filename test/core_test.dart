@@ -160,7 +160,7 @@ void main() {
   group('SecureStore (DPAPI)', () {
     test('Speichert verschlüsselt und liest wieder', () async {
       final dir = await Directory.systemTemp.createTemp('jellyflex_test');
-      final file = File('${dir.path}\\secure.bin');
+      final file = File('${dir.path}${Platform.pathSeparator}secure.bin');
       try {
         final store = SecureStore.forFile(file);
         await store.write(key: 'token', value: 'geheim-123');

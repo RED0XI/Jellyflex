@@ -30,7 +30,7 @@ String buildErrorReport({
     ..writeln('Created: $created')
     ..writeln()
     ..writeln('App version: $appVersion')
-    ..writeln('Windows: ${Platform.operatingSystemVersion}')
+    ..writeln('${Platform.isMacOS ? 'macOS' : 'Windows'}: ${Platform.operatingSystemVersion}')
     ..writeln('Dart: ${Platform.version.split(' ').first}')
     ..writeln('CPU cores: ${Platform.numberOfProcessors}')
     ..writeln(
@@ -70,9 +70,13 @@ String scrubReport(String text, {AuthSession? session}) {
       if (value.length >= 3) result = result.replaceAll(value, placeholder);
     }
   }
-  final profile = Platform.environment['USERPROFILE'];
+  // Benutzerordner (enthält den Benutzernamen) – Windows: %USERPROFILE%, macOS: $HOME.
+  final profile = Platform.environment[Platform.isWindows ? 'USERPROFILE' : 'HOME'];
   if (profile != null && profile.length > 3) {
-    result = result.replaceAll(RegExp(RegExp.escape(profile), caseSensitive: false), '%USERPROFILE%');
+    result = result.replaceAll(
+      RegExp(RegExp.escape(profile), caseSensitive: false),
+      Platform.isWindows ? '%USERPROFILE%' : '~',
+    );
   }
   // Übrige Adressen im Text (z. B. aus Fehlermeldungen) nur ohne Rechnernamen.
   return result.replaceAllMapped(RegExp(r'(https?|wss?)://[^\s/"]+'), (m) => '${m[1]}://<host>');

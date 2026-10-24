@@ -59,7 +59,7 @@ void main() {
       markTestSkipped('Demo-Server läuft nicht');
       return;
     }
-    final video = File('${Directory.systemTemp.path}\\jellyflex_test.mkv');
+    final video = File('${Directory.systemTemp.path}${Platform.pathSeparator}jellyflex_test.mkv');
     if (!video.existsSync()) {
       markTestSkipped('Testvideo fehlt');
       return;
@@ -102,7 +102,7 @@ void main() {
       );
       manager.pause('movie0');
       await pumpFor(tester, const Duration(milliseconds: 800));
-      final part = File('${entry('movie0').folder}\\media.mkv.part');
+      final part = File('${entry('movie0').folder}${Platform.pathSeparator}media.mkv.part');
       final pausedSize = part.lengthSync();
       await pumpFor(tester, const Duration(seconds: 1));
       expect(entry('movie0').status, DownloadStatus.paused);
@@ -162,7 +162,9 @@ void main() {
 
       // Index wurde gespeichert (Neustart der App findet die Downloads wieder).
       await pumpFor(tester, const Duration(seconds: 1));
-      final index = (jsonDecode(File('${root.path}\\downloads.json').readAsStringSync()) as Map)['entries'] as List;
+      final index =
+          (jsonDecode(File('${root.path}${Platform.pathSeparator}downloads.json').readAsStringSync()) as Map)['entries']
+              as List;
       expect(index.length, 1);
 
       // --- Bildschirmfoto: ein laufender und ein fertiger (angeschauter) Download ---

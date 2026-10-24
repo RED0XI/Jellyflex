@@ -1,8 +1,8 @@
 import 'package:flutter/services.dart';
 
-/// Windows-Medienanzeige (Titel/Bild im Lautstärke-Overlay) und Medientasten.
+/// Medienanzeige (Windows: Lautstärke-Overlay, macOS: „Jetzt läuft“) und Medientasten.
 ///
-/// Gegenstück in C++: windows/runner/media_session.cpp.
+/// Gegenstücke: windows/runner/media_session.cpp, macos/Runner/MediaSession.swift.
 abstract final class MediaSession {
   static const _channel = MethodChannel('jellyflex/media_session');
   static bool _initialized = false;

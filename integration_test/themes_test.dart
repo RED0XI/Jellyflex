@@ -83,7 +83,10 @@ void main() {
       }
 
       // Gespeichert?
-      expect(File('${temp.path}\\settings.json').readAsStringSync(), contains('"themeId": "noir"'));
+      expect(
+        File('${temp.path}${Platform.pathSeparator}settings.json').readAsStringSync(),
+        contains('"themeId": "noir"'),
+      );
     } finally {
       appPalette = appPalettes.first;
       await tester.pumpWidget(const SizedBox());

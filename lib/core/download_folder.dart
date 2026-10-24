@@ -3,39 +3,65 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 
+import 'platform/app_paths.dart';
+
 /// Download-Ordner: Standardort, Prüfung eines selbst gewählten Ordners und
 /// freier Speicherplatz.
 abstract final class DownloadFolder {
-  /// Standardordner: Videos\Jellyflex im Benutzerprofil.
-  static String get defaultPath =>
-      '${Platform.environment['USERPROFILE'] ?? Directory.systemTemp.path}\\Videos\\Jellyflex';
+  /// Standardordner: Videos\Jellyflex im Benutzerprofil (macOS: ~/Movies/Jellyflex).
+  static String get defaultPath => AppPaths.join(AppPaths.videos, subfolder);
 
   /// Unterordner, den die App im gewählten Ordner anlegt – so landen die
   /// Downloads nie lose zwischen eigenen Dateien (und Löschen trifft nur sie).
   static const subfolder = 'Jellyflex';
 
   /// Aus dem gewählten Ordner wird `<Ordner>\Jellyflex` (außer er heißt schon so).
-  static String fromPicked(String picked) {
-    var path = picked.replaceAll('/', '\\');
-    while (path.endsWith('\\') && path.length > 3) {
+  static String fromPicked(String picked, {bool? windows}) {
+    final win = windows ?? Platform.isWindows;
+    final sep = win ? '\\' : '/';
+    // Kürzester Pfad, der stehen bleibt: "D:\" bzw. "/".
+    final minLength = win ? 3 : 1;
+    var path = win ? picked.replaceAll('/', sep) : picked;
+    while (path.endsWith(sep) && path.length > minLength) {
       path = path.substring(0, path.length - 1);
     }
-    final last = path.split('\\').where((s) => s.isNotEmpty).lastOrNull ?? '';
+    final last = path.split(sep).where((s) => s.isNotEmpty).lastOrNull ?? '';
     if (last.toLowerCase() == subfolder.toLowerCase()) return path;
-    return path.endsWith('\\') ? '$path$subfolder' : '$path\\$subfolder';
+    return path.endsWith(sep) ? '$path$subfolder' : '$path$sep$subfolder';
   }
 
   /// Systemordner, in denen Downloads nichts verloren haben.
-  static List<String> get _forbidden => [
-    for (final name in ['SystemRoot', 'windir', 'ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432', 'ProgramData'])
-      ?Platform.environment[name],
-    ?Platform.environment['APPDATA'],
-    ?Platform.environment['LOCALAPPDATA'],
-  ];
+  static List<String> get _forbidden {
+    if (Platform.isWindows) {
+      return [
+        for (final name in ['SystemRoot', 'windir', 'ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432', 'ProgramData'])
+          ?Platform.environment[name],
+        ?Platform.environment['APPDATA'],
+        ?Platform.environment['LOCALAPPDATA'],
+      ];
+    }
+    return [
+      '/System',
+      '/Library',
+      '/Applications',
+      '/usr',
+      '/bin',
+      '/sbin',
+      '/etc',
+      '/var',
+      '/private',
+      '/opt',
+      '/dev',
+      '/cores',
+      // Einstellungen und Zwischenspeicher aller Programme (auch dieser App).
+      AppPaths.join(AppPaths.home, 'Library'),
+    ];
+  }
 
   static String _norm(String p) {
-    var s = p.replaceAll('/', '\\').toLowerCase();
-    while (s.endsWith('\\')) {
+    final sep = Platform.pathSeparator;
+    var s = (Platform.isWindows ? p.replaceAll('/', sep) : p).toLowerCase();
+    while (s.endsWith(sep)) {
       s = s.substring(0, s.length - 1);
     }
     return s;
@@ -43,12 +69,17 @@ abstract final class DownloadFolder {
 
   /// Liegt [path] in einem Systemordner (oder ist er selbst einer)?
   static bool isForbidden(String path) {
+    final sep = Platform.pathSeparator;
     final target = _norm(path);
-    if (target.split('\\').contains('..')) return true;
+    if (target.split(sep).contains('..')) return true;
+    // Ohne festen Anfang (relativer Pfad) – unklar, wo er landet.
+    if (!Platform.isWindows && !target.startsWith('/')) return true;
+    // Das Wurzelverzeichnis selbst.
+    if (!Platform.isWindows && target.isEmpty) return true;
     for (final f in _forbidden) {
       final base = _norm(f);
       if (base.isEmpty) continue;
-      if (target == base || target.startsWith('$base\\')) return true;
+      if (target == base || target.startsWith('$base$sep')) return true;
     }
     return false;
   }
@@ -60,7 +91,7 @@ abstract final class DownloadFolder {
       final dir = Directory(path);
       await dir.create(recursive: true);
       // Eindeutiger Name und "exclusive": eine vorhandene Datei wird nie überschrieben.
-      final probe = File('${dir.path}\\.jellyflex-probe-$pid-${DateTime.now().microsecondsSinceEpoch}');
+      final probe = File(AppPaths.join(dir.path, '.jellyflex-probe-$pid-${DateTime.now().microsecondsSinceEpoch}'));
       await probe.create(exclusive: true);
       try {
         await probe.writeAsString('ok', flush: true);
@@ -78,13 +109,14 @@ abstract final class DownloadFolder {
   /// Freier Speicherplatz (Bytes) auf dem Laufwerk von [path]; `null` = unbekannt.
   /// Der Ordner selbst muss nicht existieren – es zählt der nächste vorhandene darüber.
   static int? freeBytes(String path) {
-    if (!Platform.isWindows) return null;
+    if (!Platform.isWindows && !Platform.isMacOS) return null;
     var dir = Directory(path).absolute;
     while (!dir.existsSync()) {
       final parent = dir.parent;
       if (parent.path == dir.path) return null;
       dir = parent;
     }
+    if (Platform.isMacOS) return _freeBytesPosix(dir.path);
     final pathPtr = dir.path.toNativeUtf16();
     final free = calloc<Uint64>();
     try {
@@ -95,6 +127,21 @@ abstract final class DownloadFolder {
     } finally {
       calloc.free(pathPtr);
       calloc.free(free);
+    }
+  }
+
+  /// macOS: `df` (POSIX-Ausgabe in KiB) – Spalte "Available" des Laufwerks.
+  static int? _freeBytesPosix(String path) {
+    try {
+      final result = Process.runSync('/bin/df', ['-P', '-k', path]);
+      if (result.exitCode != 0) return null;
+      final lines = (result.stdout as String).trim().split('\n');
+      if (lines.length < 2) return null;
+      final columns = lines.last.trim().split(RegExp(r'\s+'));
+      final kib = columns.length >= 4 ? int.tryParse(columns[3]) : null;
+      return kib == null ? null : kib * 1024;
+    } catch (_) {
+      return null;
     }
   }
 

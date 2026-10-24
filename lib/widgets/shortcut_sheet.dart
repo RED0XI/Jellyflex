@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../l10n/strings.dart';
+import 'window_frame.dart' show isMacOS;
 import '../theme.dart';
 
 /// Übersicht aller Tastenkürzel (Taste ?) – App, Player und Controller.
@@ -37,10 +38,10 @@ Future<void> showShortcutSheet(BuildContext context) => showDialog<void>(
                   runSpacing: 22,
                   children: [
                     _Group(tr.shortcutsEverywhere, [
-                      ('Ctrl + F', tr.search),
-                      ('Ctrl + ,', tr.settings),
-                      ('F11', tr.fullscreen.replaceAll(' (F)', '')),
-                      ('Esc  ·  Alt + ←', tr.back),
+                      (isMacOS ? '⌘ F' : 'Ctrl + F', tr.search),
+                      (isMacOS ? '⌘ ,' : 'Ctrl + ,', tr.settings),
+                      (isMacOS ? '⌃⌘ F' : 'F11', tr.fullscreen.replaceAll(' (F)', '')),
+                      (isMacOS ? 'Esc  ·  ⌘ [' : 'Esc  ·  Alt + ←', tr.back),
                       ('← ↑ → ↓', tr.shortcutMoveFocus),
                       ('Enter', tr.shortcutOpen),
                       ('?', tr.shortcuts),

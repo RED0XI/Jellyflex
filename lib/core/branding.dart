@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'settings.dart';
+import 'platform/app_paths.dart';
 
 /// Eigener App-Name und eigenes Logo – überall dort, wo sonst "Jellyflex" steht
 /// (Titelleiste, Fenstertitel, Taskleisten-Symbol, Anmeldung, Start).
@@ -62,7 +63,7 @@ Future<String> importLogo(String sourcePath, {Directory? dir}) async {
   final folder = dir ?? appDataDir;
   await folder.create(recursive: true);
   final stamp = DateTime.now().millisecondsSinceEpoch;
-  final target = File('${folder.path}\\logo_$stamp.$ext');
+  final target = File(AppPaths.join(folder.path, 'logo_$stamp.$ext'));
   await target.writeAsBytes(bytes);
   try {
     await File(_iconPathFor(target.path)).writeAsBytes(await _icoFrom(image));
@@ -122,9 +123,11 @@ Future<Uint8List> _icoFrom(ui.Image image) async {
 }
 
 /// Fenstertitel und Taskleisten-Symbol an Name/Logo anpassen.
+/// (macOS: nur der Titel – das Dock-Symbol bleibt das signierte App-Symbol.)
 Future<void> applyWindowBranding(AppSettings s) async {
   try {
     await windowManager.setTitle(appDisplayName(s));
+    if (!Platform.isWindows) return;
     final logo = customLogo(s);
     final customIcon = logo == null ? null : File(_iconPathFor(logo.path));
     final icon = customIcon != null && customIcon.existsSync()

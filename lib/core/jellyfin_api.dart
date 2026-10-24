@@ -116,7 +116,7 @@ class JellyfinApi {
 
   static String get deviceName {
     final host = Platform.localHostname.replaceAll(RegExp(r'[^A-Za-z0-9 _-]'), '');
-    return host.isEmpty ? 'Windows' : host;
+    return host.isEmpty ? (Platform.isMacOS ? 'Mac' : 'Windows') : host;
   }
 
   String get authorizationHeader {

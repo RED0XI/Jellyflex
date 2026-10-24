@@ -48,6 +48,30 @@ void main() {
     expect(onExit, isNot(contains('/RELAUNCH')), reason: 'Beim Beenden nicht wieder öffnen');
   });
 
+  test('macOS-Update: erst warten, dann tauschen, bei Fehler alte App behalten', () {
+    final script = UpdateCheck.macInstallScript(
+      "/tmp/x/staging/Jellyflex.app",
+      "/Applications/Jelly'flex.app",
+      pid: 4242,
+      relaunch: true,
+    );
+    // Wartet auf das Ende genau dieser App.
+    expect(script, contains('kill -0 4242'));
+    expect(script.indexOf('kill -0'), lessThan(script.indexOf('mv ')));
+    // Pfade sicher in Anführungszeichen (auch mit Hochkomma im Namen).
+    expect(script, contains(r"'/Applications/Jelly'\''flex.app'"));
+    // Neue App nur einsetzen, wenn die alte beiseitegelegt wurde – sonst zurück.
+    expect(script, contains('else mv'));
+    expect(script, contains("open '/Applications/Jelly'\\''flex.app'"));
+    final quiet = UpdateCheck.macInstallScript('/a/Jellyflex.app', '/b/Jellyflex.app', pid: 1, relaunch: false);
+    expect(quiet, isNot(contains('open ')), reason: 'Beim Beenden nicht wieder öffnen');
+  });
+
+  test('Paketname je Betriebssystem', () {
+    expect(UpdateCheck.packageName('1.2.3', macOS: false), 'Jellyflex-Setup-1.2.3.exe');
+    expect(UpdateCheck.packageName('1.2.3', macOS: true), 'Jellyflex-1.2.3-macOS.zip');
+  });
+
   test('Laden: nur mit gültiger Signatur entsteht eine Datei', () async {
     var payload = installer;
     var signature = await sign(installer);

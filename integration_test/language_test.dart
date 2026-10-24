@@ -41,7 +41,9 @@ void main() {
           overrides: [
             sessionProvider.overrideWith(DemoSession.new),
             // Leere Einstellungen = Standard.
-            settingsProvider.overrideWith(() => SettingsController(File('${temp.path}\\settings.json'))),
+            settingsProvider.overrideWith(
+              () => SettingsController(File('${temp.path}${Platform.pathSeparator}settings.json')),
+            ),
           ],
           child: RepaintBoundary(key: shotKey, child: const JellyflexApp()),
         ),
@@ -75,7 +77,10 @@ void main() {
       await saveShot(tester, 'language_home_de');
 
       // Gespeichert?
-      expect(File('${temp.path}\\settings.json').readAsStringSync(), contains('"language": "de"'));
+      expect(
+        File('${temp.path}${Platform.pathSeparator}settings.json').readAsStringSync(),
+        contains('"language": "de"'),
+      );
 
       // --- Weitere Sprachen ---
       for (final (lang, home, row) in [

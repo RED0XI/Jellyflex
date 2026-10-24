@@ -701,7 +701,7 @@ final class _Tr extends S {
   @override
   String get surpriseMe => 'Şaşırt beni';
   @override
-  String get searchCtrlF => 'Ara (Ctrl+F)';
+  String get searchCtrlF => _isMac ? 'Ara (⌘F)' : 'Ara (Ctrl+F)';
   @override
   String get profile => 'Profil';
   @override
@@ -1135,8 +1135,9 @@ final class _Tr extends S {
   @override
   String get chooseFolder => 'Klasör seç';
   @override
-  String get folderNotAllowed =>
-      'İndirmeler sistem klasörlerine (Windows, Program Files, AppData) kaydedilemez. Lütfen başka bir klasör seç.';
+  String get folderNotAllowed => _isMac
+      ? 'İndirmeler sistem klasörlerine (System, Uygulamalar, Library) kaydedilemez. Lütfen başka bir klasör seç.'
+      : 'İndirmeler sistem klasörlerine (Windows, Program Files, AppData) kaydedilemez. Lütfen başka bir klasör seç.';
   @override
   String folderNotWritable(String error) => 'Jellyflex bu klasöre yazamıyor ($error).';
   @override
@@ -1175,8 +1176,9 @@ final class _Tr extends S {
   @override
   String get unmeteredOnly => 'Yalnızca Wi-Fi veya LAN’da';
   @override
-  String get unmeteredOnlyHint =>
-      'Mobil veri, telefon erişim noktası veya Windows’un ölçülü olarak işaretlediği ağlar üzerinden indirme yapılmaz.';
+  String get unmeteredOnlyHint => _isMac
+      ? 'Telefon erişim noktası veya Düşük Veri Modu’ndaki ağlar üzerinden indirme yapılmaz.'
+      : 'Mobil veri, telefon erişim noktası veya Windows’un ölçülü olarak işaretlediği ağlar üzerinden indirme yapılmaz.';
   @override
   String get speedLimit => 'Hız sınırı';
   @override
@@ -1275,4 +1277,12 @@ final class _Tr extends S {
   String get autoUpdate => 'Güncellemeleri otomatik yükle';
   @override
   String get autoUpdateHint => 'Yeni sürümler arka planda indirilir, kontrol edilir ve Jellyflex kapatılınca yüklenir.';
+  @override
+  String whatsNewTitle(String version) => 'Jellyflex $version sürümündeki yenilikler';
+  @override
+  String versionLabelShort(String version) => 'Sürüm $version';
+  @override
+  String get allReleaseNotes => 'Tüm sürüm notları';
+  @override
+  String get gotIt => 'Anladım';
 }

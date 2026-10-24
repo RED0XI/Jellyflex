@@ -1,17 +1,21 @@
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:ffi/ffi.dart';
+import 'package:flutter/services.dart';
 
 import '../l10n/strings.dart';
+import 'platform/app_paths.dart';
 
-/// Kleiner verschlüsselter Schlüssel-Wert-Speicher für Windows.
+/// Kleiner verschlüsselter Schlüssel-Wert-Speicher.
 ///
-/// Die Daten werden mit der Windows-Datenschutz-API (DPAPI) verschlüsselt
-/// und unter `%APPDATA%\Jellyflex\secure.bin` abgelegt. Entschlüsseln kann
-/// sie nur dasselbe Windows-Benutzerkonto – ganz ohne eigenes Passwort.
+/// Die Daten liegen verschlüsselt in `secure.bin` im App-Datenordner:
+/// - **Windows:** mit der Windows-Datenschutz-API (DPAPI) verschlüsselt. Entschlüsseln
+///   kann sie nur dasselbe Windows-Benutzerkonto – ganz ohne eigenes Passwort.
+/// - **macOS:** mit AES-256-GCM verschlüsselt; den Schlüssel verwahrt der
+///   macOS-Schlüsselbund (nur für diesen Benutzer und diese App, nie synchronisiert).
 class SecureStore {
   SecureStore._(this._fileOverride);
 
@@ -25,18 +29,14 @@ class SecureStore {
   Map<String, String>? _cache;
   Future<void> _pending = Future.value();
 
-  File get _file {
-    if (_fileOverride != null) return _fileOverride;
-    final appData = Platform.environment['APPDATA'] ?? Directory.systemTemp.path;
-    return File('$appData\\Jellyflex\\secure.bin');
-  }
+  File get _file => _fileOverride ?? File(AppPaths.join(AppPaths.appData.path, 'secure.bin'));
 
   Future<Map<String, String>> _load() async {
     if (_cache != null) return _cache!;
     try {
       final file = _file;
       if (await file.exists()) {
-        final plain = _Dpapi.unprotect(await file.readAsBytes());
+        final plain = await _Cipher.unprotect(await file.readAsBytes());
         if (plain != null) {
           final decoded = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
           return _cache = decoded.map((k, v) => MapEntry(k, v as String));
@@ -54,7 +54,7 @@ class SecureStore {
     final run = _pending.catchError((_) {}).then((_) async {
       final file = _file;
       await file.parent.create(recursive: true);
-      final encrypted = _Dpapi.protect(Uint8List.fromList(utf8.encode(jsonEncode(_cache ?? {}))));
+      final encrypted = await _Cipher.protect(Uint8List.fromList(utf8.encode(jsonEncode(_cache ?? {}))));
       if (encrypted == null) throw FileSystemException(tr.encryptionFailed);
       final tmp = File('${file.path}.tmp');
       await tmp.writeAsBytes(encrypted, flush: true);
@@ -76,7 +76,76 @@ class SecureStore {
   }
 }
 
-// --- DPAPI über dart:ffi --------------------------------------------------------
+/// Verschlüsselung je Betriebssystem. `null` = nicht möglich (dann wird nichts gespeichert).
+abstract final class _Cipher {
+  static Future<Uint8List?> protect(Uint8List data) async =>
+      Platform.isWindows ? _Dpapi.protect(data) : _KeychainAes.protect(data);
+
+  static Future<Uint8List?> unprotect(Uint8List data) async =>
+      Platform.isWindows ? _Dpapi.unprotect(data) : _KeychainAes.unprotect(data);
+}
+
+// --- macOS: AES-256-GCM, Schlüssel im Schlüsselbund ------------------------------
+
+/// Gegenstück in Swift: macos/Runner/Keychain.swift (Kanal `jellyflex/keychain`).
+abstract final class _KeychainAes {
+  static const _channel = MethodChannel('jellyflex/keychain');
+
+  /// Kennung des Dateiformats ("JFX" + Version 1), danach Nonce, Geheimtext, MAC.
+  static const _magic = [0x4A, 0x46, 0x58, 0x01];
+  static final _algorithm = AesGcm.with256bits();
+
+  static Future<SecretKey?>? _key;
+
+  static Future<SecretKey?> _loadKey() async {
+    // In `flutter test` (ohne macOS-Runner): Schlüssel nur im Arbeitsspeicher – Tests
+    // berühren nie den echten Schlüsselbund.
+    if (Platform.environment['FLUTTER_TEST'] == 'true') return _algorithm.newSecretKey();
+    try {
+      final raw = await _channel.invokeMethod<Uint8List>('storeKey');
+      if (raw != null && raw.length == 32) return SecretKey(raw);
+      return null;
+    } catch (_) {
+      // Ohne Schlüsselbund wird nie etwas gespeichert.
+      return null;
+    }
+  }
+
+  static Future<SecretKey?> _secretKey() async {
+    final key = await (_key ??= _loadKey());
+    // Fehlschlag nicht merken – beim nächsten Mal neu versuchen.
+    if (key == null) _key = null;
+    return key;
+  }
+
+  static Future<Uint8List?> protect(Uint8List data) async {
+    final key = await _secretKey();
+    if (key == null) return null;
+    final box = await _algorithm.encrypt(data, secretKey: key);
+    return Uint8List.fromList([..._magic, ...box.concatenation()]);
+  }
+
+  static Future<Uint8List?> unprotect(Uint8List data) async {
+    if (data.length < _magic.length + 12 + 16) return null;
+    for (var i = 0; i < _magic.length; i++) {
+      if (data[i] != _magic[i]) return null;
+    }
+    final key = await _secretKey();
+    if (key == null) return null;
+    try {
+      final box = SecretBox.fromConcatenation(
+        data.sublist(_magic.length),
+        nonceLength: _algorithm.nonceLength,
+        macLength: _algorithm.macAlgorithm.macLength,
+      );
+      return Uint8List.fromList(await _algorithm.decrypt(box, secretKey: key));
+    } on SecretBoxAuthenticationError {
+      return null; // Verändert oder mit einem anderen Schlüssel verschlüsselt.
+    }
+  }
+}
+
+// --- Windows: DPAPI über dart:ffi ------------------------------------------------
 
 final class _DataBlob extends Struct {
   @Uint32()

@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import '../l10n/strings.dart';
 import 'jellyfin_api.dart';
 
-/// Anbindung an die Windows-Shell (Gegenstück: windows/runner/app_shell.cpp):
-/// Sprungliste der Taskleiste und Aufrufe aus ihr.
+/// Anbindung an die System-Shell (Gegenstücke: windows/runner/app_shell.cpp, macos/Runner/AppShell.swift):
+/// Sprungliste der Taskleiste (macOS: Dock-Menü) und Aufrufe aus ihr.
 ///
 /// Ein Eintrag startet `jellyflex.exe --resume=<Kennung>`; läuft die App
 /// schon, wird der Aufruf an das offene Fenster weitergegeben.
