@@ -12,6 +12,7 @@ import 'core/redact.dart';
 import 'core/app_log.dart';
 import 'core/download_notify.dart';
 import 'core/app_shell.dart';
+import 'core/window_memory.dart';
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,18 +41,25 @@ Future<void> main(List<String> args) async {
   // Stammzertifikate für den Video-Player schon beim Start bereitlegen.
   SystemCerts.caFile();
   await windowManager.ensureInitialized();
+  // Fenster wie beim letzten Mal (Größe, Lage, maximiert).
+  final saved = await WindowMemory.load();
 
-  const options = WindowOptions(
+  final options = WindowOptions(
     title: 'Jellyflex',
-    size: Size(1440, 900),
-    minimumSize: Size(1024, 640),
-    center: true,
+    size: saved?.bounds.size ?? const Size(1440, 900),
+    minimumSize: const Size(1024, 640),
+    center: saved == null,
     // Keine backgroundColor setzen: window_manager überdeckt damit unter Windows
     // die Flutter-Oberfläche (Fenster bleibt weiß).
     titleBarStyle: TitleBarStyle.hidden,
   );
   windowManager.waitUntilReadyToShow(options, () async {
     taskbarReady = true;
+    if (saved != null) {
+      await windowManager.setBounds(saved.bounds);
+      if (saved.maximized) await windowManager.maximize();
+    }
+    WindowMemory.startWatching();
     await windowManager.show();
     await windowManager.focus();
   });
