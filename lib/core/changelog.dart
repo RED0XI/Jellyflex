@@ -12,6 +12,7 @@ const changelog = <String, ({List<String> en, List<String> de})>{
       'On first start, a short setup helps with language, look and options.',
       'The sign-in page can search your home network for Jellyfin servers – only when you click.',
       'The yearly recap shows pictures from your year: moving backdrops, a poster wall and posters next to each card.',
+      'The banner on the home page moves on reliably – silent trailers play for 30 seconds at most.',
     ],
     de: [
       'Nach einem Update zeigt dieses Fenster, was neu ist.',
@@ -20,6 +21,7 @@ const changelog = <String, ({List<String> en, List<String> de})>{
       'Beim ersten Start hilft eine kurze Einrichtung bei Sprache, Aussehen und Optionen.',
       'Die Anmeldung kann im Heimnetz nach Jellyfin-Servern suchen – nur auf Klick.',
       'Der Jahresrückblick zeigt Bilder aus deinem Jahr: bewegte Hintergründe, eine Posterwand und Poster zu jeder Karte.',
+      'Das Banner auf der Startseite blättert zuverlässig weiter – stumme Trailer laufen höchstens 30 Sekunden.',
     ],
   ),
   '0.3.2': (

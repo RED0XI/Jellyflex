@@ -36,6 +36,10 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
   static const _interval = Duration(seconds: 9);
   static const _trailerDelay = Duration(seconds: 4);
 
+  /// Stumme Trailer laufen höchstens so lange, dann geht es weiter. Mit Ton (jemand schaut
+  /// bewusst zu) läuft der Trailer bis zum Ende.
+  static const _trailerMax = Duration(seconds: 30);
+
   int _index = 0;
   bool _hovered = false;
   Timer? _timer;
@@ -46,6 +50,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
   StreamSubscription<bool>? _trailerPlayingSub;
   StreamSubscription<bool>? _trailerDoneSub;
   Timer? _trailerTimer;
+  Timer? _trailerLimit;
   String? _trailerItemId;
   bool _trailerVisible = false;
   bool _muted = true;
@@ -74,6 +79,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
     appRouteObserver.unsubscribe(this);
     _timer?.cancel();
     _trailerTimer?.cancel();
+    _trailerLimit?.cancel();
     _trailerPlayingSub?.cancel();
     _trailerDoneSub?.cancel();
     _trailerPlayer?.dispose();
@@ -141,12 +147,17 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
       // Erst einblenden, wenn wirklich Bilder kommen.
       if (playing && mounted && _trailerItemId == item.id) {
         Future.delayed(const Duration(milliseconds: 400), () {
-          if (mounted && _trailerItemId == item.id) setState(() => _trailerVisible = true);
+          if (!mounted || _trailerItemId != item.id || _trailerVisible) return;
+          setState(() => _trailerVisible = true);
+          _trailerLimit?.cancel();
+          _trailerLimit = Timer(_trailerMax, () {
+            if (mounted && _muted && _trailerItemId == item.id) _goTo(_index + 1);
+          });
         });
       }
     });
     _trailerDoneSub = player.stream.completed.listen((done) {
-      if (done && mounted && _trailerItemId == item.id) _advance(_index + 1);
+      if (done && mounted && _trailerItemId == item.id) _goTo(_index + 1);
     });
     await player.setVolume(_muted ? 0 : 70);
     // Zertifikate prüfen, bevor mit dem Anmelde-Token gestreamt wird.
@@ -164,6 +175,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
 
   void _stopTrailer() {
     _trailerTimer?.cancel();
+    _trailerLimit?.cancel();
     _trailerItemId = null;
     _trailerPlayer?.stop();
     if (_trailerVisible && mounted) setState(() => _trailerVisible = false);
@@ -180,6 +192,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
     ref.listen(featuredProvider, (prev, next) {
       if ((prev?.value ?? const []).isEmpty && (next.value ?? const []).isNotEmpty) _scheduleTrailer();
     });
+    // Trailer in den Einstellungen ausgeschaltet → laufenden sofort beenden.
+    ref.listen(settingsProvider.select((s) => s.bannerTrailers), (_, on) => on ? _scheduleTrailer() : _stopTrailer());
     final items = ref.watch(featuredProvider).value ?? const <BaseItem>[];
     final api = ref.watch(apiProvider);
     final width = MediaQuery.sizeOf(context).width;
@@ -203,85 +217,88 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
     final item = items[current];
     final backdrop = Images.backdrop(item);
 
-    return MouseRegion(
-      onEnter: (_) => _hovered = true,
-      onExit: (_) => _hovered = false,
-      child: SizedBox(
-        height: widget.height,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 1100),
-                switchInCurve: Curves.easeOut,
-                switchOutCurve: Curves.easeIn,
-                child: _KenBurnsBackdrop(
-                  key: ValueKey(item.id),
-                  url: api.imageUrlOrNull(backdrop, maxWidth: screenImageWidth(context)),
-                  blurHash: backdrop?.blurHash,
-                ),
+    // Nur über Text, Knöpfen und Punkten anhalten – das Banner ist zu groß, als dass die Maus
+    // sonst je woanders stünde.
+    Widget pauseOnHover(Widget child) =>
+        MouseRegion(onEnter: (_) => _hovered = true, onExit: (_) => _hovered = false, child: child);
+
+    return SizedBox(
+      height: widget.height,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 1100),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              child: _KenBurnsBackdrop(
+                key: ValueKey(item.id),
+                url: api.imageUrlOrNull(backdrop, maxWidth: screenImageWidth(context)),
+                blurHash: backdrop?.blurHash,
               ),
             ),
-            // Trailer blendet weich über das Hintergrundbild. Der Platz bleibt immer im Baum –
-            // sonst baut Flutter den Rest des Banners neu und der Fokus (Tastatur/Controller) ginge verloren.
-            Positioned.fill(
-              child: _trailerVideo == null
-                  ? const SizedBox.shrink()
-                  : IgnorePointer(
-                      child: AnimatedOpacity(
-                        opacity: _trailerVisible ? 1 : 0,
-                        duration: const Duration(milliseconds: 1200),
-                        curve: Curves.easeInOut,
-                        child: ClipRect(
-                          child: Video(
-                            controller: _trailerVideo!,
-                            controls: NoVideoControls,
-                            fit: BoxFit.cover,
-                            fill: Colors.transparent,
-                            wakelock: false,
-                          ),
+          ),
+          // Trailer blendet weich über das Hintergrundbild. Der Platz bleibt immer im Baum –
+          // sonst baut Flutter den Rest des Banners neu und der Fokus (Tastatur/Controller) ginge verloren.
+          Positioned.fill(
+            child: _trailerVideo == null
+                ? const SizedBox.shrink()
+                : IgnorePointer(
+                    child: AnimatedOpacity(
+                      opacity: _trailerVisible ? 1 : 0,
+                      duration: const Duration(milliseconds: 1200),
+                      curve: Curves.easeInOut,
+                      child: ClipRect(
+                        child: Video(
+                          controller: _trailerVideo!,
+                          controls: NoVideoControls,
+                          fit: BoxFit.cover,
+                          fill: Colors.transparent,
+                          wakelock: false,
                         ),
                       ),
                     ),
-            ),
-            // Abdunkeln links (für den Text) und unten (Übergang zu den Reihen).
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    stops: [0, 0.35, 0.75],
-                    colors: [
-                      AppColors.background.withAlpha(0xF0),
-                      AppColors.background.withAlpha(0x99),
-                      AppColors.background.withAlpha(0x00),
-                    ],
                   ),
+          ),
+          // Abdunkeln links (für den Text) und unten (Übergang zu den Reihen).
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  stops: [0, 0.35, 0.75],
+                  colors: [
+                    AppColors.background.withAlpha(0xF0),
+                    AppColors.background.withAlpha(0x99),
+                    AppColors.background.withAlpha(0x00),
+                  ],
                 ),
               ),
             ),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    stops: [0, 0.35, 1],
-                    colors: [
-                      AppColors.background,
-                      AppColors.background.withAlpha(0x00),
-                      AppColors.background.withAlpha(0x55),
-                    ],
-                  ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  stops: [0, 0.35, 1],
+                  colors: [
+                    AppColors.background,
+                    AppColors.background.withAlpha(0x00),
+                    AppColors.background.withAlpha(0x55),
+                  ],
                 ),
               ),
             ),
-            Positioned(
-              left: kPageGutter,
-              bottom: 84,
-              width: math.min(600, width * 0.46),
-              child: AnimatedSwitcher(
+          ),
+          Positioned(
+            left: kPageGutter,
+            bottom: 84,
+            width: math.min(600, width * 0.46),
+            child: pauseOnHover(
+              AnimatedSwitcher(
                 duration: const Duration(milliseconds: 600),
                 switchInCurve: Curves.easeOutCubic,
                 transitionBuilder: (child, anim) => FadeTransition(
@@ -294,10 +311,12 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
                 child: _HeroInfo(key: ValueKey(item.id), item: item),
               ),
             ),
-            Positioned(
-              left: kPageGutter,
-              bottom: 40,
-              child: Row(
+          ),
+          Positioned(
+            left: kPageGutter,
+            bottom: 40,
+            child: pauseOnHover(
+              Row(
                 children: [
                   for (var i = 0; i < items.length; i++)
                     GestureDetector(
@@ -320,29 +339,29 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
                 ],
               ),
             ),
-            // Ton an/aus, solange ein Trailer läuft.
-            Positioned(
-              right: kPageGutter,
-              bottom: 84,
-              child: AnimatedOpacity(
-                opacity: _trailerVisible ? 1 : 0,
-                duration: const Duration(milliseconds: 400),
-                child: ExcludeFocus(
-                  excluding: !_trailerVisible,
-                  child: IgnorePointer(
-                    ignoring: !_trailerVisible,
-                    child: CircleIconButton(
-                      icon: _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                      tooltip: _muted ? tr.soundOn : tr.soundOff,
-                      size: 46,
-                      onPressed: _toggleMute,
-                    ),
+          ),
+          // Ton an/aus, solange ein Trailer läuft.
+          Positioned(
+            right: kPageGutter,
+            bottom: 84,
+            child: AnimatedOpacity(
+              opacity: _trailerVisible ? 1 : 0,
+              duration: const Duration(milliseconds: 400),
+              child: ExcludeFocus(
+                excluding: !_trailerVisible,
+                child: IgnorePointer(
+                  ignoring: !_trailerVisible,
+                  child: CircleIconButton(
+                    icon: _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                    tooltip: _muted ? tr.soundOn : tr.soundOff,
+                    size: 46,
+                    onPressed: _toggleMute,
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
