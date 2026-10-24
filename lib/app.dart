@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/branding.dart';
+import 'core/changelog.dart';
+import 'core/version.dart';
+import 'widgets/whats_new_dialog.dart';
 import 'core/download_notify.dart';
 import 'core/update_check.dart';
 import 'features/settings/about_section.dart';
@@ -110,6 +113,28 @@ class JellyflexApp extends ConsumerStatefulWidget {
 }
 
 class _JellyflexAppState extends ConsumerState<JellyflexApp> {
+  bool _whatsNewChecked = false;
+
+  /// Neuigkeiten seit der zuletzt gesehenen Version zeigen. Nach einer frischen
+  /// Installation nicht (dann gibt es noch keine Einstellungen); Versionen vor 0.3.4
+  /// kannten das Fenster nicht – dort gelten die Neuigkeiten ab 0.3.4.
+  void _maybeShowWhatsNew() {
+    if (_whatsNewChecked) return;
+    _whatsNewChecked = true;
+    final controller = ref.read(settingsProvider.notifier);
+    final last = controller.current.lastSeenVersion;
+    if (last == appVersion) return;
+    controller.update((s) => s.copyWith(lastSeenVersion: () => appVersion));
+    if (last == null && !controller.existedOnStart) return;
+    final changes = changesSince(last ?? '0.3.3', appVersion);
+    if (changes.isEmpty) return;
+    // Erst wenn die Startseite steht.
+    Future<void>.delayed(const Duration(milliseconds: 1500), () {
+      final context = ref.read(routerProvider).routerDelegate.navigatorKey.currentContext;
+      if (mounted && context != null && context.mounted) showWhatsNew(context, changes);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -126,6 +151,10 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
         );
       });
     }
+    // "Was ist neu": einmal nach einem Update – sobald jemand angemeldet ist.
+    ref.listenManual(sessionProvider, (_, session) {
+      if (session.value != null) _maybeShowWhatsNew();
+    }, fireImmediately: true);
     // Eigener Name/Logo: Fenstertitel und Taskleisten-Symbol mitziehen.
     ref.listenManual(
       settingsProvider.select((s) => (s.appName, s.logoPath)),

@@ -1288,4 +1288,12 @@ final class _Fr extends S {
   @override
   String get autoUpdateHint =>
       'Les nouvelles versions sont téléchargées et vérifiées en arrière-plan, puis installées à la fermeture de Jellyflex.';
+  @override
+  String whatsNewTitle(String version) => 'Nouveautés de Jellyflex $version';
+  @override
+  String versionLabelShort(String version) => 'Version $version';
+  @override
+  String get allReleaseNotes => 'Toutes les notes de version';
+  @override
+  String get gotIt => 'Compris';
 }
