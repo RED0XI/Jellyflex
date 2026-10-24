@@ -553,7 +553,7 @@ final class _Tr extends S {
   @override
   String get alreadyWatched => 'Zaten izlendi';
   @override
-  String get forget => 'Unut';
+  String get forget => 'İzlemeye devam et’ten kaldır';
   @override
   String get download => 'İndir';
   @override
@@ -1318,4 +1318,18 @@ final class _Tr extends S {
   String get serversFound => 'Ev ağında bulundu';
   @override
   String get searchAgain => 'Tekrar ara';
+
+  // --- Player: Lautstärke, Schaust du noch?, Zufällig ---
+  @override
+  String get stillWatching => 'Hâlâ izliyor musun?';
+  @override
+  String stillWatchingHint(String next) => 'Art arda birkaç bölüm oynatıldı. Sıradaki: $next';
+  @override
+  String get shuffle => 'Karışık';
+  @override
+  String get shufflePlay => 'Karışık oynat';
+  @override
+  String get nothingToShuffle => 'Burada oynatılacak bir şey yok';
+  @override
+  String get upNextCaps => 'SIRADAKİ';
 }

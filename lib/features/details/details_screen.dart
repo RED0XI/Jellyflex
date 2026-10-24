@@ -505,6 +505,12 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         playButtons,
+        if (item.isSeries)
+          GlassButton(
+            label: tr.shuffle,
+            icon: Icons.shuffle_rounded,
+            onPressed: () => playShuffled(context, parentId: item.id, includeItemTypes: 'Episode'),
+          ),
         if (item.mediaSources.length > 1 && source != null)
           Builder(
             builder: (buttonContext) => GlassButton(

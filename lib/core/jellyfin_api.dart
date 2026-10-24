@@ -442,6 +442,26 @@ class JellyfinApi {
     'limit': limit,
   });
 
+  /// Gemischte Titel unterhalb von [parentId] (Serie, Staffel, Sammlung, Bibliothek) für
+  /// "Zufällig abspielen" – ohne fehlende Folgen.
+  Future<List<BaseItem>> getShuffled(
+    String parentId, {
+    required String includeItemTypes,
+    bool unplayedOnly = false,
+    String? genre,
+    int limit = 200,
+  }) => _getItems('/Items', {
+    ..._common,
+    'parentId': parentId,
+    'includeItemTypes': includeItemTypes,
+    'recursive': true,
+    'sortBy': 'Random',
+    'isMissing': false,
+    if (unplayedOnly) 'filters': 'IsUnplayed',
+    'genres': ?genre,
+    'limit': limit,
+  });
+
   /// Zufällige Titel für "Überrasch mich" – optional nur Ungesehenes bzw. ein Genre.
   Future<List<BaseItem>> getRandomPicks({
     String includeItemTypes = 'Movie,Series',

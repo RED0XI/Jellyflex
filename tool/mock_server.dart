@@ -701,6 +701,11 @@ Object? _handle(HttpRequest req) {
     if (types.contains('Movie') && q['parentId'] != 'lib-shows') list.addAll(movies);
     if (types.contains('Series') && q['parentId'] != 'lib-movies') list.addAll(series);
     if (types.contains('Episode')) list.addAll([for (final e in episodes.values) ...e]);
+    // Folgen einer Serie bzw. Staffel (z. B. "Zufällig abspielen").
+    final parent = q['parentId'];
+    if (parent != null && !parent.startsWith('lib-')) {
+      list = list.where((i) => i['Type'] != 'Episode' || i['SeriesId'] == parent || i['SeasonId'] == parent).toList();
+    }
     final personId = q['personIds'];
     if (personId != null) {
       list = list.where((i) => ((i['People'] as List?) ?? const []).any((p) => p['Id'] == personId)).toList();

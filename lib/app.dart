@@ -101,6 +101,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           itemId: state.pathParameters['id']!,
           startTicks: int.tryParse(state.uri.queryParameters['start'] ?? ''),
           mediaSourceId: state.uri.queryParameters['source'],
+          autoPlayed: state.uri.queryParameters['auto'] == '1',
+          fromQueue: state.uri.queryParameters['queue'] == '1',
           restoreFullscreen: switch (state.uri.queryParameters['rf']) {
             '1' => true,
             '0' => false,

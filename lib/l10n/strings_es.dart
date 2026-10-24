@@ -554,7 +554,7 @@ final class _Es extends S {
   @override
   String get alreadyWatched => 'Ya visto';
   @override
-  String get forget => 'Olvidar';
+  String get forget => 'Quitar de «Seguir viendo»';
   @override
   String get download => 'Descargar';
   @override
@@ -1326,4 +1326,18 @@ final class _Es extends S {
   String get serversFound => 'Encontrado en la red local';
   @override
   String get searchAgain => 'Buscar de nuevo';
+
+  // --- Player: Lautstärke, Schaust du noch?, Zufällig ---
+  @override
+  String get stillWatching => '¿Sigues viendo?';
+  @override
+  String stillWatchingHint(String next) => 'Se reprodujeron varios episodios seguidos. A continuación: $next';
+  @override
+  String get shuffle => 'Aleatorio';
+  @override
+  String get shufflePlay => 'Reproducción aleatoria';
+  @override
+  String get nothingToShuffle => 'No hay nada que reproducir';
+  @override
+  String get upNextCaps => 'A CONTINUACIÓN';
 }
