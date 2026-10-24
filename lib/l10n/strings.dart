@@ -1066,4 +1066,12 @@ class S {
   String get shufflePlay => _t('Shuffle play', 'Zufällig abspielen');
   String get nothingToShuffle => _t('Nothing to play here', 'Hier gibt es nichts abzuspielen');
   String get upNextCaps => _t('UP NEXT', 'ALS NÄCHSTES');
+
+  // --- Szenen-Vorschau auf Karten ------------------------------------------------
+
+  String get hoverPreview => _t('Scene preview on cards', 'Szenen-Vorschau auf Karten');
+  String get hoverPreviewHint => _t(
+    'When you rest on a title, its card flips through scenes (images from your server, no video).',
+    'Verweilst du auf einem Titel, blättert die Karte durch Szenen (Bilder von deinem Server, kein Video).',
+  );
 }

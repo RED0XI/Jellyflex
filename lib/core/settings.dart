@@ -82,6 +82,7 @@ class AppSettings {
     this.autoUpdate = true,
     this.lastSeenVersion,
     this.setupDone = true,
+    this.hoverPreview = true,
   });
 
   /// Zuletzt eingestellte Lautstärke im Player (0–100).
@@ -125,6 +126,9 @@ class AppSettings {
 
   /// Ersteinrichtung abgeschlossen (frisch installiert: nein – dann kommt der Assistent).
   final bool setupDone;
+
+  /// Karten blättern beim Darüberfahren durch Szenen des Titels.
+  final bool hoverPreview;
 
   /// Klänge bei "Überrasch mich" und im Quiz.
   final bool soundEffects;
@@ -233,6 +237,7 @@ class AppSettings {
     bool? autoUpdate,
     String? Function()? lastSeenVersion,
     bool? setupDone,
+    bool? hoverPreview,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -271,6 +276,7 @@ class AppSettings {
     autoUpdate: autoUpdate ?? this.autoUpdate,
     lastSeenVersion: lastSeenVersion != null ? lastSeenVersion() : this.lastSeenVersion,
     setupDone: setupDone ?? this.setupDone,
+    hoverPreview: hoverPreview ?? this.hoverPreview,
   );
 
   Map<String, dynamic> toJson() => {
@@ -311,6 +317,7 @@ class AppSettings {
     'autoUpdate': autoUpdate,
     'lastSeenVersion': lastSeenVersion,
     'setupDone': setupDone,
+    'hoverPreview': hoverPreview,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -352,6 +359,7 @@ class AppSettings {
     lastSeenVersion: json['lastSeenVersion'] as String?,
     // Ältere Versionen kannten den Assistenten nicht – wer schon Einstellungen hat, ist eingerichtet.
     setupDone: json['setupDone'] as bool? ?? true,
+    hoverPreview: json['hoverPreview'] as bool? ?? true,
   );
 }
 

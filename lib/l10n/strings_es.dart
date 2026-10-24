@@ -1340,4 +1340,11 @@ final class _Es extends S {
   String get nothingToShuffle => 'No hay nada que reproducir';
   @override
   String get upNextCaps => 'A CONTINUACIÓN';
+
+  // --- Szenen-Vorschau auf Karten ---
+  @override
+  String get hoverPreview => 'Vista previa de escenas en las tarjetas';
+  @override
+  String get hoverPreviewHint =>
+      'Al detenerte en un título, la tarjeta pasa por escenas (imágenes de tu servidor, sin vídeo).';
 }

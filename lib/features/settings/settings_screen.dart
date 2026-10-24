@@ -240,6 +240,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           icon: Icons.home_outlined,
                           children: [
                             _Row(
+                              title: tr.hoverPreview,
+                              subtitle: tr.hoverPreviewHint,
+                              trailing: _Toggle(
+                                value: s.hoverPreview,
+                                onChanged: (v) => ctrl.update((s) => s.copyWith(hoverPreview: v)),
+                              ),
+                            ),
+                            _Row(
                               title: tr.bannerTrailers,
                               subtitle: tr.bannerTrailersHint,
                               trailing: _Toggle(

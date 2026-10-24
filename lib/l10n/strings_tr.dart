@@ -1332,4 +1332,11 @@ final class _Tr extends S {
   String get nothingToShuffle => 'Burada oynatılacak bir şey yok';
   @override
   String get upNextCaps => 'SIRADAKİ';
+
+  // --- Szenen-Vorschau auf Karten ---
+  @override
+  String get hoverPreview => 'Kartlarda sahne önizlemesi';
+  @override
+  String get hoverPreviewHint =>
+      'Bir başlıkta durduğunda kart sahneler arasında geçiş yapar (sunucundan resimler, video yok).';
 }

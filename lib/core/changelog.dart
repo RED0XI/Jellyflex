@@ -17,6 +17,7 @@ const changelog = <String, ({List<String> en, List<String> de})>{
       'Player: volume up to 150 % and with the mouse wheel; resuming starts a few seconds earlier.',
       'After several episodes in a row without input, the player asks “Still watching?”.',
       'Shuffle play for series, seasons, collections and libraries.',
+      'Rest on a card and it flips through scenes of the title (can be switched off in the settings).',
     ],
     de: [
       'Nach einem Update zeigt dieses Fenster, was neu ist.',
@@ -30,6 +31,7 @@ const changelog = <String, ({List<String> en, List<String> de})>{
       'Player: Lautstärke bis 150 % und mit dem Mausrad; beim Fortsetzen geht es ein paar Sekunden früher los.',
       'Nach mehreren Folgen am Stück ohne Bedienung fragt der Player „Schaust du noch?“.',
       'Zufällig abspielen für Serien, Staffeln, Sammlungen und Bibliotheken.',
+      'Verweilst du auf einer Karte, blättert sie durch Szenen des Titels (abschaltbar in den Einstellungen).',
     ],
   ),
   '0.3.2': (

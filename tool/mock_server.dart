@@ -170,6 +170,20 @@ Map<String, dynamic> _source(
   ],
 };
 
+/// Trickplay-Vorschaubilder (Kacheln 10×10 à 160×90) für eine Fassung.
+Map<String, dynamic> _trickplay(String sourceId, int runtimeTicks) => {
+  sourceId: {
+    '160': {
+      'Width': 160,
+      'Height': 90,
+      'TileWidth': 10,
+      'TileHeight': 10,
+      'ThumbnailCount': runtimeTicks ~/ (10 * 10000000),
+      'Interval': 10000,
+    },
+  },
+};
+
 List<Map<String, dynamic>> _twoVersions(String id, String name) => [
   {
     'Id': id,
@@ -384,6 +398,8 @@ void _seed() {
         ],
       // "Das Echo der Sterne" gibt es in zwei Fassungen (4K + 1080p).
       'MediaSources': i == 0 ? _twoVersions(id, _movieNames[i]) : [_source(id, 'mkv', width: 1920, height: 1080)],
+      // Szenen-Vorschau (Hover, Spulen) – zwei Filme ohne, damit auch der Ersatz geprüft wird.
+      if (i != 7 && i != 8) 'Trickplay': _trickplay(id, runtime),
     };
     movies.add(m);
     byId[id] = m;
@@ -467,6 +483,7 @@ void _seed() {
           'SeasonName': 'Staffel $n',
           'RunTimeTicks': runtime,
           'MediaSources': [_source(epId, 'mkv', width: 1920, height: 1080, size: 1200000000)],
+          'Trickplay': _trickplay(epId, runtime),
           'Overview': 'In dieser Folge spitzt sich die Lage zu – und eine alte Entscheidung holt alle wieder ein.',
           'ImageTags': {'Primary': 'p'},
           'SeriesPrimaryImageTag': 'p',
@@ -508,6 +525,33 @@ void _seed() {
 
 final _imageCache = <String, List<int>>{};
 
+/// Kachel aus [cols]×[rows] Vorschaubildern, jedes mit eigenem Farbverlauf.
+List<int> _tilePng(int cellW, int cellH, int cols, int rows, int seed) {
+  final colors = [
+    for (var i = 0; i < cols * rows; i++)
+      () {
+        final r = math.Random(seed + i * 7919);
+        return [40 + r.nextInt(200), 40 + r.nextInt(200), 40 + r.nextInt(200)];
+      }(),
+  ];
+  final w = cellW * cols;
+  final h = cellH * rows;
+  final raw = BytesBuilder();
+  for (var y = 0; y < h; y++) {
+    raw.addByte(0);
+    final row = Uint8List(w * 3);
+    for (var x = 0; x < w; x++) {
+      final c = colors[(y ~/ cellH) * cols + x ~/ cellW];
+      final shade = 0.6 + 0.4 * ((x % cellW) / cellW);
+      for (var k = 0; k < 3; k++) {
+        row[x * 3 + k] = (c[k] * shade).round().clamp(0, 255);
+      }
+    }
+    raw.add(row);
+  }
+  return _encodePng(w, h, raw.toBytes(), 3);
+}
+
 List<int> _png(int w, int h, int seed, {bool logo = false}) {
   final r = math.Random(seed);
   final c1 = [40 + r.nextInt(150), 30 + r.nextInt(120), 60 + r.nextInt(170)];
@@ -535,7 +579,12 @@ List<int> _png(int w, int h, int seed, {bool logo = false}) {
     }
     raw.add(row);
   }
-  final idat = ZLibEncoder().convert(raw.toBytes());
+  return _encodePng(w, h, raw.toBytes(), channels);
+}
+
+/// PNG aus Rohzeilen (je Zeile ein Filter-Byte 0 vorneweg); 3 = RGB, 4 = RGBA.
+List<int> _encodePng(int w, int h, List<int> rows, int channels) {
+  final idat = ZLibEncoder().convert(rows);
   final out = BytesBuilder()..add([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
   void chunk(String type, List<int> data) {
     final typeBytes = ascii.encode(type);
@@ -545,7 +594,7 @@ List<int> _png(int w, int h, int seed, {bool logo = false}) {
     out.add(_u32(_crc32([...typeBytes, ...data])));
   }
 
-  chunk('IHDR', [..._u32(w), ..._u32(h), 8, logo ? 6 : 2, 0, 0, 0]);
+  chunk('IHDR', [..._u32(w), ..._u32(h), 8, channels == 4 ? 6 : 2, 0, 0, 0]);
   chunk('IDAT', idat);
   chunk('IEND', const []);
   return out.toBytes();
@@ -983,6 +1032,15 @@ Future<void> main() async {
         _lastStream = {'itemId': seg[1], 'path': seg[2], ...req.uri.queryParameters};
         // Umgerechnet (static=false): wie Jellyfin am Stück, ohne Größe und ohne Range.
         unawaited(_serveVideo(req, progressive: req.uri.queryParameters['static'] == 'false'));
+        continue;
+      }
+      // Trickplay-Kachel: jedes Vorschaubild eine eigene Farbe.
+      if (seg.length == 5 && seg[0] == 'Videos' && seg[2] == 'Trickplay') {
+        final key = 'trickplay/${seg[1]}/${seg[4]}';
+        final bytes = _imageCache.putIfAbsent(key, () => _tilePng(160, 90, 10, 10, key.hashCode));
+        res.headers.contentType = ContentType('image', 'png');
+        res.add(bytes);
+        await res.close();
         continue;
       }
       if (seg.length >= 4 && seg[0] == 'Items' && seg[2] == 'Images') {

@@ -13,6 +13,7 @@ import '../features/item_actions.dart';
 import '../l10n/strings.dart';
 import '../theme.dart';
 import 'focusable.dart';
+import 'hover_preview.dart';
 import 'jf_image.dart';
 
 /// Kartengrößen – abhängig vom Layout (siehe [AppLayout.cardScale]).
@@ -387,6 +388,7 @@ class PosterCard extends ConsumerWidget {
                     blurHash: poster?.blurHash,
                     fallback: _TitleFallback(item.name),
                   ),
+                  HoverPreview(item: item, active: hovered),
                   _Badge(item),
                   if (progressOf(item) case final p?) _ProgressBar(p),
                 ],
@@ -442,6 +444,7 @@ class LandscapeCard extends ConsumerWidget {
                     blurHash: image?.blurHash,
                     fallback: _TitleFallback(cardTitle(item)),
                   ),
+                  HoverPreview(item: item, active: hovered),
                   AnimatedOpacity(
                     opacity: hovered ? 1 : 0,
                     duration: const Duration(milliseconds: 200),

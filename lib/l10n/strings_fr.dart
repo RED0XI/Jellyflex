@@ -1344,4 +1344,11 @@ final class _Fr extends S {
   String get nothingToShuffle => 'Rien à lire ici';
   @override
   String get upNextCaps => 'À SUIVRE';
+
+  // --- Szenen-Vorschau auf Karten ---
+  @override
+  String get hoverPreview => 'Aperçu des scènes sur les cartes';
+  @override
+  String get hoverPreviewHint =>
+      'Quand vous vous arrêtez sur un titre, la carte fait défiler des scènes (images de votre serveur, pas de vidéo).';
 }
