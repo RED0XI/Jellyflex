@@ -289,6 +289,7 @@ class S {
   String get upcoming => _t('Upcoming', 'Demnächst');
   String get upcomingHint =>
       _t('New episodes of your shows in the coming weeks.', 'Neue Folgen deiner Serien in den nächsten Wochen.');
+  String get noUpcomingTitle => _t('Nothing announced', 'Nichts angekündigt');
   String get noUpcoming => _t(
     'No new episodes announced for your shows right now.',
     'Für deine Serien sind gerade keine neuen Folgen angekündigt.',
@@ -314,9 +315,10 @@ class S {
     'Private lists on your Jellyfin server – available on all your devices.',
     'Private Listen auf deinem Jellyfin-Server – auf all deinen Geräten verfügbar.',
   );
-  String get noListsYet => _t(
-    'No lists yet. Use the bookmark on a title or “Add to list”.',
-    'Noch keine Listen. Nutze das Lesezeichen bei einem Titel oder „Zu Liste hinzufügen“.',
+  String get noListsTitle => _t('No lists yet', 'Noch keine Listen');
+  String get noListsHint => _t(
+    'Use the bookmark on a title or “Add to list”.',
+    'Nutze das Lesezeichen bei einem Titel oder „Zu Liste hinzufügen“.',
   );
   String get listEmpty => _t('This list is empty.', 'Diese Liste ist leer.');
   String get deleteList => _t('Delete list', 'Liste löschen');
@@ -573,7 +575,7 @@ class S {
   String downloadsSummary(int count, String size) =>
       _t('$count ${count == 1 ? 'title' : 'titles'} · $size used', '$count Titel · $size belegt');
   String get openFolder => _t('Open folder', 'Ordner öffnen');
-  String get noDownloadsYet => _t('No downloads yet.', 'Noch keine Downloads.');
+  String get noDownloadsYet => _t('No downloads yet', 'Noch keine Downloads');
   String get noDownloadsHint => _t(
     'Click “Download” on a details page or via right-click.',
     'Auf einer Detailseite oder per Rechtsklick auf „Herunterladen“ klicken.',
@@ -674,6 +676,11 @@ class S {
   String get searchHint => _t('Search titles, episodes or actors …', 'Titel, Folgen oder Schauspieler suchen …');
   String get clear => _t('Clear', 'Leeren');
   String searchFailed(Object e) => _t('Search failed: $e', 'Suche fehlgeschlagen: $e');
+  String get browseByGenre => _t('Browse by genre', 'Nach Genre stöbern');
+  String get searchEmptyHint => _t(
+    'Search for titles, episodes or people – or pick a genre.',
+    'Suche nach Titeln, Folgen oder Personen – oder wähle ein Genre.',
+  );
   String get whatDoYouFeelLike => _t('What are you in the mood for?', 'Wonach ist dir heute?');
   String nothingFoundFor(String term) => _t('Nothing found for “$term”.', 'Nichts gefunden für „$term“.');
   String get movies => _t('Movies', 'Filme');

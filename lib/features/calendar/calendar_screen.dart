@@ -9,6 +9,7 @@ import '../../l10n/strings.dart';
 import '../../theme.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/jf_image.dart';
+import '../../widgets/page_header.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/states.dart';
 import '../../widgets/top_scrim.dart';
@@ -79,19 +80,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               physics: physics,
               slivers: [
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 28, kPageGutter, 6),
-                    child: Text(
-                      tr.upcoming,
-                      style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -0.8),
-                    ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 24),
-                    child: Text(tr.upcomingHint, style: TextStyle(color: AppColors.textSecondary)),
-                  ),
+                  child: PageHeader(title: tr.upcoming, subtitle: tr.upcomingHint),
                 ),
                 ...upcoming.when(
                   loading: () => [const SliverToBoxAdapter(child: RowsSkeleton())],
@@ -118,19 +107,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       ),
                       if (days.isEmpty)
                         SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 70),
-                            child: Column(
-                              children: [
-                                Icon(Icons.event_available_rounded, size: 52, color: AppColors.textMuted),
-                                const SizedBox(height: 12),
-                                Text(
-                                  tr.noUpcoming,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
-                                ),
-                              ],
-                            ),
+                          child: EmptyState(
+                            icon: Icons.event_available_rounded,
+                            title: tr.noUpcomingTitle,
+                            hint: tr.noUpcoming,
                           ),
                         )
                       else

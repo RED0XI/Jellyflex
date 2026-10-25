@@ -7,7 +7,9 @@ import '../../l10n/strings.dart';
 import '../../theme.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/media_cards.dart';
+import '../../widgets/buttons.dart';
 import '../../widgets/media_row.dart';
+import '../../widgets/page_header.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/states.dart';
 import '../../widgets/top_scrim.dart';
@@ -69,28 +71,10 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
               physics: physics,
               slivers: [
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 28, kPageGutter, 18),
-                    child: Row(
-                      children: [
-                        Text(
-                          tr.myLists,
-                          style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -0.8),
-                        ),
-                        const Spacer(),
-                        FilledButton.icon(
-                          onPressed: _create,
-                          icon: const Icon(Icons.add_rounded),
-                          label: Text(tr.newList),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 24),
-                    child: Text(tr.listsHint, style: TextStyle(color: AppColors.textSecondary)),
+                  child: PageHeader(
+                    title: tr.myLists,
+                    subtitle: tr.listsHint,
+                    actions: [GlassButton(label: tr.newList, icon: Icons.add_rounded, onPressed: _create)],
                   ),
                 ),
                 ...lists.when(
@@ -103,15 +87,10 @@ class _ListsScreenState extends ConsumerState<ListsScreen> {
                   data: (lists) => lists.isEmpty
                       ? [
                           SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 60),
-                              child: Column(
-                                children: [
-                                  Icon(Icons.bookmark_border_rounded, size: 52, color: AppColors.textMuted),
-                                  const SizedBox(height: 12),
-                                  Text(tr.noListsYet, style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
-                                ],
-                              ),
+                            child: EmptyState(
+                              icon: Icons.bookmark_border_rounded,
+                              title: tr.noListsTitle,
+                              hint: tr.noListsHint,
                             ),
                           ),
                         ]

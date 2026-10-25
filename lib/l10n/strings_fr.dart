@@ -596,7 +596,7 @@ final class _Fr extends S {
   @override
   String get openFolder => 'Ouvrir le dossier';
   @override
-  String get noDownloadsYet => 'Aucun téléchargement pour l’instant.';
+  String get noDownloadsYet => 'Aucun téléchargement pour l’instant';
   @override
   String get noDownloadsHint => 'Cliquez sur « Télécharger » sur une page de détails ou via le clic droit.';
   @override
@@ -1031,6 +1031,12 @@ final class _Fr extends S {
   @override
   String get myLists => 'Mes listes';
   @override
+  String get browseByGenre => 'Parcourir par genre';
+  @override
+  String get searchEmptyHint => 'Cherchez des titres, des épisodes ou des personnes – ou choisissez un genre.';
+  @override
+  String get noUpcomingTitle => 'Rien d’annoncé';
+  @override
   String get upcoming => 'À venir';
   @override
   String get upcomingHint => 'Les nouveaux épisodes de vos séries dans les semaines à venir.';
@@ -1067,8 +1073,9 @@ final class _Fr extends S {
   @override
   String get listsHint => 'Listes privées sur votre serveur Jellyfin – disponibles sur tous vos appareils.';
   @override
-  String get noListsYet =>
-      'Aucune liste pour l’instant. Utilisez le marque-page d’un titre ou « Ajouter à une liste ».';
+  String get noListsTitle => 'Aucune liste pour l’instant';
+  @override
+  String get noListsHint => 'Utilisez le marque-page d’un titre ou « Ajouter à une liste ».';
   @override
   String get listEmpty => 'Cette liste est vide.';
   @override

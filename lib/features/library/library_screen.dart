@@ -11,6 +11,7 @@ import '../../core/session.dart';
 import '../../theme.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/media_cards.dart';
+import '../../widgets/page_header.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/states.dart';
 import '../../widgets/top_scrim.dart';
@@ -340,13 +341,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.name,
-                          style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -0.8),
-                        ),
-                        Text(
-                          _total == null ? ' ' : tr.titlesCount(_total!),
-                          style: TextStyle(color: AppColors.textSecondary),
+                        PageHeader(
+                          title: widget.name,
+                          subtitle: _total == null ? ' ' : tr.titlesCount(_total!),
+                          padding: EdgeInsets.zero,
                         ),
                         const SizedBox(height: 18),
                         Wrap(

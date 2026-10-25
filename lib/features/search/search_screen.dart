@@ -12,6 +12,7 @@ import '../../widgets/media_cards.dart';
 import '../../widgets/media_row.dart';
 import '../../widgets/people_row.dart';
 import '../../widgets/smooth_scroll.dart';
+import '../../widgets/states.dart';
 import '../../widgets/top_scrim.dart';
 import '../../l10n/strings.dart';
 
@@ -20,6 +21,7 @@ enum _Filter { all, movies, shows, episodes, people }
 
 /// Suche mit Live-Ergebnissen: Filme, Serien, Folgen und Personen (z. B. nach
 /// Schauspielern suchen), mit Filtern und den letzten Suchen (nur auf diesem Gerät).
+/// Ohne Suchbegriff lässt sich nach Genre stöbern.
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
@@ -40,6 +42,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   int _requestId = 0;
   _Filter _filter = _Filter.all;
   bool _onlyUnwatched = false;
+
+  /// Gewähltes Genre (Stöbern ohne Suchbegriff) und alle Genres der Bibliotheken.
+  String? _genre;
+  List<String> _genres = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(apiProvider).getGenres(null).then((g) {
+      if (mounted) setState(() => _genres = g);
+    }, onError: (_) {});
+  }
 
   @override
   void dispose() {
@@ -66,11 +80,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _search(String term) async {
-    if (term == _term) return;
+    if (term == _term && _genre == null) return;
     final id = ++_requestId;
     _remember?.cancel();
     setState(() {
       _term = term;
+      _genre = null;
       _error = null;
       _loading = term.isNotEmpty;
       if (term.isEmpty) {
@@ -101,6 +116,38 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       if (mounted && id == _requestId) setState(() => _loading = false);
     }
   }
+
+  /// Filme und Serien eines Genres zeigen (Suchfeld wird geleert).
+  Future<void> _browseGenre(String genre) async {
+    final id = ++_requestId;
+    _remember?.cancel();
+    _controller.clear();
+    setState(() {
+      _term = '';
+      _genre = genre;
+      _error = null;
+      _loading = true;
+      _results = const [];
+      _people = const [];
+      if (_filter == _Filter.episodes || _filter == _Filter.people) _filter = _Filter.all;
+    });
+    try {
+      final results = await ref.read(apiProvider).getByGenre(genre, limit: 120);
+      if (mounted && id == _requestId) setState(() => _results = results);
+    } catch (e) {
+      if (mounted && id == _requestId) setState(() => _error = e);
+    } finally {
+      if (mounted && id == _requestId) setState(() => _loading = false);
+    }
+  }
+
+  /// Genres als anklickbare Chips.
+  Widget _genreChips({WrapAlignment alignment = WrapAlignment.start}) => Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    alignment: alignment,
+    children: [for (final g in _genres) _Chip(label: g, selected: false, onTap: () => _browseGenre(g))],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +213,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     ),
                   ),
                 ),
-                if (_term.isNotEmpty)
+                if (_term.isNotEmpty || _genre != null)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 20),
@@ -175,12 +222,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         runSpacing: 8,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
+                          if (_genre case final genre?) ...[
+                            _Chip(
+                              label: tr.genreLabel(genre),
+                              icon: Icons.close_rounded,
+                              selected: true,
+                              onTap: () => _search(''),
+                            ),
+                            const SizedBox(width: 12),
+                          ],
                           for (final (f, label) in [
                             (_Filter.all, tr.filterAll),
                             (_Filter.movies, tr.movies),
                             (_Filter.shows, tr.shows),
-                            (_Filter.episodes, tr.episodes),
-                            (_Filter.people, tr.people),
+                            if (_genre == null) ...[(_Filter.episodes, tr.episodes), (_Filter.people, tr.people)],
                           ])
                             _Chip(label: label, selected: _filter == f, onTap: () => setState(() => _filter = f)),
                           const SizedBox(width: 12),
@@ -196,17 +251,48 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   ),
                 if (_error != null)
                   SliverToBoxAdapter(
-                    child: _Hint(icon: Icons.cloud_off_rounded, text: tr.searchFailed(_error!)),
+                    child: EmptyState(icon: Icons.cloud_off_rounded, title: tr.searchFailed(_error!)),
                   )
-                else if (_term.isEmpty)
+                else if (_term.isEmpty && _genre == null)
                   SliverToBoxAdapter(
                     child: recent.isEmpty
-                        ? _Hint(icon: Icons.movie_filter_rounded, text: tr.whatDoYouFeelLike)
-                        : _RecentSearches(terms: recent, onUse: _useRecent, onRemove: _forget),
+                        ? EmptyState(
+                            icon: Icons.movie_filter_rounded,
+                            title: tr.whatDoYouFeelLike,
+                            hint: tr.searchEmptyHint,
+                            child: _genres.isEmpty ? null : _genreChips(alignment: WrapAlignment.center),
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _RecentSearches(terms: recent, onUse: _useRecent, onRemove: _forget),
+                              if (_genres.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(kPageGutter, 34, kPageGutter, 40),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(Icons.theater_comedy_outlined, size: 20, color: AppColors.textSecondary),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            tr.browseByGenre,
+                                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _genreChips(),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
                   )
                 else if (!_loading && nothing)
                   SliverToBoxAdapter(
-                    child: _Hint(icon: Icons.search_off_rounded, text: tr.nothingFoundFor(_term)),
+                    child: EmptyState(icon: Icons.search_off_rounded, title: tr.nothingFoundFor(_genre ?? _term)),
                   )
                 else
                   SliverList.list(
@@ -343,27 +429,6 @@ class _Chip extends StatelessWidget {
             ?trailing,
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _Hint extends StatelessWidget {
-  const _Hint({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 80),
-      child: Column(
-        children: [
-          Icon(icon, size: 56, color: AppColors.textMuted),
-          const SizedBox(height: 14),
-          Text(text, style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
-        ],
       ),
     );
   }

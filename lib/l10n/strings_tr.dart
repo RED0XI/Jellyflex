@@ -595,7 +595,7 @@ final class _Tr extends S {
   @override
   String get openFolder => 'Klasörü aç';
   @override
-  String get noDownloadsYet => 'Henüz indirme yok.';
+  String get noDownloadsYet => 'Henüz indirme yok';
   @override
   String get noDownloadsHint => 'Bir ayrıntı sayfasında ya da sağ tıklayarak “İndir”e tıkla.';
   @override
@@ -1027,6 +1027,12 @@ final class _Tr extends S {
   @override
   String get myLists => 'Listelerim';
   @override
+  String get browseByGenre => 'Türe göre göz at';
+  @override
+  String get searchEmptyHint => 'Başlık, bölüm ya da kişi ara – ya da bir tür seç.';
+  @override
+  String get noUpcomingTitle => 'Duyurulmuş bir şey yok';
+  @override
   String get upcoming => 'Yakında';
   @override
   String get upcomingHint => 'Dizilerinin önümüzdeki haftalardaki yeni bölümleri.';
@@ -1063,7 +1069,9 @@ final class _Tr extends S {
   @override
   String get listsHint => 'Jellyfin sunucundaki özel listeler – tüm cihazlarında kullanılabilir.';
   @override
-  String get noListsYet => 'Henüz liste yok. Bir başlıktaki yer imini ya da “Listeye ekle”yi kullan.';
+  String get noListsTitle => 'Henüz liste yok';
+  @override
+  String get noListsHint => 'Bir başlıktaki yer imini ya da “Listeye ekle”yi kullan.';
   @override
   String get listEmpty => 'Bu liste boş.';
   @override

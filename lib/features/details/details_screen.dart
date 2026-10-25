@@ -578,23 +578,53 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
     final audioStream =
         source.audioStreams.where((s) => s.index == audio).firstOrNull ?? source.embeddedStreams('Audio').firstOrNull;
     final subtitleStream = source.subtitleStreams.where((s) => s.index == subtitle).firstOrNull;
+    final audioName = audioStream == null ? '?' : _audioShort(source, audioStream);
+    final subtitleName = subtitleStream == null ? tr.off : _subtitleShort(subtitleStream);
     return [
       if (source.audioStreams.length > 1)
         Builder(
-          builder: (buttonContext) => GlassButton(
-            label: tr.audioLabel(audioStream == null ? '?' : _audioShort(source, audioStream)),
+          builder: (buttonContext) => OptionChip(
+            text: tr.audioLabel(audioName),
+            value: audioName,
             icon: Icons.volume_up_rounded,
             onPressed: () => _chooseAudio(buttonContext, source, audioStream?.index),
           ),
         ),
       if (source.subtitleStreams.isNotEmpty)
         Builder(
-          builder: (buttonContext) => GlassButton(
-            label: tr.subtitlesLabel(subtitleStream == null ? tr.off : _subtitleShort(subtitleStream)),
+          builder: (buttonContext) => OptionChip(
+            text: tr.subtitlesLabel(subtitleName),
+            value: subtitleName,
             icon: Icons.subtitles_rounded,
             onPressed: () => _chooseSubtitle(buttonContext, source, subtitleStream?.index),
           ),
         ),
+    ];
+  }
+
+  /// Auswahl unter den Hauptknöpfen: Fassung, Ton, Untertitel (nur, was es zu wählen gibt).
+  List<Widget> _optionChips(MediaSource? source) {
+    final item = widget.item;
+    if (source == null || item.isSeries || item.isCollection) return const [];
+    final version = _shortVersion(source);
+    return [
+      if (item.mediaSources.length > 1)
+        Builder(
+          builder: (buttonContext) => OptionChip(
+            text: tr.versionLabel(version),
+            value: version,
+            icon: Icons.video_settings_rounded,
+            onPressed: () => _chooseVersion(buttonContext),
+          ),
+        ),
+      ..._trackButtons(source),
+      // Medieninfo gehört zu den Angaben über die Datei.
+      CircleIconButton(
+        icon: Icons.info_outline_rounded,
+        tooltip: tr.mediaInfoTooltip,
+        size: 38,
+        onPressed: () => showMediaInfoDialog(context, item, source),
+      ),
     ];
   }
 
@@ -662,7 +692,8 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       );
     }
 
-    return Wrap(
+    final options = _optionChips(source);
+    final actions = Wrap(
       spacing: 12,
       runSpacing: 12,
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -674,15 +705,6 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
             icon: Icons.shuffle_rounded,
             onPressed: () => playShuffled(context, parentId: item.id, includeItemTypes: 'Episode'),
           ),
-        if (item.mediaSources.length > 1 && source != null)
-          Builder(
-            builder: (buttonContext) => GlassButton(
-              label: tr.versionLabel(_shortVersion(source)),
-              icon: Icons.video_settings_rounded,
-              onPressed: () => _chooseVersion(buttonContext),
-            ),
-          ),
-        if (source != null && !item.isSeries && !item.isCollection) ..._trackButtons(source),
         CircleIconButton(
           icon: Icons.check_rounded,
           tooltip: played ? tr.markUnplayed : tr.markPlayed,
@@ -699,12 +721,15 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
         ),
         if (!item.isCollection) WatchlistButton(item: item),
         if (!item.isSeries && !item.isCollection) _DownloadButton(item: item, mediaSourceId: _chosenSourceId),
-        if (source != null && !item.isSeries && !item.isCollection)
-          CircleIconButton(
-            icon: Icons.info_outline_rounded,
-            tooltip: tr.mediaInfoTooltip,
-            onPressed: () => showMediaInfoDialog(context, item, source),
-          ),
+      ],
+    );
+    if (options.isEmpty) return actions;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        actions,
+        const SizedBox(height: 16),
+        Wrap(spacing: 10, runSpacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: options),
       ],
     );
   }

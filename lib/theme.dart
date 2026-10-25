@@ -74,6 +74,18 @@ ThemeData buildTheme([String? key]) {
         TargetPlatform.android: _FadeScaleTransitionsBuilder(),
       },
     ),
+    // "Aus" ruhig und grau, "An" in der Themenfarbe – so springt ins Auge, was eingeschaltet ist.
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected) ? Colors.white : AppColors.textSecondary,
+      ),
+      trackColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected) ? AppColors.accent : Colors.white.withValues(alpha: 0.1),
+      ),
+      trackOutlineColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.focused) ? AppColors.textPrimary : Colors.transparent,
+      ),
+    ),
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(color: AppColors.surfaceHigh, borderRadius: BorderRadius.circular(6)),
       textStyle: textTheme.bodySmall,

@@ -109,6 +109,60 @@ class _GlassButtonState extends State<GlassButton> {
   }
 }
 
+/// Kleine Auswahl unter den Hauptknöpfen (Fassung, Ton, Untertitel): "Ton: **Deutsch** ⌄".
+/// [text] ist der ganze Text (z. B. tr.audioLabel(value)); der Teil [value] am Ende wird betont.
+class OptionChip extends StatelessWidget {
+  const OptionChip({super.key, required this.text, required this.value, required this.onPressed, this.icon});
+
+  final String text;
+  final String value;
+  final IconData? icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final prefix = text.endsWith(value) ? text.substring(0, text.length - value.length) : '';
+    return Focusable(
+      onTap: onPressed,
+      semanticLabel: text,
+      builder: (context, hovered) => AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 38,
+        padding: const EdgeInsets.only(left: 14, right: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: hovered ? 0.16 : 0.07),
+          borderRadius: BorderRadius.circular(19),
+          border: Border.all(color: Colors.white.withValues(alpha: hovered ? 0.5 : 0.12)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[Icon(icon, size: 18, color: AppColors.textSecondary), const SizedBox(width: 8)],
+            Text.rich(
+              TextSpan(
+                children: [
+                  if (prefix.isNotEmpty)
+                    TextSpan(
+                      text: prefix,
+                      style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                    ),
+                  TextSpan(
+                    text: prefix.isEmpty ? text : value,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              style: const TextStyle(fontSize: 14),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.expand_more_rounded, size: 18, color: AppColors.textSecondary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Runder Icon-Button (Favorit, Gesehen, …).
 class CircleIconButton extends StatefulWidget {
   const CircleIconButton({

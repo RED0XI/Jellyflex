@@ -9,7 +9,9 @@ import '../../core/settings.dart';
 import '../../theme.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/focusable.dart';
+import '../../widgets/page_header.dart';
 import '../../widgets/smooth_scroll.dart';
+import '../../widgets/states.dart';
 import '../../widgets/top_scrim.dart';
 import '../../l10n/strings.dart';
 import '../../core/platform/app_paths.dart';
@@ -48,52 +50,29 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
               physics: physics,
               slivers: [
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 28, kPageGutter, 24),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              tr.downloads,
-                              style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -0.8),
-                            ),
-                            Text(
-                              entries.isEmpty
-                                  ? tr.savedForOffline
-                                  : tr.downloadsSummary(done.length, formatBytes(manager.usedBytes)),
-                              style: TextStyle(color: AppColors.textSecondary),
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        GlassButton(
-                          label: tr.openFolder,
-                          icon: Icons.folder_open_rounded,
-                          onPressed: () {
-                            manager.root.createSync(recursive: true);
-                            AppPaths.openFolder(manager.root.path);
-                          },
-                        ),
-                      ],
-                    ),
+                  child: PageHeader(
+                    title: tr.downloads,
+                    subtitle: entries.isEmpty
+                        ? tr.savedForOffline
+                        : tr.downloadsSummary(done.length, formatBytes(manager.usedBytes)),
+                    actions: [
+                      GlassButton(
+                        label: tr.openFolder,
+                        icon: Icons.folder_open_rounded,
+                        onPressed: () {
+                          manager.root.createSync(recursive: true);
+                          AppPaths.openFolder(manager.root.path);
+                        },
+                      ),
+                    ],
                   ),
                 ),
                 if (entries.isEmpty)
                   SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.only(top: 80),
-                      child: Column(
-                        children: [
-                          Icon(Icons.download_for_offline_outlined, size: 56, color: AppColors.textMuted),
-                          SizedBox(height: 14),
-                          Text(tr.noDownloadsYet, style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
-                          SizedBox(height: 4),
-                          Text(tr.noDownloadsHint, style: TextStyle(color: AppColors.textMuted)),
-                        ],
-                      ),
+                    child: EmptyState(
+                      icon: Icons.download_for_offline_outlined,
+                      title: tr.noDownloadsYet,
+                      hint: tr.noDownloadsHint,
                     ),
                   ),
                 if (active.isNotEmpty)

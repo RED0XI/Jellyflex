@@ -8,6 +8,7 @@ import '../../core/session.dart';
 import '../../core/settings.dart';
 import '../screensaver/screensaver.dart';
 import '../../theme.dart';
+import '../../widgets/page_header.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/smooth_scroll.dart';
@@ -96,10 +97,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          tr.settings,
-                          style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -0.8),
-                        ),
+                        PageHeader(title: tr.settings, padding: EdgeInsets.zero),
                         const SizedBox(height: 28),
 
                         _Section(
@@ -704,12 +702,7 @@ class _Toggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Switch(
-      value: value,
-      onChanged: onChanged,
-      activeThumbColor: Colors.white,
-      activeTrackColor: AppColors.accent,
-    );
+    return Switch(value: value, onChanged: onChanged);
   }
 }
 

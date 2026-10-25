@@ -74,6 +74,47 @@ class RowsSkeleton extends StatelessWidget {
   }
 }
 
+/// Leere Seite: Symbol, kurzer Titel, ein Satz Hinweis, optional etwas zum Anklicken.
+/// Überall gleich hoch, damit Listen, Downloads, Kalender und Suche zusammenpassen.
+class EmptyState extends StatelessWidget {
+  const EmptyState({super.key, required this.icon, required this.title, this.hint, this.child});
+
+  final IconData icon;
+  final String title;
+  final String? hint;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 64, 32, 0),
+      child: Column(
+        children: [
+          Icon(icon, size: 52, color: AppColors.textMuted),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 17, fontWeight: FontWeight.w600),
+          ),
+          if (hint != null) ...[
+            const SizedBox(height: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Text(
+                hint!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textSecondary, height: 1.45),
+              ),
+            ),
+          ],
+          if (child != null) ...[const SizedBox(height: 22), child!],
+        ],
+      ),
+    );
+  }
+}
+
 /// Fehleransicht mit "Erneut versuchen".
 class ErrorView extends StatelessWidget {
   const ErrorView({super.key, required this.message, required this.onRetry, this.secondaryLabel, this.onSecondary});

@@ -596,7 +596,7 @@ final class _Es extends S {
   @override
   String get openFolder => 'Abrir carpeta';
   @override
-  String get noDownloadsYet => 'Todavía no hay descargas.';
+  String get noDownloadsYet => 'Todavía no hay descargas';
   @override
   String get noDownloadsHint => 'Haz clic en «Descargar» en una página de detalles o con el botón derecho.';
   @override
@@ -1031,6 +1031,12 @@ final class _Es extends S {
   @override
   String get myLists => 'Mis listas';
   @override
+  String get browseByGenre => 'Explorar por género';
+  @override
+  String get searchEmptyHint => 'Busca títulos, episodios o personas, o elige un género.';
+  @override
+  String get noUpcomingTitle => 'Nada anunciado';
+  @override
   String get upcoming => 'Próximamente';
   @override
   String get upcomingHint => 'Nuevos episodios de tus series en las próximas semanas.';
@@ -1067,7 +1073,9 @@ final class _Es extends S {
   @override
   String get listsHint => 'Listas privadas en tu servidor Jellyfin – disponibles en todos tus dispositivos.';
   @override
-  String get noListsYet => 'Todavía no hay listas. Usa el marcador de un título o «Añadir a una lista».';
+  String get noListsTitle => 'Todavía no hay listas';
+  @override
+  String get noListsHint => 'Usa el marcador de un título o «Añadir a una lista».';
   @override
   String get listEmpty => 'Esta lista está vacía.';
   @override

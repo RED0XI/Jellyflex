@@ -9,6 +9,7 @@ import '../../core/images.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../theme.dart';
+import '../../widgets/page_header.dart';
 import '../../widgets/backdrop_slideshow.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/focusable.dart';
@@ -255,18 +256,12 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.casino_rounded, size: 34, color: AppColors.accent),
-                          SizedBox(width: 12),
-                          Text(
-                            tr.surpriseMe,
-                            style: TextStyle(fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -0.8),
-                          ),
-                        ],
+                      PageHeader(
+                        title: tr.surpriseMe,
+                        subtitle: tr.letChanceDecide,
+                        icon: Icons.casino_rounded,
+                        padding: EdgeInsets.zero,
                       ),
-                      const SizedBox(height: 4),
-                      Text(tr.letChanceDecide, style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
                       const SizedBox(height: 20),
                       _filters(),
                     ],
