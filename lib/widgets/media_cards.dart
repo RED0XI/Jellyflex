@@ -34,10 +34,37 @@ void openItem(BuildContext context, BaseItem item) {
 
 /// Startet die Wiedergabe (ggf. an der gespeicherten Stelle) – optional eine
 /// bestimmte Fassung ([mediaSourceId]), wenn es mehrere gibt.
-void playItem(BuildContext context, BaseItem item, {bool fromStart = false, String? mediaSourceId}) {
+void playItem(
+  BuildContext context,
+  BaseItem item, {
+  bool fromStart = false,
+  String? mediaSourceId,
+  int? audioIndex,
+  int? subtitleIndex,
+}) {
   final ticks = item.userData.playbackPositionTicks;
-  final query = Uri(queryParameters: {if (!fromStart && ticks > 0) 'start': '$ticks', 'source': ?mediaSourceId}).query;
-  context.push('/play/${item.id}${query.isEmpty ? '' : '?$query'}');
+  context.push(
+    playPath(
+      item.id,
+      startTicks: fromStart ? 0 : ticks,
+      mediaSourceId: mediaSourceId,
+      audioIndex: audioIndex,
+      subtitleIndex: subtitleIndex,
+    ),
+  );
+}
+
+/// Adresse des Players mit Startpunkt, Fassung und (auf der Detailseite gewählten) Spuren.
+String playPath(String itemId, {int startTicks = 0, String? mediaSourceId, int? audioIndex, int? subtitleIndex}) {
+  final query = Uri(
+    queryParameters: {
+      if (startTicks > 0) 'start': '$startTicks',
+      'source': ?mediaSourceId,
+      if (audioIndex != null) 'audio': '$audioIndex',
+      if (subtitleIndex != null) 'sub': '$subtitleIndex',
+    },
+  ).query;
+  return '/play/$itemId${query.isEmpty ? '' : '?$query'}';
 }
 
 /// "Zufällig abspielen": Titel unterhalb von [parentId] mischen und nacheinander abspielen.

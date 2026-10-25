@@ -482,6 +482,10 @@ final class _Es extends S {
   @override
   String versionLabel(String v) => 'Versión: $v';
   @override
+  String audioLabel(String v) => 'Audio: $v';
+  @override
+  String subtitlesLabel(String v) => 'Subtítulos: $v';
+  @override
   String get markUnplayed => 'Marcar como no visto';
   @override
   String get markPlayed => 'Marcar como visto';

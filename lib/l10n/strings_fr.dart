@@ -481,6 +481,10 @@ final class _Fr extends S {
   @override
   String versionLabel(String v) => 'Version : $v';
   @override
+  String audioLabel(String v) => 'Audio : $v';
+  @override
+  String subtitlesLabel(String v) => 'Sous-titres : $v';
+  @override
   String get markUnplayed => 'Marquer comme non vu';
   @override
   String get markPlayed => 'Marquer comme vu';

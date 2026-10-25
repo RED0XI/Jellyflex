@@ -481,6 +481,10 @@ final class _Tr extends S {
   @override
   String versionLabel(String v) => 'Sürüm: $v';
   @override
+  String audioLabel(String v) => 'Ses: $v';
+  @override
+  String subtitlesLabel(String v) => 'Altyazı: $v';
+  @override
   String get markUnplayed => 'İzlenmedi işaretle';
   @override
   String get markPlayed => 'İzlendi işaretle';

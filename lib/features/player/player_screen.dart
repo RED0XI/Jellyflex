@@ -26,6 +26,7 @@ import '../../core/session.dart';
 import '../../core/series_tracks.dart';
 import '../../core/settings.dart';
 import '../../core/sleep_timer.dart';
+import '../../core/track_choice.dart';
 import '../../theme.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/window_frame.dart';
@@ -50,6 +51,8 @@ class PlayerScreen extends ConsumerStatefulWidget {
     this.startTicks,
     this.restoreFullscreen,
     this.mediaSourceId,
+    this.audioIndex,
+    this.subtitleIndex,
     this.autoPlayed = false,
     this.fromQueue = false,
   });
@@ -73,6 +76,11 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
   /// Gewählte Fassung bei mehreren Versionen; `null` = Standard (erste).
   final String? mediaSourceId;
+
+  /// Auf der Detailseite gewählte Spuren (Jellyfin-Streamindex, Untertitel -1 = aus);
+  /// `null` = wie sonst (für die Serie gemerkt, Einstellungen, Jellyfin).
+  final int? audioIndex;
+  final int? subtitleIndex;
 
   /// Vollbild-Zustand, der beim Schließen wiederhergestellt wird (bei "Nächste Folge"
   /// vom vorherigen Player übernommen). `null` = aktuellen Zustand nehmen.
@@ -531,15 +539,24 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       // Ist die Datei ohnehin kleiner als die Grenze, lohnt Umrechnen nicht.
       if (maxBitrate != null && (source.bitrate ?? 0) > 0 && source.bitrate! <= maxBitrate) maxBitrate = null;
       if (_localFile != null) maxBitrate = null; // lokal nie umrechnen
+      // Schon auf der Detailseite gewählte Spuren (nur, wenn es sie in dieser Fassung gibt).
+      final chosenAudio = validAudioIndex(source, widget.audioIndex);
+      final chosenSubtitle = validSubtitleIndex(source, widget.subtitleIndex);
       setState(() {
         _item = item;
         _source = source;
         _playSessionId = info.playSessionId;
         _maxBitrate = maxBitrate;
-        _audioIndex = _preferredAudioIndex(source);
-        _subtitleIndex = _preferredSubtitleIndex(source);
+        _audioIndex =
+            chosenAudio ?? preferredAudioIndex(source, remembered: _remembered?.audio, setting: settings.audioLanguage);
+        _subtitleIndex =
+            chosenSubtitle ??
+            preferredSubtitleIndex(source, remembered: _remembered?.subtitle, setting: settings.subtitleLanguage);
         _chapters = item.chapters;
       });
+      // Auf der Detailseite gewählt → wie eine Wahl im Player für die Serie merken.
+      if (chosenAudio != null) _rememberAudio(chosenAudio);
+      if (chosenSubtitle != null) _rememberSubtitle(chosenSubtitle);
 
       // Intro/Abspann und nächste Folge im Hintergrund nachladen.
       _api.getMediaSegments(item.id).then((s) {
@@ -777,47 +794,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     } else {
       _showControls(autoHide: false);
     }
-  }
-
-  /// Tonspur: für diese Serie zuletzt gewählt, sonst nach App-Einstellung
-  /// (bevorzugte Sprache), sonst wie in Jellyfin.
-  int? _preferredAudioIndex(MediaSource source) {
-    for (final pref in [_remembered?.audio, ref.read(settingsProvider).audioLanguage]) {
-      if (pref == null) continue;
-      final match = source.embeddedStreams('Audio').where((s) => sameLanguage(s.language, pref)).firstOrNull;
-      if (match != null) return match.index;
-    }
-    return source.defaultAudioStreamIndex;
-  }
-
-  /// Untertitel: für diese Serie zuletzt gewählt, sonst nach App-Einstellung,
-  /// sonst wie in Jellyfin (-1 = aus).
-  int? _preferredSubtitleIndex(MediaSource source) {
-    final remembered = _remembered?.subtitle;
-    if (remembered != null) {
-      if (remembered == subtitlesOff) return -1;
-      final index = _subtitleIndexFor(source, remembered);
-      if (index != null) return index;
-    }
-    final pref = ref.read(settingsProvider).subtitleLanguage;
-    if (pref == subtitlesOff) return -1;
-    if (pref != null) {
-      final index = _subtitleIndexFor(source, pref);
-      if (index != null) return index;
-    }
-    return source.defaultSubtitleStreamIndex;
-  }
-
-  /// Beste Untertitelspur einer Sprache (oder `null`).
-  int? _subtitleIndexFor(MediaSource source, String pref) {
-    // Vollständige Untertitel vor erzwungenen, eingebettete vor Dateien.
-    final candidates = source.mediaStreams.where((s) => s.type == 'Subtitle' && sameLanguage(s.language, pref)).toList()
-      ..sort((a, b) {
-        final forced = (a.isForced ? 1 : 0) - (b.isForced ? 1 : 0);
-        if (forced != 0) return forced;
-        return (a.isExternal ? 1 : 0) - (b.isExternal ? 1 : 0);
-      });
-    return candidates.firstOrNull?.index;
   }
 
   /// Gewählte Spur für diese Serie merken (nächste Folge startet genauso).

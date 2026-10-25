@@ -9,7 +9,10 @@ import '../../core/format.dart';
 import '../../core/images.dart';
 import '../../core/media_info.dart';
 import '../../core/models.dart';
+import '../../core/series_tracks.dart';
 import '../../core/session.dart';
+import '../../core/settings.dart';
+import '../../core/track_choice.dart';
 import '../../theme.dart';
 import '../../widgets/backdrop_slideshow.dart';
 import '../../widgets/buttons.dart';
@@ -107,6 +110,31 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
   /// Gewählte Fassung (bei mehreren Versionen); `null` = Standard.
   String? _sourceId;
 
+  /// Hier gewählte Ton- und Untertitelspur (Streamindex der Fassung, Untertitel -1 = aus);
+  /// `null` = was der Player ohnehin nehmen würde.
+  int? _audioIndex;
+  int? _subtitleIndex;
+
+  /// Andere Fassung: gewählte Spuren in derselben Sprache übernehmen (Indizes gelten je Fassung).
+  void _selectSource(BaseItem item, String id) {
+    MediaSource? find(String? sourceId) => item.mediaSources.where((s) => s.id == sourceId).firstOrNull;
+    final old = find(_sourceId) ?? item.mediaSources.firstOrNull;
+    final next = find(id);
+    String? language(String type, int? index) =>
+        old?.mediaStreams.where((s) => s.type == type && s.index == index).firstOrNull?.language;
+    final audioLanguage = language('Audio', _audioIndex);
+    final subtitleLanguage = language('Subtitle', _subtitleIndex);
+    setState(() {
+      _sourceId = id;
+      _audioIndex = next == null || audioLanguage == null
+          ? null
+          : next.embeddedStreams('Audio').where((s) => sameLanguage(s.language, audioLanguage)).firstOrNull?.index;
+      if (_subtitleIndex != null && _subtitleIndex! >= 0) {
+        _subtitleIndex = next == null || subtitleLanguage == null ? null : subtitleIndexFor(next, subtitleLanguage);
+      }
+    });
+  }
+
   @override
   void dispose() {
     _scroll.dispose();
@@ -200,7 +228,17 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(kPageGutter, size.height * 0.26, kPageGutter, 40),
-                  child: _Header(item: item, source: source, onSelectSource: (id) => setState(() => _sourceId = id)),
+                  child: _Header(
+                    item: item,
+                    source: source,
+                    onSelectSource: (id) => _selectSource(item, id),
+                    audioIndex: _audioIndex,
+                    subtitleIndex: _subtitleIndex,
+                    onSelectTracks: (audio, subtitle) => setState(() {
+                      _audioIndex = audio;
+                      _subtitleIndex = subtitle;
+                    }),
+                  ),
                 ),
               ),
               if (item.isSeries) SliverToBoxAdapter(child: _SeasonsSection(series: item)),
@@ -216,7 +254,12 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                 ),
               if (!item.isSeries && !item.isCollection && item.chapters.length > 1)
                 SliverToBoxAdapter(
-                  child: _ScenesRow(item: item, mediaSourceId: _sourceId),
+                  child: _ScenesRow(
+                    item: item,
+                    mediaSourceId: _sourceId,
+                    audioIndex: _audioIndex,
+                    subtitleIndex: _subtitleIndex,
+                  ),
                 ),
               if (people.isNotEmpty)
                 SliverToBoxAdapter(
@@ -233,14 +276,27 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
   }
 }
 
+/// Neue Wahl auf der Detailseite: Tonspur, Untertitel (-1 = aus).
+typedef _TracksChanged = void Function(int? audioIndex, int? subtitleIndex);
+
 class _Header extends ConsumerWidget {
-  const _Header({required this.item, this.source, required this.onSelectSource});
+  const _Header({
+    required this.item,
+    this.source,
+    required this.onSelectSource,
+    this.audioIndex,
+    this.subtitleIndex,
+    required this.onSelectTracks,
+  });
 
   final BaseItem item;
 
   /// Gewählte Fassung (für Abzeichen, Abspielen, Medieninfo).
   final MediaSource? source;
   final ValueChanged<String> onSelectSource;
+  final int? audioIndex;
+  final int? subtitleIndex;
+  final _TracksChanged onSelectTracks;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -346,7 +402,14 @@ class _Header extends ConsumerWidget {
               ),
             ],
             const SizedBox(height: 28),
-            _ActionButtons(item: item, source: source, onSelectSource: onSelectSource),
+            _ActionButtons(
+              item: item,
+              source: source,
+              onSelectSource: onSelectSource,
+              audioIndex: audioIndex,
+              subtitleIndex: subtitleIndex,
+              onSelectTracks: onSelectTracks,
+            ),
           ],
         ),
       ),
@@ -355,11 +418,21 @@ class _Header extends ConsumerWidget {
 }
 
 class _ActionButtons extends ConsumerStatefulWidget {
-  const _ActionButtons({required this.item, this.source, required this.onSelectSource});
+  const _ActionButtons({
+    required this.item,
+    this.source,
+    required this.onSelectSource,
+    this.audioIndex,
+    this.subtitleIndex,
+    required this.onSelectTracks,
+  });
 
   final BaseItem item;
   final MediaSource? source;
   final ValueChanged<String> onSelectSource;
+  final int? audioIndex;
+  final int? subtitleIndex;
+  final _TracksChanged onSelectTracks;
 
   @override
   ConsumerState<_ActionButtons> createState() => _ActionButtonsState();
@@ -405,27 +478,31 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
   /// Nur bei mehreren Fassungen gezielt eine abspielen, sonst entscheidet der Server.
   String? get _chosenSourceId => widget.item.mediaSources.length > 1 ? widget.source?.id : null;
 
-  Future<void> _chooseVersion(BuildContext buttonContext) async {
+  /// Auswahlmenü unter einem Knopf (Fassung, Ton, Untertitel): Titel und optional eine zweite Zeile.
+  static Future<T?> _choose<T>(
+    BuildContext buttonContext, {
+    required T? current,
+    required List<({T value, String title, String details})> options,
+  }) async {
     final box = buttonContext.findRenderObject()! as RenderBox;
     final overlay = Overlay.of(buttonContext).context.findRenderObject()! as RenderBox;
     final position = box.localToGlobal(Offset(0, box.size.height + 6), ancestor: overlay);
-    final current = widget.source?.id;
     final previousFocus = FocusManager.instance.primaryFocus;
-    final chosen = await showMenu<String>(
+    final chosen = await showMenu<T>(
       context: buttonContext,
       position: RelativeRect.fromRect(position & const Size(1, 1), Offset.zero & overlay.size),
       constraints: const BoxConstraints(minWidth: 320),
       items: [
-        for (final s in widget.item.mediaSources)
+        for (final o in options)
           PopupMenuItem(
-            value: s.id,
-            height: 56,
+            value: o.value,
+            height: o.details.isEmpty ? 44 : 56,
             child: Row(
               children: [
                 Icon(
-                  s.id == current ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                  o.value == current ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
                   size: 20,
-                  color: s.id == current ? AppColors.accent : AppColors.textMuted,
+                  color: o.value == current ? AppColors.accent : AppColors.textMuted,
                 ),
                 const SizedBox(width: 14),
                 Flexible(
@@ -433,9 +510,9 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(versionLabel(s), style: const TextStyle(fontWeight: FontWeight.w600)),
-                      if (versionDetails(s).isNotEmpty)
-                        Text(versionDetails(s), style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+                      Text(o.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      if (o.details.isNotEmpty)
+                        Text(o.details, style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
                     ],
                   ),
                 ),
@@ -445,7 +522,100 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       ],
     );
     previousFocus?.requestFocus();
+    return chosen;
+  }
+
+  Future<void> _chooseVersion(BuildContext buttonContext) async {
+    final chosen = await _choose(
+      buttonContext,
+      current: widget.source?.id,
+      options: [
+        for (final s in widget.item.mediaSources) (value: s.id, title: versionLabel(s), details: versionDetails(s)),
+      ],
+    );
     if (chosen != null) widget.onSelectSource(chosen);
+  }
+
+  /// Spuren, mit denen der Player ohne Wahl hier starten würde (für Episoden zählt die
+  /// für die Serie gemerkte Sprache, sonst die Einstellungen).
+  ({int? audio, int? subtitle}) _defaultTracks(MediaSource source) {
+    final settings = ref.watch(settingsProvider);
+    final account = ref.watch(sessionProvider).value?.accountKey;
+    final item = widget.item;
+    final remembered = item.isEpisode && item.seriesId != null && account != null
+        ? SeriesTracks.instance.get(account, item.seriesId!)
+        : null;
+    return (
+      audio: preferredAudioIndex(source, remembered: remembered?.audio, setting: settings.audioLanguage),
+      subtitle: preferredSubtitleIndex(source, remembered: remembered?.subtitle, setting: settings.subtitleLanguage),
+    );
+  }
+
+  /// Kurzname für den Knopf ("Englisch"); gibt es die Sprache mehrfach, mit Tonformat.
+  static String _audioShort(MediaSource source, MediaStream stream) {
+    final name = languageName(stream.language);
+    final twins = source.audioStreams.where(
+      (s) => sameLanguage(s.language, stream.language) || s.language == stream.language,
+    );
+    return twins.length > 1 ? '$name · ${audioSummary(stream)}' : name;
+  }
+
+  static String _subtitleShort(MediaStream stream) =>
+      stream.isForced ? '${languageName(stream.language)} (${tr.forced})' : languageName(stream.language);
+
+  // Nur die geänderte Spur festlegen – die andere bleibt bei "wie sonst".
+  Future<void> _chooseAudio(BuildContext buttonContext, MediaSource source, int? current) async {
+    final chosen = await _choose(
+      buttonContext,
+      current: current,
+      options: [
+        for (final s in source.audioStreams)
+          (value: s.index, title: s.displayTitle ?? _audioShort(source, s), details: s.title ?? ''),
+      ],
+    );
+    if (chosen != null) widget.onSelectTracks(chosen, widget.subtitleIndex);
+  }
+
+  Future<void> _chooseSubtitle(BuildContext buttonContext, MediaSource source, int? current) async {
+    final chosen = await _choose(
+      buttonContext,
+      current: current ?? -1,
+      options: [
+        (value: -1, title: tr.off, details: ''),
+        for (final s in source.subtitleStreams)
+          (value: s.index, title: s.displayTitle ?? _subtitleShort(s), details: s.title ?? ''),
+      ],
+    );
+    if (chosen != null) widget.onSelectTracks(widget.audioIndex, chosen);
+  }
+
+  /// Knöpfe "Ton" und "Untertitel" – nur, wenn es etwas zu wählen gibt.
+  List<Widget> _trackButtons(MediaSource source) {
+    final defaults = _defaultTracks(source);
+    final audio = validAudioIndex(source, widget.audioIndex) ?? defaults.audio;
+    final subtitle = validSubtitleIndex(source, widget.subtitleIndex) ?? defaults.subtitle;
+    // Ohne Vorgabe nimmt mpv die erste Tonspur der Datei.
+    final audioStream =
+        source.audioStreams.where((s) => s.index == audio).firstOrNull ?? source.embeddedStreams('Audio').firstOrNull;
+    final subtitleStream = source.subtitleStreams.where((s) => s.index == subtitle).firstOrNull;
+    return [
+      if (source.audioStreams.length > 1)
+        Builder(
+          builder: (buttonContext) => GlassButton(
+            label: tr.audioLabel(audioStream == null ? '?' : _audioShort(source, audioStream)),
+            icon: Icons.volume_up_rounded,
+            onPressed: () => _chooseAudio(buttonContext, source, audioStream?.index),
+          ),
+        ),
+      if (source.subtitleStreams.isNotEmpty)
+        Builder(
+          builder: (buttonContext) => GlassButton(
+            label: tr.subtitlesLabel(subtitleStream == null ? tr.off : _subtitleShort(subtitleStream)),
+            icon: Icons.subtitles_rounded,
+            onPressed: () => _chooseSubtitle(buttonContext, source, subtitleStream?.index),
+          ),
+        ),
+    ];
   }
 
   @override
@@ -485,14 +655,27 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
           PrimaryButton(
             label: resuming ? '${tr.resume}  ·  ${remainingLabel(item) ?? ''}' : tr.play,
             icon: Icons.play_arrow_rounded,
-            onPressed: () => playItem(context, item, mediaSourceId: _chosenSourceId),
+            onPressed: () => playItem(
+              context,
+              item,
+              mediaSourceId: _chosenSourceId,
+              audioIndex: widget.audioIndex,
+              subtitleIndex: widget.subtitleIndex,
+            ),
           ),
           if (resuming) ...[
             const SizedBox(width: 12),
             GlassButton(
               label: tr.fromStart,
               icon: Icons.replay_rounded,
-              onPressed: () => playItem(context, item, fromStart: true, mediaSourceId: _chosenSourceId),
+              onPressed: () => playItem(
+                context,
+                item,
+                fromStart: true,
+                mediaSourceId: _chosenSourceId,
+                audioIndex: widget.audioIndex,
+                subtitleIndex: widget.subtitleIndex,
+              ),
             ),
           ],
         ],
@@ -519,6 +702,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
               onPressed: () => _chooseVersion(buttonContext),
             ),
           ),
+        if (source != null && !item.isSeries && !item.isCollection) ..._trackButtons(source),
         CircleIconButton(
           icon: Icons.check_rounded,
           tooltip: played ? tr.markUnplayed : tr.markPlayed,
@@ -939,10 +1123,14 @@ class _EpisodesRow extends ConsumerWidget {
 
 /// Kapitel als "Szenen" mit Vorschaubild – ein Klick spielt ab dieser Stelle.
 class _ScenesRow extends ConsumerWidget {
-  const _ScenesRow({required this.item, this.mediaSourceId});
+  const _ScenesRow({required this.item, this.mediaSourceId, this.audioIndex, this.subtitleIndex});
 
   final BaseItem item;
   final String? mediaSourceId;
+
+  /// Auf der Detailseite gewählte Spuren.
+  final int? audioIndex;
+  final int? subtitleIndex;
 
   static const _width = 260.0;
 
@@ -960,11 +1148,15 @@ class _ScenesRow extends ConsumerWidget {
         final name = chapter.name.isEmpty ? tr.chapterN(i + 1) : chapter.name;
         return Focusable(
           semanticLabel: '$name ${formatTimecode(chapter.start)}',
-          onTap: () {
-            final ticks = durationToTicks(chapter.start);
-            final query = Uri(queryParameters: {if (ticks > 0) 'start': '$ticks', 'source': ?mediaSourceId}).query;
-            context.push('/play/${item.id}${query.isEmpty ? '' : '?$query'}');
-          },
+          onTap: () => context.push(
+            playPath(
+              item.id,
+              startTicks: durationToTicks(chapter.start),
+              mediaSourceId: mediaSourceId,
+              audioIndex: audioIndex,
+              subtitleIndex: subtitleIndex,
+            ),
+          ),
           builder: (context, hovered) => SizedBox(
             width: _width,
             child: Column(

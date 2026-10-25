@@ -491,6 +491,8 @@ class S {
   String episodeN(int n) => _t('Episode $n', 'Folge $n');
   String get fromStart => _t('From the start', 'Von vorne');
   String versionLabel(String v) => _t('Version: $v', 'Fassung: $v');
+  String audioLabel(String v) => _t('Audio: $v', 'Ton: $v');
+  String subtitlesLabel(String v) => _t('Subtitles: $v', 'Untertitel: $v');
   String get markUnplayed => _t('Mark as unwatched', 'Als ungesehen markieren');
   String get markPlayed => _t('Mark as watched', 'Als gesehen markieren');
   String get removeFavorite => _t('Remove from favorites', 'Aus Favoriten entfernen');
