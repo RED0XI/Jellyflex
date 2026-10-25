@@ -17,6 +17,7 @@ import 'package:jellyflex/core/session.dart';
 import 'package:jellyflex/core/settings.dart';
 import 'package:jellyflex/features/player/player_screen.dart';
 import 'package:jellyflex/widgets/buttons.dart';
+import 'package:jellyflex/widgets/rating_badges.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -74,6 +75,9 @@ void main() {
     await pumpFor(tester, const Duration(seconds: 2));
     expect(find.text('Ton: Deutsch'), findsOneWidget);
     expect(find.text('Untertitel: Aus'), findsOneWidget);
+    // Bewertung mit dem Zeichen ihrer Quelle (Demo-Filme: OMDb zuerst → IMDb).
+    expect(find.byType(ImdbLogo), findsOneWidget);
+    expect(find.byType(TomatoIcon), findsOneWidget);
 
     await tester.tap(find.text('Ton: Deutsch'));
     await pumpFor(tester, const Duration(milliseconds: 600));
@@ -113,6 +117,8 @@ void main() {
     player = null;
     router.push('/item/series0_s1_e1');
     await pumpFor(tester, const Duration(seconds: 2));
+    expect(find.byType(TmdbLogo), findsOneWidget, reason: 'Serien: TMDB zuerst');
+    await saveShot(tester, 'details_ratings_episode');
     expect(find.text('Ton: Deutsch'), findsOneWidget);
     await tester.tap(find.text('Ton: Deutsch'));
     await pumpFor(tester, const Duration(milliseconds: 600));

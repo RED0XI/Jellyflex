@@ -493,6 +493,10 @@ class S {
   String versionLabel(String v) => _t('Version: $v', 'Fassung: $v');
   String audioLabel(String v) => _t('Audio: $v', 'Ton: $v');
   String subtitlesLabel(String v) => _t('Subtitles: $v', 'Untertitel: $v');
+  String get imdbRating => _t('IMDb rating (audience)', 'IMDb-Bewertung (Publikum)');
+  String get tmdbRating => _t('TMDB rating (audience)', 'TMDB-Bewertung (Publikum)');
+  String get audienceRating => _t('Audience rating', 'Bewertung des Publikums');
+  String get rottenTomatoesRating => _t('Rotten Tomatoes (critics)', 'Rotten Tomatoes (Kritiker)');
   String get markUnplayed => _t('Mark as unwatched', 'Als ungesehen markieren');
   String get markPlayed => _t('Mark as watched', 'Als gesehen markieren');
   String get removeFavorite => _t('Remove from favorites', 'Aus Favoriten entfernen');

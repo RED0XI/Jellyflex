@@ -485,6 +485,14 @@ final class _Fr extends S {
   @override
   String subtitlesLabel(String v) => 'Sous-titres : $v';
   @override
+  String get imdbRating => 'Note IMDb (public)';
+  @override
+  String get tmdbRating => 'Note TMDB (public)';
+  @override
+  String get audienceRating => 'Note du public';
+  @override
+  String get rottenTomatoesRating => 'Rotten Tomatoes (critiques)';
+  @override
   String get markUnplayed => 'Marquer comme non vu';
   @override
   String get markPlayed => 'Marquer comme vu';

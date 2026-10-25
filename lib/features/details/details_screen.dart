@@ -18,6 +18,7 @@ import '../../widgets/backdrop_slideshow.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/media_cards.dart';
 import '../../widgets/media_row.dart';
+import '../../widgets/rating_badges.dart';
 import '../../widgets/people_row.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/states.dart';
@@ -307,28 +308,7 @@ class _Header extends ConsumerWidget {
         : null;
 
     final meta = <Widget>[
-      if (item.communityRating != null)
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.star_rounded, color: Color(0xFFFFC94D), size: 20),
-            const SizedBox(width: 4),
-            Text(item.communityRating!.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.w700)),
-          ],
-        ),
-      if (item.criticRating != null)
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.local_florist_rounded,
-              color: item.criticRating! >= 60 ? const Color(0xFFFF5A47) : const Color(0xFF7BC67B),
-              size: 18,
-            ),
-            const SizedBox(width: 4),
-            Text('${item.criticRating!.round()} %'),
-          ],
-        ),
+      if (item.communityRating != null || item.criticRating != null) RatingBadges(item: item),
       if (yearLabel(item) case final year?) Text(year),
       if (runtime != null && !item.isSeries) Text(formatRuntime(runtime)),
       if (item.isSeries && item.childCount != null) Text(tr.seasonsCount(item.childCount!)),

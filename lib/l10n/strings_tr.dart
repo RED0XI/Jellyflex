@@ -485,6 +485,14 @@ final class _Tr extends S {
   @override
   String subtitlesLabel(String v) => 'Altyazı: $v';
   @override
+  String get imdbRating => 'IMDb puanı (izleyici)';
+  @override
+  String get tmdbRating => 'TMDB puanı (izleyici)';
+  @override
+  String get audienceRating => 'İzleyici puanı';
+  @override
+  String get rottenTomatoesRating => 'Rotten Tomatoes (eleştirmen)';
+  @override
   String get markUnplayed => 'İzlenmedi işaretle';
   @override
   String get markPlayed => 'İzlendi işaretle';

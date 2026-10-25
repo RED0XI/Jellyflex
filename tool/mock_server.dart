@@ -487,6 +487,7 @@ void _seed() {
           'SeasonId': seasonId,
           'SeasonName': 'Staffel $n',
           'RunTimeTicks': runtime,
+          'CommunityRating': 7.2 + e / 10,
           'MediaSources': [_source(epId, 'mkv', width: 1920, height: 1080, size: 1200000000)],
           'Trickplay': _trickplay(epId, runtime),
           'Overview': 'In dieser Folge spitzt sich die Lage zu – und eine alte Entscheidung holt alle wieder ein.',
@@ -652,7 +653,29 @@ Object? _handle(HttpRequest req) {
         if (p['Type'] == 'Person' && (p['Name'] as String).toLowerCase().contains(term)) p,
     ], q);
   }
-  if (path == '/Users/Me') return {'Id': 'user1', 'Name': 'Demo'};
+  if (path == '/Users/Me') {
+    return {
+      'Id': 'user1',
+      'Name': 'Demo',
+      'Policy': {'IsAdministrator': true},
+    };
+  }
+  // Bibliothekseinstellungen: Filme mit OMDb zuerst (IMDb-Wertung), Serien wie Jellyfin-Standard.
+  if (path == '/Library/VirtualFolders') {
+    Map<String, dynamic> folder(String name, String type, List<String> order) => {
+      'Name': name,
+      'CollectionType': type,
+      'LibraryOptions': {
+        'TypeOptions': [
+          {'Type': type == 'movies' ? 'Movie' : 'Series', 'MetadataFetchers': order, 'MetadataFetcherOrder': order},
+        ],
+      },
+    };
+    return [
+      folder('Filme', 'movies', ['The Open Movie Database', 'TheMovieDb']),
+      folder('Serien', 'tvshows', ['TheMovieDb', 'The Open Movie Database']),
+    ];
+  }
   if (path == '/Items/Counts') {
     return {
       'MovieCount': movies.length,

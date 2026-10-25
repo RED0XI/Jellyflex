@@ -486,6 +486,14 @@ final class _Es extends S {
   @override
   String subtitlesLabel(String v) => 'Subtítulos: $v';
   @override
+  String get imdbRating => 'Valoración de IMDb (público)';
+  @override
+  String get tmdbRating => 'Valoración de TMDB (público)';
+  @override
+  String get audienceRating => 'Valoración del público';
+  @override
+  String get rottenTomatoesRating => 'Rotten Tomatoes (crítica)';
+  @override
   String get markUnplayed => 'Marcar como no visto';
   @override
   String get markPlayed => 'Marcar como visto';

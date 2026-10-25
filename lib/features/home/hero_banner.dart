@@ -16,6 +16,7 @@ import '../../theme.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/jf_image.dart';
 import '../../widgets/media_cards.dart';
+import '../../widgets/rating_badges.dart';
 import 'home_providers.dart';
 import '../../l10n/strings.dart';
 import '../../core/system_certs.dart';
@@ -470,15 +471,7 @@ class _HeroInfo extends ConsumerWidget {
             spacing: 14,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              if (item.communityRating != null)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.star_rounded, color: Color(0xFFFFC94D), size: 20),
-                    const SizedBox(width: 4),
-                    Text(item.communityRating!.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.w700)),
-                  ],
-                ),
+              if (item.communityRating != null) RatingBadges(item: item, critics: false),
               for (final m in meta) Text(m),
               if (item.officialRating != null) RatingBadge(item.officialRating!),
             ],

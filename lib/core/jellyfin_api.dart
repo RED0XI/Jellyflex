@@ -783,6 +783,12 @@ class JellyfinApi {
     return (res.data as Map).cast<String, dynamic>();
   }
 
+  /// Bibliotheken mit ihren Einstellungen (nur für Administratoren lesbar).
+  Future<List<Json>> getVirtualFolders() async {
+    final res = await dio.get('/Library/VirtualFolders');
+    return [for (final f in (res.data as List? ?? const [])) (f as Map).cast<String, dynamic>()];
+  }
+
   /// Profilbild eines Benutzers, oder `null` ohne Bild.
   String? userImageUrl(String userId, String? tag) {
     if (tag == null) return null;
