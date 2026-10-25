@@ -42,10 +42,24 @@ class _FakeApi extends JellyfinApi {
     'DefaultSubtitleStreamIndex': -1,
     'MediaStreams': [
       {'Type': 'Video', 'Index': 0},
-      {'Type': 'Audio', 'Index': 1, 'Language': 'ger', 'DisplayTitle': 'Deutsch - AAC - Stereo - Standard'},
-      {'Type': 'Audio', 'Index': 2, 'Language': 'eng', 'DisplayTitle': 'Englisch - AAC - Stereo'},
-      {'Type': 'Subtitle', 'Index': 3, 'Language': 'ger', 'DisplayTitle': 'Deutsch - SRT'},
-      {'Type': 'Subtitle', 'Index': 4, 'Language': 'eng', 'DisplayTitle': 'Englisch - SRT'},
+      {
+        'Type': 'Audio',
+        'Index': 1,
+        'Language': 'ger',
+        'Codec': 'aac',
+        'Channels': 2,
+        'DisplayTitle': 'Deutsch - AAC - Stereo - Standard',
+      },
+      {
+        'Type': 'Audio',
+        'Index': 2,
+        'Language': 'eng',
+        'Codec': 'aac',
+        'Channels': 2,
+        'DisplayTitle': 'Englisch - AAC - Stereo',
+      },
+      {'Type': 'Subtitle', 'Index': 3, 'Language': 'ger', 'Codec': 'subrip', 'DisplayTitle': 'Deutsch - SRT'},
+      {'Type': 'Subtitle', 'Index': 4, 'Language': 'eng', 'Codec': 'subrip', 'DisplayTitle': 'Englisch - SRT'},
     ],
   };
 

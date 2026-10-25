@@ -56,4 +56,33 @@ void main() {
     expect(versionDetails(source), '4K Remux · 57,2 GB · 62,0 Mbit/s');
     expect(qualityBadges(source), ['4K', 'HDR10', 'Atmos']);
   });
+
+  test('Spurnamen: einheitlich, ohne doppelte Angaben', () {
+    MediaStream track(Map<String, Object> raw) => MediaStream(raw);
+    expect(
+      trackLabel(track({'Type': 'Audio', 'Language': 'ger', 'Codec': 'eac3', 'Channels': 6, 'IsDefault': true})),
+      'Deutsch · Dolby Digital Plus · 5.1 · Standard',
+    );
+    expect(
+      trackLabel(track({'Type': 'Audio', 'Language': 'eng', 'Codec': 'ac3', 'Channels': 2, 'Title': 'Kommentar'})),
+      'Englisch · Dolby Digital · Stereo · Kommentar',
+    );
+    // Titel, der nur wiederholt, was schon dasteht.
+    expect(
+      trackLabel(track({'Type': 'Audio', 'Language': 'eng', 'Codec': 'aac', 'Channels': 2, 'Title': 'English Stereo'})),
+      'Englisch · AAC · Stereo · English Stereo',
+      reason: '"English" ist nicht "Englisch" – der Titel bleibt',
+    );
+    expect(
+      trackLabel(
+        track({'Type': 'Subtitle', 'Language': 'ger', 'Codec': 'subrip', 'Title': 'Deutsch', 'IsForced': true}),
+      ),
+      'Deutsch · SRT · Erzwungen',
+    );
+    expect(
+      trackLabel(track({'Type': 'Subtitle', 'Language': 'ger', 'Codec': 'srt', 'IsExternal': true})),
+      'Deutsch · SRT · Datei',
+    );
+    expect(trackLabel(track({'Type': 'Subtitle', 'Codec': 'pgssub', 'Title': 'Signs & Songs'})), 'Signs & Songs · PGS');
+  });
 }

@@ -53,6 +53,7 @@ class _TracksPanelState extends State<_TracksPanel> {
 
   @override
   Widget build(BuildContext context) {
+    // So hoch wie die längere Spalte (höchstens 380), der Trennstrich reicht durch.
     return Container(
       width: 640,
       constraints: const BoxConstraints(maxHeight: 380),
@@ -63,29 +64,31 @@ class _TracksPanelState extends State<_TracksPanel> {
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 40)],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: _TrackColumn(
-              title: tr.audio,
-              entries: widget.audioEntries(),
-              selectedId: widget.selectedAudio(),
-              emptyText: tr.noAudioTracks,
-              onSelect: widget.onAudio,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _TrackColumn(
+                title: tr.audio,
+                entries: widget.audioEntries(),
+                selectedId: widget.selectedAudio(),
+                emptyText: tr.noAudioTracks,
+                onSelect: widget.onAudio,
+              ),
             ),
-          ),
-          Container(width: 1, height: 300, color: Colors.white.withValues(alpha: 0.08)),
-          Expanded(
-            child: _TrackColumn(
-              title: tr.subtitles,
-              entries: widget.subtitleEntries(),
-              selectedId: widget.selectedSubtitle(),
-              emptyText: tr.noSubtitles,
-              onSelect: widget.onSubtitle,
+            Container(width: 1, color: Colors.white.withValues(alpha: 0.08)),
+            Expanded(
+              child: _TrackColumn(
+                title: tr.subtitles,
+                entries: widget.subtitleEntries(),
+                selectedId: widget.selectedSubtitle(),
+                emptyText: tr.noSubtitles,
+                onSelect: widget.onSubtitle,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -122,13 +125,13 @@ class _TrackColumn extends StatelessWidget {
             child: Text(emptyText, style: TextStyle(color: AppColors.textMuted)),
           ),
         Flexible(
-          child: ListView(
-            shrinkWrap: true,
-            padding: EdgeInsets.zero,
-            children: [
-              for (final e in entries)
-                _TrackRow(label: e.label, selected: e.id == selectedId, onTap: () => onSelect(e.id)),
-            ],
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                for (final e in entries)
+                  _TrackRow(label: e.label, selected: e.id == selectedId, onTap: () => onSelect(e.id)),
+              ],
+            ),
           ),
         ),
       ],

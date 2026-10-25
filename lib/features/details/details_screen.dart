@@ -548,10 +548,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
     final chosen = await _choose(
       buttonContext,
       current: current,
-      options: [
-        for (final s in source.audioStreams)
-          (value: s.index, title: s.displayTitle ?? _audioShort(source, s), details: s.title ?? ''),
-      ],
+      options: [for (final s in source.audioStreams) (value: s.index, title: trackLabel(s), details: '')],
     );
     if (chosen != null) widget.onSelectTracks(chosen, widget.subtitleIndex);
   }
@@ -562,8 +559,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       current: current ?? -1,
       options: [
         (value: -1, title: tr.off, details: ''),
-        for (final s in source.subtitleStreams)
-          (value: s.index, title: s.displayTitle ?? _subtitleShort(s), details: s.title ?? ''),
+        for (final s in source.subtitleStreams) (value: s.index, title: trackLabel(s), details: ''),
       ],
     );
     if (chosen != null) widget.onSelectTracks(widget.audioIndex, chosen);

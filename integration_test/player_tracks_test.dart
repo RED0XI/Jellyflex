@@ -69,17 +69,17 @@ void main() {
     expect(find.text('Audio'), findsOneWidget);
     expect(find.text('Untertitel'), findsOneWidget);
 
-    await tester.tap(find.text('Englisch - AAC - Stereo'));
+    await tester.tap(find.text('Englisch · AAC · Stereo'));
     await pumpFor(tester, const Duration(milliseconds: 800));
     expect(p.state.track.audio.id, '2');
 
-    await tester.tap(find.text('Englisch - SRT'));
+    await tester.tap(find.text('Englisch · SRT'));
     await pumpFor(tester, const Duration(milliseconds: 800));
     expect(p.state.track.subtitle.id, '2');
 
     // Panel bleibt nach 4 s offen (Bedienleiste blendet sich nicht aus).
     await pumpFor(tester, const Duration(seconds: 4));
-    expect(find.text('Englisch - SRT'), findsOneWidget);
+    expect(find.text('Englisch · SRT'), findsOneWidget);
 
     await tester.tap(find.text('Aus'));
     await pumpFor(tester, const Duration(milliseconds: 800));
@@ -87,7 +87,7 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.escape); // Panel schließen
     await pumpFor(tester, const Duration(milliseconds: 500));
-    expect(find.text('Englisch - SRT'), findsNothing);
+    expect(find.text('Englisch · SRT'), findsNothing);
 
     // --- Intro überspringen (Test-Intro: 3 s bis 25 s) ---
     await p.seek(const Duration(seconds: 5));
@@ -172,9 +172,9 @@ void main() {
     await pumpFor(tester, const Duration(milliseconds: 400));
     await tester.tap(find.byIcon(Icons.subtitles_rounded));
     await pumpFor(tester, const Duration(milliseconds: 500));
-    await tester.tap(find.text('Englisch - AAC - Stereo'));
+    await tester.tap(find.text('Englisch · AAC · Stereo'));
     await pumpFor(tester, const Duration(milliseconds: 500));
-    await tester.tap(find.text('Englisch - SRT'));
+    await tester.tap(find.text('Englisch · SRT'));
     await pumpFor(tester, const Duration(milliseconds: 500));
     await tester.sendKeyEvent(LogicalKeyboardKey.escape); // Panel schließen
     await pumpFor(tester, const Duration(milliseconds: 300));
@@ -245,7 +245,7 @@ void main() {
     // Spurwechsel bei Umrechnung startet den Stream neu.
     await tester.tap(find.byIcon(Icons.subtitles_rounded));
     await pumpFor(tester, const Duration(milliseconds: 500));
-    await tester.tap(find.text('Englisch - AAC - Stereo'));
+    await tester.tap(find.text('Englisch · AAC · Stereo'));
     await pumpFor(tester, const Duration(seconds: 3));
     expect(harnessTranscodeRequests.length, 2);
   });

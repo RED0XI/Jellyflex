@@ -1,4 +1,5 @@
 import 'downloads.dart' show formatBytes;
+import 'format.dart' show languageName;
 import 'models.dart';
 import '../l10n/strings.dart';
 
@@ -68,6 +69,30 @@ String? audioFeature(MediaStream audio) {
   if (text.contains('dts:x') || text.contains('dts-x')) return 'DTS:X';
   if (text.contains('dts-hd ma')) return 'DTS-HD MA';
   return null;
+}
+
+/// Einheitlicher Name einer Ton- oder Untertitelspur für Menüs und Player:
+/// "Deutsch · Dolby Digital Plus · 5.1 · Standard", "Englisch · SRT · Erzwungen".
+/// Ein eigener Titel der Spur ("Kommentar") kommt dazu, wenn er nicht nur wiederholt.
+String trackLabel(MediaStream s) {
+  final title = s.title?.trim() ?? '';
+  final hasLanguage = (s.language ?? '').isNotEmpty && s.language!.toLowerCase() != 'und';
+  final language = hasLanguage ? languageName(s.language) : (title.isNotEmpty ? title : languageName(null));
+  final format = s.type == 'Audio' ? audioSummary(s) : codecLabel(s.codec);
+  final parts = [language, if (format.isNotEmpty && format != '?') format];
+  final known = parts.join(' ').toLowerCase();
+  if (hasLanguage && title.isNotEmpty && !_repeats(title.toLowerCase(), known)) parts.add(title);
+  if (s.isForced) parts.add(tr.forced);
+  if (s.isDefault) parts.add(tr.defaultTrack);
+  if (s.isExternal) parts.add(tr.file);
+  return parts.join(' · ');
+}
+
+/// Titel wie "German", "Deutsch DTS 5.1" oder "Forced" sagen nichts Neues.
+bool _repeats(String title, String known) {
+  const noise = {'default', 'standard', 'forced', 'erzwungen', 'stereo', 'mono', 'sdh', 'full', 'komplett'};
+  final words = title.split(RegExp(r'[^\p{L}\p{N}.:+-]+', unicode: true)).where((w) => w.isNotEmpty);
+  return words.every((w) => known.contains(w) || noise.contains(w) || RegExp(r'^\d(\.\d)?$').hasMatch(w));
 }
 
 /// z. B. "TrueHD Atmos · 7.1"

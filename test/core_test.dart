@@ -142,7 +142,8 @@ void main() {
       expect(formatRuntime(const Duration(minutes: 105)), '1 Std. 45 Min.');
       expect(formatRuntime(const Duration(minutes: 48)), '48 Min.');
       expect(formatTimecode(const Duration(hours: 1, minutes: 5, seconds: 9)), '1:05:09');
-      expect(formatTimecode(const Duration(minutes: 5, seconds: 9)), '05:09');
+      expect(formatTimecode(const Duration(minutes: 5, seconds: 9)), '5:09');
+      expect(formatTimecode(Duration.zero), '0:00');
     });
 
     test('Server-Adresse wird normalisiert', () {

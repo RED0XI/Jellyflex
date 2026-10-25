@@ -82,13 +82,13 @@ void main() {
     await tester.tap(find.text('Ton: Deutsch'));
     await pumpFor(tester, const Duration(milliseconds: 600));
     await saveShot(tester, 'details_tracks_audio_menu');
-    await tester.tap(find.text('Englisch - TrueHD Atmos - 7.1'));
+    await tester.tap(find.text('Englisch · TrueHD Atmos · 7.1'));
     await pumpFor(tester, const Duration(milliseconds: 600));
     expect(find.text('Ton: Englisch'), findsOneWidget);
 
     await tester.tap(find.text('Untertitel: Aus'));
     await pumpFor(tester, const Duration(milliseconds: 600));
-    await tester.tap(find.text('Deutsch - SRT - Extern'));
+    await tester.tap(find.text('Deutsch · SRT · Datei'));
     await pumpFor(tester, const Duration(milliseconds: 600));
     expect(find.text('Untertitel: Deutsch'), findsOneWidget);
     await saveShot(tester, 'details_tracks_chosen');
@@ -122,7 +122,7 @@ void main() {
     expect(find.text('Ton: Deutsch'), findsOneWidget);
     await tester.tap(find.text('Ton: Deutsch'));
     await pumpFor(tester, const Duration(milliseconds: 600));
-    await tester.tap(find.text('Englisch - TrueHD - 7.1'));
+    await tester.tap(find.text('Englisch · TrueHD · 7.1'));
     await pumpFor(tester, const Duration(milliseconds: 600));
     await play();
     p = await waitForPlayer();

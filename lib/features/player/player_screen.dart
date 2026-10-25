@@ -19,6 +19,7 @@ import '../../core/gamepad_input.dart';
 import '../../core/images.dart';
 import '../../core/jellyfin_api.dart';
 import '../../core/live_connection.dart';
+import '../../core/media_info.dart' show trackLabel;
 import '../../core/media_session.dart';
 import '../../core/models.dart';
 import '../../core/play_queue.dart';
@@ -682,7 +683,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     await _player.setSubtitleTrack(
       sub == null
           ? SubtitleTrack.no()
-          : SubtitleTrack.uri(_api.onServer(sub.deliveryUrl!), title: sub.displayTitle, language: sub.language),
+          : SubtitleTrack.uri(_api.onServer(sub.deliveryUrl!), title: trackLabel(sub), language: sub.language),
     );
   }
 
@@ -867,11 +868,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     return _api.subtitleUrl(widget.itemId, _source!.id, stream);
   }
 
-  SubtitleTrack _externalTrack(MediaStream stream) => SubtitleTrack.uri(
-    _subtitleUri(stream),
-    title: stream.displayTitle ?? languageName(stream.language),
-    language: stream.language,
-  );
+  SubtitleTrack _externalTrack(MediaStream stream) =>
+      SubtitleTrack.uri(_subtitleUri(stream), title: trackLabel(stream), language: stream.language);
 
   /// Jellyfin-Streamindex → mpv-Spur-ID (eingebettete Spuren, 1-basiert).
   String? _mpvIdFor(MediaSource source, String type, int? jellyfinIndex) {
@@ -897,7 +895,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   String _trackLabel(String type, String id, String? title, String? language, String? codec) {
     final stream = _jellyfinStreamFor(type, id);
-    if (stream?.displayTitle != null) return stream!.displayTitle!;
+    if (stream != null) return trackLabel(stream);
     return [?title, languageName(language), ?codec?.toUpperCase()].join(' · ');
   }
 
@@ -1748,7 +1746,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (_transcoding) {
       return [
         for (final s in _source?.mediaStreams.where((s) => s.type == 'Audio') ?? const <MediaStream>[])
-          (id: 'jf:${s.index}', label: s.displayTitle ?? languageName(s.language)),
+          (id: 'jf:${s.index}', label: trackLabel(s)),
       ];
     }
     return [
@@ -1778,7 +1776,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       return [
         (id: 'no', label: tr.off),
         for (final s in _source?.mediaStreams.where((s) => s.type == 'Subtitle') ?? const <MediaStream>[])
-          (id: 'jf:${s.index}', label: s.displayTitle ?? languageName(s.language)),
+          (id: 'jf:${s.index}', label: trackLabel(s)),
       ];
     }
     // Nur eingebettete Spuren aus mpv; nachgeladene Dateien zeigen wir separat
@@ -1792,7 +1790,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       (id: 'no', label: tr.off),
       for (final t in tracks) (id: t.id, label: _trackLabel('Subtitle', t.id, t.title, t.language, t.codec)),
       for (final s in _externalSubtitles)
-        (id: _subtitleUri(s), label: '${s.displayTitle ?? languageName(s.language)}  (${tr.file})'),
+        (id: _subtitleUri(s), label: s.isExternal ? trackLabel(s) : '${trackLabel(s)} · ${tr.file}'),
     ];
   }
 

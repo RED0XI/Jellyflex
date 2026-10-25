@@ -10,12 +10,13 @@ String formatRuntime(Duration d) {
   return '${tr.hours(h)} ${tr.minutes(m)}';
 }
 
-/// Player-Zeitanzeige: "1:05:09" bzw. "05:09"
+/// Player-Zeitanzeige: "1:05:09" bzw. "5:09"
 String formatTimecode(Duration d) {
   final h = d.inHours;
-  final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final m = d.inMinutes.remainder(60);
   final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-  return h > 0 ? '$h:$m:$s' : '$m:$s';
+  // Wie bei üblichen Playern: "0:05", "20:00", "1:00:00" – führende Null nur nach Stunden.
+  return h > 0 ? '$h:${m.toString().padLeft(2, '0')}:$s' : '$m:$s';
 }
 
 /// "22:41"
