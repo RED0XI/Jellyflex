@@ -29,7 +29,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [sessionProvider.overrideWith(DemoSession.new), settingsProvider.overrideWith(() => settings)],
-        child: const JellyflexApp(),
+        child: RepaintBoundary(key: shotKey, child: const JellyflexApp()),
       ),
     );
     await pumpFor(tester, const Duration(seconds: 3));
@@ -48,16 +48,29 @@ void main() {
     final mouse = TestPointer(1, PointerDeviceKind.mouse);
     await tester.sendEventToBinding(mouse.hover(Offset(banner.right - 120, banner.center.dy)));
 
+    // Fortschritt im aktiven Punkt: füllt sich bis zum nächsten Titel.
+    double progress() => tester
+        .widget<FractionallySizedBox>(
+          find.descendant(of: find.byType(HeroBanner), matching: find.byType(FractionallySizedBox)).first,
+        )
+        .widthFactor!;
     final first = title();
-    await pumpFor(tester, const Duration(seconds: 11));
+    final p1 = progress();
+    await pumpFor(tester, const Duration(seconds: 2));
+    expect(progress(), greaterThan(p1), reason: 'Balken wächst');
+    await pumpFor(tester, const Duration(seconds: 9));
     expect(title(), isNot(first), reason: 'Nach 9 Sekunden kommt der nächste Titel');
 
     // Über dem Text dagegen bleibt er stehen (zum Lesen und Klicken).
     final text = tester.getCenter(find.descendant(of: find.byType(HeroBanner), matching: find.byType(Text)).first);
     await tester.sendEventToBinding(mouse.hover(text));
     final second = title();
+    await pumpFor(tester, const Duration(milliseconds: 300));
+    final paused = progress();
     await pumpFor(tester, const Duration(seconds: 11));
     expect(title(), second);
+    expect(progress(), closeTo(paused, 0.01), reason: 'Balken steht still, solange die Maus auf dem Text ist');
+    await saveShot(tester, 'hero_banner_progress');
 
     await tester.pumpWidget(const SizedBox());
   });

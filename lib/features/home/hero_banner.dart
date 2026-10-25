@@ -32,7 +32,7 @@ class HeroBanner extends ConsumerStatefulWidget {
   ConsumerState<HeroBanner> createState() => _HeroBannerState();
 }
 
-class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
+class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, SingleTickerProviderStateMixin {
   static const _interval = Duration(seconds: 9);
   static const _trailerDelay = Duration(seconds: 4);
 
@@ -42,7 +42,14 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
 
   int _index = 0;
   bool _hovered = false;
-  Timer? _timer;
+
+  /// Zeit bis zum nächsten Titel – treibt das Weiterblättern und den Fortschritt im aktiven
+  /// Punkt. Hält an, solange die Maus auf Text/Punkten steht, ein Trailer läuft oder eine
+  /// andere Seite offen ist.
+  late final AnimationController _cycle = AnimationController(vsync: this, duration: _interval)
+    ..addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted && _pageVisible) _goTo(_index + 1);
+    });
 
   // --- Trailer im Hintergrund ---
   Player? _trailerPlayer;
@@ -77,7 +84,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
   @override
   void dispose() {
     appRouteObserver.unsubscribe(this);
-    _timer?.cancel();
+    _cycle.dispose();
     _trailerTimer?.cancel();
     _trailerLimit?.cancel();
     _trailerPlayingSub?.cancel();
@@ -86,11 +93,24 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
     super.dispose();
   }
 
-  // Andere Seite geöffnet → Trailer anhalten; zurück → weiter wie gewohnt.
+  // Andere Seite geöffnet → Trailer anhalten und seinen Player freigeben (ein eigener
+  // Video-Player belegt um die 60 MB – die braucht man beim Schauen woanders); zurück → neu.
   @override
   void didPushNext() {
     _pageVisible = false;
+    _syncCycle();
     _stopTrailer();
+    _releaseTrailerPlayer();
+  }
+
+  void _releaseTrailerPlayer() {
+    final player = _trailerPlayer;
+    if (player == null) return;
+    _trailerPlayingSub?.cancel();
+    _trailerDoneSub?.cancel();
+    _trailerPlayer = null;
+    if (mounted) setState(() => _trailerVideo = null);
+    player.dispose();
   }
 
   @override
@@ -101,11 +121,17 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
   }
 
   void _restartTimer() {
-    _timer?.cancel();
-    _timer = Timer.periodic(_interval, (_) {
-      // Während ein Trailer läuft, wird nicht weitergeblättert.
-      if (!_hovered && !_trailerVisible && _pageVisible && mounted) _advance(_index + 1);
-    });
+    _cycle.value = 0;
+    _syncCycle();
+  }
+
+  /// Weiterlaufen lassen oder anhalten – je nach Maus, Trailer und sichtbarer Seite.
+  void _syncCycle() {
+    if (_hovered || _trailerVisible || !_pageVisible) {
+      _cycle.stop();
+    } else if (!_cycle.isAnimating && _cycle.value < 1) {
+      _cycle.forward();
+    }
   }
 
   void _advance(int index) {
@@ -149,6 +175,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
         Future.delayed(const Duration(milliseconds: 400), () {
           if (!mounted || _trailerItemId != item.id || _trailerVisible) return;
           setState(() => _trailerVisible = true);
+          _syncCycle();
           _trailerLimit?.cancel();
           _trailerLimit = Timer(_trailerMax, () {
             if (mounted && _muted && _trailerItemId == item.id) _goTo(_index + 1);
@@ -179,6 +206,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
     _trailerItemId = null;
     _trailerPlayer?.stop();
     if (_trailerVisible && mounted) setState(() => _trailerVisible = false);
+    if (mounted) _syncCycle();
   }
 
   void _toggleMute() {
@@ -219,8 +247,17 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
 
     // Nur über Text, Knöpfen und Punkten anhalten – das Banner ist zu groß, als dass die Maus
     // sonst je woanders stünde.
-    Widget pauseOnHover(Widget child) =>
-        MouseRegion(onEnter: (_) => _hovered = true, onExit: (_) => _hovered = false, child: child);
+    Widget pauseOnHover(Widget child) => MouseRegion(
+      onEnter: (_) {
+        _hovered = true;
+        _syncCycle();
+      },
+      onExit: (_) {
+        _hovered = false;
+        _syncCycle();
+      },
+      child: child,
+    );
 
     return SizedBox(
       height: widget.height,
@@ -323,16 +360,29 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware {
                       onTap: () => _goTo(i),
                       child: MouseRegion(
                         cursor: SystemMouseCursors.click,
+                        // Der aktive Punkt füllt sich bis zum nächsten Titel (wie bei Stories).
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeOutCubic,
                           margin: const EdgeInsets.only(right: 8),
-                          width: i == current ? 28 : 8,
+                          width: i == current ? 36 : 8,
                           height: 8,
+                          clipBehavior: Clip.antiAlias,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(4),
-                            color: i == current ? Colors.white : Colors.white.withValues(alpha: 0.3),
+                            color: Colors.white.withValues(alpha: i == current ? 0.35 : 0.3),
                           ),
+                          alignment: Alignment.centerLeft,
+                          child: i == current
+                              ? AnimatedBuilder(
+                                  animation: _cycle,
+                                  builder: (context, _) => FractionallySizedBox(
+                                    widthFactor: _cycle.value,
+                                    heightFactor: 1,
+                                    child: const ColoredBox(color: Colors.white),
+                                  ),
+                                )
+                              : null,
                         ),
                       ),
                     ),

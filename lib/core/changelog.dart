@@ -11,6 +11,9 @@ const changelog = <String, ({List<String> en, List<String> de})>{
       'Starting without a reachable server now shows “Server not reachable” with a way to your downloads.',
       'Security: updates are checked again right before installing; the home-network search warns about unknown servers.',
       'Jellyflex is now free software under the GNU GPL v3.0 – see Settings → About → Licenses.',
+      'The banner shows how long until the next title.',
+      'When your sign-in has expired, Jellyflex says so and asks for your password again.',
+      'Fewer requests to your server and less memory while browsing and watching.',
     ],
     de: [
       'Player: Bildausschnitt – einpassen, ausfüllen ohne schwarze Balken (Z) oder stufenlos zoomen (Strg + Mausrad); je Serie gemerkt.',
@@ -18,6 +21,9 @@ const changelog = <String, ({List<String> en, List<String> de})>{
       'Start ohne erreichbaren Server zeigt jetzt „Server nicht erreichbar“ mit dem Weg zu deinen Downloads.',
       'Sicherheit: Updates werden direkt vor der Installation erneut geprüft; die Heimnetz-Suche warnt vor unbekannten Servern.',
       'Jellyflex ist jetzt freie Software unter der GNU GPL v3.0 – siehe Einstellungen → Über → Lizenzen.',
+      'Das Banner zeigt, wie lange es bis zum nächsten Titel dauert.',
+      'Ist deine Anmeldung abgelaufen, sagt Jellyflex das und fragt erneut nach dem Passwort.',
+      'Weniger Anfragen an deinen Server und weniger Arbeitsspeicher beim Stöbern und Schauen.',
     ],
   ),
   '0.3.4': (
