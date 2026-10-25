@@ -122,9 +122,11 @@ On macOS, use `⌘` instead of `Ctrl` (`⌘F` search, `⌘,` settings), `⌃⌘F
 | Cards | Right-click | Play, mark watched, add to list, download … |
 | Player | `Space` / `K` | Play / pause |
 | Player | `←` / `→` (`J` / `L`) | 10 s back / forward |
-| Player | `↑` / `↓` | Volume |
+| Player | `↑` / `↓` / mouse wheel | Volume (up to 150 %) |
 | Player | `F` / double-click | Fullscreen |
 | Player | `M` | Mute |
+| Player | `Z` | Fit / fill the picture (no black bars) |
+| Player | `Ctrl` + mouse wheel | Zoom freely (remembered per series) |
 | Player | `P` | Mini player |
 | Player | `C` | Chapters |
 | Player | `I` | Playback info (codec, bitrate, buffer …) |

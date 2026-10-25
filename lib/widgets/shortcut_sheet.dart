@@ -53,6 +53,8 @@ Future<void> showShortcutSheet(BuildContext context) => showDialog<void>(
                       ('↑ ↓', tr.shortcutVolume),
                       ('F', tr.fullscreen.replaceAll(' (F)', '')),
                       ('M', tr.mute.replaceAll(' (M)', '')),
+                      ('Z', tr.shortcutZoom),
+                      (tr.keyCtrlWheel, tr.shortcutZoomWheel),
                       ('P', tr.miniPlayer.replaceAll(' (P)', '')),
                       ('C', tr.chapters),
                       ('I', tr.statsTitle.replaceAll(' (I)', '')),

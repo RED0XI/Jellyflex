@@ -1361,4 +1361,20 @@ final class _Tr extends S {
   // --- Fensterleiste im Vollbild ---
   @override
   String get leaveFullscreen => 'Tam ekrandan çık (F11)';
+
+  // --- Player: Bildausschnitt (Zoom) ---
+  @override
+  String get zoomTooltip => 'Görüntü boyutu (Z)';
+  @override
+  String get zoomFit => 'Sığdır – tüm görüntü';
+  @override
+  String get zoomFill => 'Doldur – siyah şerit yok';
+  @override
+  String zoomPercent(int percent) => 'Yakınlaştırma %$percent';
+  @override
+  String get shortcutZoom => 'Görüntüyü sığdır / doldur';
+  @override
+  String get shortcutZoomWheel => 'Serbest yakınlaştırma';
+  @override
+  String get keyCtrlWheel => 'Ctrl + fare tekerleği';
 }

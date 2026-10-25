@@ -159,6 +159,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   double? _pendingVolume;
   double get _volume => _pendingVolume ?? _player.state.volume;
 
+  /// Bildausschnitt: einpassen (ganzes Bild), ausfüllen (keine schwarzen Balken) oder stufenlos
+  /// gezoomt ([_customZoom], 1 = eingepasst). Gilt je Serie für die nächsten Folgen.
+  _ZoomMode _zoomMode = _ZoomMode.fit;
+  double _customZoom = 1;
+  final _zoomOsd = ValueNotifier<String?>(null);
+  Timer? _zoomOsdTimer;
+
   /// Kurze Lautstärke-Anzeige in der Bildmitte (Mausrad, Pfeiltasten); `null` = ausgeblendet.
   final _volumeOsd = ValueNotifier<double?>(null);
   Timer? _volumeOsdTimer;
@@ -465,6 +472,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _sleepLeft.dispose();
     _volumeOsdTimer?.cancel();
     _volumeOsd.dispose();
+    _zoomOsdTimer?.cancel();
+    _zoomOsd.dispose();
     if (MediaSession.onButton == _onMediaButton) {
       MediaSession.onButton = null;
       // Bei "Nächste Folge" übernimmt gleich der neue Player die Anzeige.
@@ -520,6 +529,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       if (item.isEpisode && item.seriesId != null && account != null) {
         _trackAccount = account;
         _remembered = SeriesTracks.instance.get(account, item.seriesId!);
+        _restoreZoom(SeriesTracks.instance.zoom(account, item.seriesId!));
       }
       var maxBitrate = settings.maxBitrate;
       // Ist die Datei ohnehin kleiner als die Grenze, lohnt Umrechnen nicht.
@@ -560,6 +570,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _subscriptions
         ..add(_player.stream.tracks.listen((_) => _applyDefaultTracks()))
         ..add(_player.stream.playing.listen(_onPlayingChanged))
+        // Erst mit der Bildgröße lässt sich "Ausfüllen" berechnen.
+        ..add(_player.stream.width.listen((_) => _zoomMode == _ZoomMode.fill ? setState(() {}) : null))
         // Lautstärke von mpv bestätigt → wieder den echten Wert lesen.
         ..add(
           _player.stream.volume.listen((v) {
@@ -941,6 +953,67 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     context.pop();
   }
 
+  // --- Bildausschnitt (Zoom) -------------------------------------------------------
+
+  /// Vergrößerung gegenüber "eingepasst" für eine Fläche der Größe [box].
+  double _zoomScale(Size box) => switch (_zoomMode) {
+    _ZoomMode.fit => 1,
+    _ZoomMode.fill => _fillScale(box),
+    _ZoomMode.custom => _customZoom,
+  };
+
+  /// So weit vergrößern, dass das Bild die Fläche ganz füllt (Ränder werden abgeschnitten).
+  double _fillScale(Size box) {
+    final w = _player.state.width;
+    final h = _player.state.height;
+    if (w == null || h == null || w == 0 || h == 0 || box.isEmpty) return 1;
+    final video = w / h;
+    final screen = box.width / box.height;
+    return video > screen ? video / screen : screen / video;
+  }
+
+  /// Z / Knopf: Einpassen ↔ Ausfüllen (ein freier Zoom geht zurück auf Einpassen).
+  void _cycleZoom() => _applyZoom(_zoomMode == _ZoomMode.fit ? _ZoomMode.fill : _ZoomMode.fit);
+
+  /// Strg + Mausrad: stufenlos zwischen 100 % und 300 %.
+  void _setCustomZoom(double scale) {
+    _customZoom = (scale.clamp(1.0, 3.0) * 20).round() / 20;
+    _applyZoom(_customZoom == 1 ? _ZoomMode.fit : _ZoomMode.custom);
+  }
+
+  void _applyZoom(_ZoomMode mode) {
+    setState(() => _zoomMode = mode);
+    _zoomOsd.value = switch (mode) {
+      _ZoomMode.fit => tr.zoomFit,
+      _ZoomMode.fill => tr.zoomFill,
+      _ZoomMode.custom => tr.zoomPercent((_customZoom * 100).round()),
+    };
+    _zoomOsdTimer?.cancel();
+    _zoomOsdTimer = Timer(const Duration(milliseconds: 1400), () => _zoomOsd.value = null);
+    // Für die nächsten Folgen dieser Serie merken.
+    final item = _item;
+    final account = _trackAccount;
+    if (item != null && item.isEpisode && item.seriesId != null && account != null) {
+      SeriesTracks.instance.setZoom(account, item.seriesId!, switch (mode) {
+        _ZoomMode.fit => 'fit',
+        _ZoomMode.fill => 'fill',
+        _ZoomMode.custom => _customZoom.toStringAsFixed(2),
+      });
+    }
+  }
+
+  void _restoreZoom(String? saved) {
+    if (saved == null || saved == 'fit') return;
+    if (saved == 'fill') {
+      _zoomMode = _ZoomMode.fill;
+      return;
+    }
+    final scale = double.tryParse(saved);
+    if (scale == null || scale <= 1) return;
+    _customZoom = scale.clamp(1.0, 3.0).toDouble();
+    _zoomMode = _ZoomMode.custom;
+  }
+
   /// Beim Fortsetzen ein paar Sekunden früher einsteigen, damit man wieder hineinfindet.
   static Duration? _resumePoint(int? ticks) {
     if (ticks == null) return null;
@@ -1125,6 +1198,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _toggleFullscreen();
     } else if (key == LogicalKeyboardKey.keyM) {
       _toggleMute();
+    } else if (key == LogicalKeyboardKey.keyZ) {
+      _cycleZoom();
     } else if (key == LogicalKeyboardKey.keyP) {
       _toggleMini();
     } else if (key == LogicalKeyboardKey.keyS) {
@@ -1179,6 +1254,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             onPointerSignal: (event) {
               if (event is! PointerScrollEvent || _anyPanelOpen || event.scrollDelta.dy == 0) return;
               _userActive();
+              // Strg (macOS: ⌘) + Mausrad: stufenlos zoomen.
+              final keys = HardwareKeyboard.instance;
+              if (keys.isControlPressed || keys.isMetaPressed) {
+                final box = context.size ?? Size.zero;
+                _setCustomZoom(_zoomScale(box) + (event.scrollDelta.dy < 0 ? 0.05 : -0.05));
+                return;
+              }
               _setVolume(_volume + (event.scrollDelta.dy < 0 ? 5 : -5), osd: true);
             },
             child: Stack(
@@ -1194,8 +1276,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   },
                 ),
                 Positioned.fill(
-                  child: Video(controller: _video, controls: NoVideoControls, fill: Colors.transparent),
+                  child: LayoutBuilder(
+                    builder: (context, box) => ClipRect(
+                      child: AnimatedScale(
+                        scale: _zoomScale(box.biggest),
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                        child: Video(controller: _video, controls: NoVideoControls, fill: Colors.transparent),
+                      ),
+                    ),
+                  ),
                 ),
+                Center(child: _ZoomOsd(label: _zoomOsd)),
                 Positioned.fill(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
@@ -1595,6 +1687,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       icon: Icons.tune_rounded,
                       tooltip: tr.playbackOptions,
                       onPressed: () => _setPlaybackPanel(!_playbackPanelOpen),
+                    ),
+                    _PlayerIconButton(
+                      icon: _zoomMode == _ZoomMode.fit ? Icons.fit_screen_outlined : Icons.fit_screen_rounded,
+                      tooltip: tr.zoomTooltip,
+                      onPressed: _cycleZoom,
                     ),
                     _PlayerIconButton(
                       icon: Icons.picture_in_picture_alt_rounded,

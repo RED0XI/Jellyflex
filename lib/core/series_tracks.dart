@@ -42,6 +42,11 @@ class SeriesTracks {
 
   static String _key(String account, String seriesId) => '$account|$seriesId';
 
+  /// Gemerkter Bildausschnitt im Player ("fit", "fill" oder ein Zoomfaktor wie "1.25").
+  String? zoom(String account, String seriesId) => _load()[_key(account, seriesId)]?['zoom'];
+
+  void setZoom(String account, String seriesId, String zoom) => _set(account, seriesId, 'zoom', zoom);
+
   /// Gemerkte Tonsprache (z. B. "jpn") und Untertitel ("ger" bzw. [subtitlesOff]).
   ({String? audio, String? subtitle}) get(String account, String seriesId) {
     final entry = _load()[_key(account, seriesId)];

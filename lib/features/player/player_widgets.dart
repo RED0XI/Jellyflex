@@ -372,6 +372,44 @@ class _VolumeControl extends StatelessWidget {
   }
 }
 
+/// Bildausschnitt des Players.
+enum _ZoomMode { fit, fill, custom }
+
+/// Gewählten Bildausschnitt kurz in der Bildmitte zeigen.
+class _ZoomOsd extends StatelessWidget {
+  const _ZoomOsd({required this.label});
+
+  final ValueListenable<String?> label;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: ValueListenableBuilder<String?>(
+        valueListenable: label,
+        builder: (context, text, _) => AnimatedOpacity(
+          opacity: text == null ? 0 : 1,
+          duration: const Duration(milliseconds: 180),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.fit_screen_rounded, size: 28),
+                const SizedBox(width: 12),
+                Text(text ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Lautstärke kurz in der Bildmitte zeigen (Mausrad, Pfeiltasten bei ausgeblendeter Leiste).
 class _VolumeOsd extends StatelessWidget {
   const _VolumeOsd({required this.volume});

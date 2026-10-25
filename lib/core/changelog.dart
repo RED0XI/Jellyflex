@@ -4,6 +4,22 @@ import '../l10n/strings.dart';
 /// Englisch und Deutsch; andere Sprachen zeigen Englisch. Neue Version: oben
 /// einen Eintrag ergänzen (Versionen ohne Eintrag erscheinen nicht).
 const changelog = <String, ({List<String> en, List<String> de})>{
+  '0.3.5': (
+    en: [
+      'Player: picture size – fit, fill without black bars (Z) or zoom freely (Ctrl + mouse wheel); remembered per series.',
+      'Fullscreen (F11) keeps the Back button and gets an “Exit fullscreen” button.',
+      'Starting without a reachable server now shows “Server not reachable” with a way to your downloads.',
+      'Security: updates are checked again right before installing; the home-network search warns about unknown servers.',
+      'Jellyflex is now free software under the GNU GPL v3.0 – see Settings → About → Licenses.',
+    ],
+    de: [
+      'Player: Bildausschnitt – einpassen, ausfüllen ohne schwarze Balken (Z) oder stufenlos zoomen (Strg + Mausrad); je Serie gemerkt.',
+      'Im Vollbild (F11) bleibt der Zurück-Knopf, dazu kommt „Vollbild beenden“.',
+      'Start ohne erreichbaren Server zeigt jetzt „Server nicht erreichbar“ mit dem Weg zu deinen Downloads.',
+      'Sicherheit: Updates werden direkt vor der Installation erneut geprüft; die Heimnetz-Suche warnt vor unbekannten Servern.',
+      'Jellyflex ist jetzt freie Software unter der GNU GPL v3.0 – siehe Einstellungen → Über → Lizenzen.',
+    ],
+  ),
   '0.3.4': (
     en: [
       'After an update, this window shows what’s new.',

@@ -6,6 +6,7 @@
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -15,6 +16,7 @@ import 'package:jellyflex/core/session.dart';
 import 'package:jellyflex/core/settings.dart';
 import 'package:jellyflex/features/player/player_screen.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'test_helpers.dart';
@@ -137,6 +139,55 @@ void main() {
     container.read(routerProvider).push('/play/movie1');
     await waitForPlayer(tester);
     expect(PlayQueue.contains(current), isFalse);
+
+    await closePlayer(tester);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Bildausschnitt: Z, Strg + Mausrad, für die Serie gemerkt', (tester) async {
+    if (!await demoServerRunning()) return;
+    await startApp(tester);
+
+    double scale() => tester
+        .widget<AnimatedScale>(find.ancestor(of: find.byType(Video), matching: find.byType(AnimatedScale)).first)
+        .scale;
+
+    container.read(routerProvider).push('/play/series0_s1_e1');
+    await waitForPlayer(tester);
+    expect(scale(), 1, reason: 'Standard: ganzes Bild');
+
+    // Z: Ausfüllen – größer als eingepasst (die Balken verschwinden).
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+    await pumpFor(tester, const Duration(milliseconds: 400));
+    expect(scale(), greaterThan(1));
+    expect(find.text('Ausfüllen – ohne schwarze Balken'), findsOneWidget);
+    await saveShot(tester, 'player_zoom_fill');
+
+    // Strg + Mausrad: stufenlos (hier auf 150 %).
+    final mouse = TestPointer(1, PointerDeviceKind.mouse);
+    await tester.sendEventToBinding(mouse.hover(tester.getCenter(find.byType(PlayerScreen))));
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    for (var i = 0; i < 20; i++) {
+      await tester.sendEventToBinding(mouse.scroll(const Offset(0, -100)));
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await pumpFor(tester, const Duration(milliseconds: 400));
+    final zoomed = scale();
+    expect(zoomed, greaterThan(1.4));
+    expect(find.textContaining('Zoom '), findsOneWidget);
+
+    // Nächste Folge derselben Serie: gleicher Ausschnitt.
+    container.read(routerProvider).go('/');
+    await pumpFor(tester, const Duration(seconds: 1));
+    container.read(routerProvider).push('/play/series0_s1_e2');
+    await waitForPlayer(tester);
+    expect(scale(), closeTo(zoomed, 0.001));
+
+    // Z führt zurück zum ganzen Bild.
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+    await pumpFor(tester, const Duration(milliseconds: 400));
+    expect(scale(), 1);
 
     await closePlayer(tester);
     await tester.pumpWidget(const SizedBox());

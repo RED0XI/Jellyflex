@@ -1103,4 +1103,14 @@ class S {
   // --- Fensterleiste im Vollbild ---
 
   String get leaveFullscreen => _t('Exit fullscreen (F11)', 'Vollbild beenden (F11)');
+
+  // --- Player: Bildausschnitt (Zoom) -------------------------------------------
+
+  String get zoomTooltip => _t('Picture size (Z)', 'Bildausschnitt (Z)');
+  String get zoomFit => _t('Fit – whole picture', 'Einpassen – ganzes Bild');
+  String get zoomFill => _t('Fill – no black bars', 'Ausfüllen – ohne schwarze Balken');
+  String zoomPercent(int percent) => _t('Zoom $percent %', 'Zoom $percent %');
+  String get shortcutZoom => _t('Fit / fill picture', 'Bild einpassen / ausfüllen');
+  String get shortcutZoomWheel => _t('Zoom freely', 'Stufenlos zoomen');
+  String get keyCtrlWheel => _t('Ctrl + mouse wheel', 'Strg + Mausrad');
 }

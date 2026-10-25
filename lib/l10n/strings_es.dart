@@ -1370,4 +1370,20 @@ final class _Es extends S {
   // --- Fensterleiste im Vollbild ---
   @override
   String get leaveFullscreen => 'Salir de pantalla completa (F11)';
+
+  // --- Player: Bildausschnitt (Zoom) ---
+  @override
+  String get zoomTooltip => 'Tamaño de imagen (Z)';
+  @override
+  String get zoomFit => 'Ajustar – imagen completa';
+  @override
+  String get zoomFill => 'Rellenar – sin barras negras';
+  @override
+  String zoomPercent(int percent) => 'Zoom $percent %';
+  @override
+  String get shortcutZoom => 'Ajustar / rellenar imagen';
+  @override
+  String get shortcutZoomWheel => 'Zoom libre';
+  @override
+  String get keyCtrlWheel => 'Ctrl + rueda';
 }
