@@ -450,6 +450,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _outputSizeTimer?.cancel();
     playerPlaying.value = false;
     // Gemerktes erst nach dem Abbau speichern – während des Abbaus des
     // Widget-Baums dürfen Provider nicht geändert werden.
@@ -602,7 +603,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         ..add(_player.stream.tracks.listen((_) => _applyDefaultTracks()))
         ..add(_player.stream.playing.listen(_onPlayingChanged))
         // Erst mit der Bildgröße lässt sich "Ausfüllen" berechnen.
-        ..add(_player.stream.width.listen((_) => _zoomMode == _ZoomMode.fill ? setState(() {}) : null))
+        // Erst mit der Bildgröße lassen sich "Ausfüllen" und die Ausgabegröße berechnen.
+        ..add(_player.stream.width.listen((_) => mounted ? setState(() {}) : null))
         // Lautstärke von mpv bestätigt → wieder den echten Wert lesen.
         ..add(
           _player.stream.volume.listen((v) {
@@ -737,12 +739,51 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _showControls(autoHide: false);
   }
 
-  /// Untertitelgröße und Hintergrund aus den Einstellungen an mpv übergeben.
+  Timer? _outputSizeTimer;
+  Size? _outputSize;
+
+  /// mpv rendert in der Größe, in der das Video auf dem Bildschirm erscheint (statt in der
+  /// Auflösung der Datei). So skaliert mpv selbst sauber und zeichnet Untertitel scharf –
+  /// sonst zog Flutter z. B. ein 1080p-Bild samt Untertiteln unscharf auf 1440p hoch.
+  void _fitOutputSize(Size box, double zoom) {
+    final w = _player.state.width;
+    final h = _player.state.height;
+    if (w == null || h == null || w <= 0 || h <= 0 || box.isEmpty) return;
+    final aspect = w / h;
+    var fit = box.width / box.height > aspect
+        ? Size(box.height * aspect, box.height)
+        : Size(box.width, box.width / aspect);
+    fit = fit * MediaQuery.devicePixelRatioOf(context) * zoom;
+    // Höchstens 4K breit (Grafikspeicher); kleine Fenster sparen dafür Arbeit.
+    if (fit.width > 3840) fit = fit * (3840 / fit.width);
+    final target = Size(fit.width.roundToDouble(), fit.height.roundToDouble());
+    if (target == _outputSize) return;
+    _outputSizeTimer?.cancel();
+    // Erst wenn das Fenster zur Ruhe kommt (Größe ziehen, Vollbild-Animation).
+    _outputSizeTimer = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted || _closing) return;
+      _outputSize = target;
+      _video.setSize(width: target.width.toInt(), height: target.height.toInt());
+    });
+  }
+
+  /// Untertitel: ruhige Systemschrift, schmaler Rand mit weichem Schatten statt der groben
+  /// mpv-Vorgabe; Größe und Hintergrund aus den Einstellungen.
   Future<void> _applySubtitleStyle() async {
     final native = _player.platform;
     if (native is! NativePlayer) return;
     final s = ref.read(settingsProvider);
     final props = {
+      'sub-font': Platform.isMacOS ? 'Helvetica Neue' : 'Segoe UI',
+      'sub-bold': 'yes',
+      'sub-font-size': '34',
+      'sub-color': '#FFFFFFFF',
+      'sub-border-color': '#E6000000',
+      'sub-border-size': '1.6',
+      'sub-shadow-color': '#80000000',
+      'sub-shadow-offset': '1.2',
+      'sub-blur': '0.3',
+      'sub-margin-y': '36',
       'sub-scale': s.subtitleScale.toStringAsFixed(2),
       'sub-border-style': s.subtitleBackground ? 'background-box' : 'outline-and-shadow',
       'sub-back-color': '#B3000000',
@@ -1261,14 +1302,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 ),
                 Positioned.fill(
                   child: LayoutBuilder(
-                    builder: (context, box) => ClipRect(
-                      child: AnimatedScale(
-                        scale: _zoomScale(box.biggest),
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                        child: Video(controller: _video, controls: NoVideoControls, fill: Colors.transparent),
-                      ),
-                    ),
+                    builder: (context, box) {
+                      _fitOutputSize(box.biggest, _zoomScale(box.biggest));
+                      return ClipRect(
+                        child: AnimatedScale(
+                          scale: _zoomScale(box.biggest),
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOutCubic,
+                          child: Video(controller: _video, controls: NoVideoControls, fill: Colors.transparent),
+                        ),
+                      );
+                    },
                   ),
                 ),
                 Center(child: _ZoomOsd(label: _zoomOsd)),
