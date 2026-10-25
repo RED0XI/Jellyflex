@@ -1383,4 +1383,34 @@ final class _Tr extends S {
   String get sessionExpired => 'Oturumunun süresi doldu – lütfen şifreni tekrar gir.';
   @override
   String get signInAgain => 'Yeniden giriş yap';
+  @override
+  String get perfTest => 'Performans testi';
+  @override
+  String get perfTestHint =>
+      'Sunucunun ve Jellyflex’in ne kadar hızlı olduğunu ölçer (yaklaşık 2 dakika) ve kişisel veri içermeyen bir rapor kaydeder.';
+  @override
+  String get perfTestIntro =>
+      'Jellyflex sunucuyu, kütüphaneleri, aramayı, görselleri, ağ hızını, kaydırmayı ve belleği kontrol eder. En büyük kütüphanenizi kendisi açar – bu sırada hiçbir şeye tıklamayın. Hiçbir şey gönderilmez: rapor JSON dosyası olarak İndirilenler klasörünüze kaydedilir.';
+  @override
+  String get perfTestPlayback => 'Oynatmayı da test et (bir filmi 20 saniye sessiz oynatır)';
+  @override
+  String get perfTestStart => 'Testi başlat';
+  @override
+  String get perfTestDone => 'Bitti – rapor kaydedildi.';
+  @override
+  String get perfTestFailed => 'Test tamamlanamadı.';
+  @override
+  String get perfServer => 'Sunucu yanıtı';
+  @override
+  String get perfNetwork => 'Ağ hızı';
+  @override
+  String get perfImages => 'Görsel yükleme';
+  @override
+  String get perfScrolling => 'Akıcı kaydırma';
+  @override
+  String get perfPlayback => 'Oynatma başlangıcı';
+  @override
+  String get showInFolder => 'Klasörde göster';
+  @override
+  String perfTestStep(int n, int total) => 'Adım $n / $total – lütfen bekleyin';
 }

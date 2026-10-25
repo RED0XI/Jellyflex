@@ -1392,4 +1392,35 @@ final class _Es extends S {
   String get sessionExpired => 'Tu sesión ha caducado; vuelve a introducir tu contraseña.';
   @override
   String get signInAgain => 'Volver a iniciar sesión';
+  @override
+  String get perfTest => 'Prueba de rendimiento';
+  @override
+  String get perfTestHint =>
+      'Mide lo rápido que son tu servidor y Jellyflex (unos 2 minutos) y guarda un informe sin datos personales.';
+  @override
+  String get perfTestIntro =>
+      'Jellyflex comprueba el servidor, las bibliotecas, la búsqueda, las imágenes, la velocidad de red, el desplazamiento y la memoria. Abre por sí mismo tu biblioteca más grande; no hagas clic en nada mientras tanto. No se envía nada: el informe se guarda como JSON en tu carpeta Descargas.';
+  @override
+  String get perfTestPlayback =>
+      'Probar también la reproducción (reproduce una película sin sonido durante 20 segundos)';
+  @override
+  String get perfTestStart => 'Iniciar prueba';
+  @override
+  String get perfTestDone => 'Listo: el informe se ha guardado.';
+  @override
+  String get perfTestFailed => 'No se pudo completar la prueba.';
+  @override
+  String get perfServer => 'Respuesta del servidor';
+  @override
+  String get perfNetwork => 'Velocidad de red';
+  @override
+  String get perfImages => 'Carga de una imagen';
+  @override
+  String get perfScrolling => 'Desplazamiento fluido';
+  @override
+  String get perfPlayback => 'Inicio de la reproducción';
+  @override
+  String get showInFolder => 'Mostrar en la carpeta';
+  @override
+  String perfTestStep(int n, int total) => 'Paso $n de $total – espera, por favor';
 }

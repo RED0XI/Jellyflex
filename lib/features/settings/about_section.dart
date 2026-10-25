@@ -14,6 +14,7 @@ import '../../core/version.dart';
 import '../../l10n/strings.dart';
 import '../../theme.dart';
 import '../live_handler.dart';
+import 'performance_dialog.dart';
 import '../../core/platform/app_paths.dart';
 
 void _notice(String text, {required String action, required VoidCallback onAction}) {
@@ -295,6 +296,15 @@ class AboutRows extends ConsumerWidget {
             ),
             icon: const Icon(Icons.gavel_rounded, size: 18),
             label: Text(tr.licenses),
+          ),
+        ),
+        row(
+          title: tr.perfTest,
+          subtitle: tr.perfTestHint,
+          trailing: TextButton.icon(
+            onPressed: () => showPerformanceDialog(context),
+            icon: const Icon(Icons.speed_rounded, size: 18),
+            label: Text(tr.perfTestStart),
           ),
         ),
         row(

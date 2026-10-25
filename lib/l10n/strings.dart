@@ -1121,4 +1121,31 @@ class S {
     'Deine Anmeldung ist abgelaufen – bitte gib dein Passwort erneut ein.',
   );
   String get signInAgain => _t('Sign in again', 'Neu anmelden');
+
+  // --- Leistungstest ------------------------------------------------------------------
+
+  String get perfTest => _t('Performance test', 'Leistungstest');
+  String get perfTestHint => _t(
+    'Measures how fast your server and Jellyflex are (about 2 minutes) and saves a report without personal data.',
+    'Misst, wie schnell Server und Jellyflex sind (etwa 2 Minuten), und speichert einen Bericht ohne persönliche Angaben.',
+  );
+  String get perfTestIntro => _t(
+    'Jellyflex checks the server, libraries, search, images, network speed, scrolling and memory. It opens your largest library by itself – please don’t click anything meanwhile. Nothing is sent: the report is saved as a JSON file in your Downloads folder.',
+    'Jellyflex prüft Server, Bibliotheken, Suche, Bilder, Netz-Geschwindigkeit, Scrollen und Arbeitsspeicher. Dabei öffnet es selbst deine größte Bibliothek – bitte solange nichts anklicken. Verschickt wird nichts: Der Bericht landet als JSON-Datei in deinem Downloads-Ordner.',
+  );
+  String get perfTestPlayback => _t(
+    'Also test playback (plays a movie muted for 20 seconds)',
+    'Auch die Wiedergabe testen (spielt 20 Sekunden eines Films stumm ab)',
+  );
+  String get perfTestStart => _t('Start test', 'Test starten');
+  String perfTestStep(int n, int total) =>
+      _t('Step $n of $total – please wait', 'Schritt $n von $total – bitte warten');
+  String get perfTestDone => _t('Done – the report has been saved.', 'Fertig – der Bericht ist gespeichert.');
+  String get perfTestFailed => _t('The test could not be completed.', 'Der Test konnte nicht abgeschlossen werden.');
+  String get perfServer => _t('Server response', 'Server-Antwort');
+  String get perfNetwork => _t('Network speed', 'Netz-Geschwindigkeit');
+  String get perfImages => _t('Loading a picture', 'Bild laden');
+  String get perfScrolling => _t('Smooth scrolling', 'Flüssiges Scrollen');
+  String get perfPlayback => _t('Playback start', 'Wiedergabe-Start');
+  String get showInFolder => _t('Show in folder', 'Im Ordner zeigen');
 }

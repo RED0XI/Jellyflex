@@ -653,6 +653,13 @@ Object? _handle(HttpRequest req) {
     ], q);
   }
   if (path == '/Users/Me') return {'Id': 'user1', 'Name': 'Demo'};
+  if (path == '/Items/Counts') {
+    return {
+      'MovieCount': movies.length,
+      'SeriesCount': series.length,
+      'EpisodeCount': episodes.values.fold<int>(0, (n, e) => n + e.length),
+    };
+  }
   if (path == '/System/Info/Public') {
     return {'ServerName': 'Demo-Server', 'Version': '12.2.0', 'Id': 'mock-server', 'ProductName': 'Jellyfin Server'};
   }

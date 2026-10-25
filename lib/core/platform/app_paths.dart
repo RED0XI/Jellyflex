@@ -52,6 +52,9 @@ abstract final class AppPaths {
   /// Ordner für Videos (Standard-Downloadort liegt darin).
   static String get videos => join(home, Platform.isMacOS ? 'Movies' : 'Videos');
 
+  /// Downloads-Ordner (Leistungstest-Berichte) – anders als „Dokumente“ selten in OneDrive umgeleitet.
+  static String get downloads => join(home, 'Downloads');
+
   /// Ordner für Bilder (Bildschirmfotos, Jahresrückblick).
   static String get pictures => join(home, 'Pictures');
 
