@@ -69,10 +69,29 @@ Future<void> main(List<String> args) async {
     exitCode = 1;
     return;
   }
-  final key = jsonDecode(raw) as Map<String, dynamic>;
-  final pair = await algorithm.newKeyPairFromSeed(base64Decode(key['seed'] as String));
+  // Nie den Inhalt ausgeben – Fehlermeldungen landen in öffentlichen Actions-Protokollen.
+  final List<int> seed;
+  try {
+    seed = _parseSeed(raw);
+  } catch (_) {
+    stderr.writeln('Schlüssel ist kein gültiges JSON mit "seed" (Inhalt wird nicht angezeigt).');
+    exitCode = 1;
+    return;
+  }
+  final pair = await algorithm.newKeyPairFromSeed(seed);
   final installer = File(args.first);
   final signature = await algorithm.sign(await installer.readAsBytes(), keyPair: pair);
   final sigFile = File('${installer.path}.sig')..writeAsStringSync(base64Encode(signature.bytes));
   stdout.writeln('Signiert: ${sigFile.path}');
+}
+
+/// Seed aus dem Schlüssel-JSON. Ein BOM am Anfang (PowerShell beim Weiterleiten) und
+/// Leerzeichen/Zeilenumbrüche drumherum werden ignoriert.
+List<int> _parseSeed(String raw) {
+  var text = raw.trim();
+  if (text.startsWith('\uFEFF')) text = text.substring(1).trim();
+  final key = jsonDecode(text) as Map<String, dynamic>;
+  final seed = base64Decode(key['seed'] as String);
+  if (seed.length != 32) throw const FormatException();
+  return seed;
 }
