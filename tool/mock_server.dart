@@ -638,6 +638,42 @@ Object? _handle(HttpRequest req) {
   final seg = path.split('/').where((s) => s.isNotEmpty).toList();
 
   if (path == '/System/Ping') return 'Jellyfin Server';
+  // Untertitelsuche (wie mit dem OpenSubtitles-Plugin): drei Treffer je Sprache, Laden hängt
+  // eine externe Untertiteldatei an alle Fassungen des Titels.
+  if (seg.length == 5 && seg[0] == 'Items' && seg[2] == 'RemoteSearch' && seg[3] == 'Subtitles') {
+    if (req.method == 'POST') {
+      final item = byId[seg[1]];
+      final language = seg[4].split('-').elementAtOrNull(1) ?? 'ger';
+      for (final source in (item?['MediaSources'] as List? ?? const [])) {
+        final streams = (source as Map)['MediaStreams'] as List;
+        final next = streams.fold<int>(0, (m, s) => ((s as Map)['Index'] as int) > m ? s['Index'] as int : m) + 1;
+        streams.add({
+          'Type': 'Subtitle',
+          'Index': next,
+          'Language': language,
+          'Codec': 'srt',
+          'IsExternal': true,
+          'Title': 'OpenSubtitles',
+        });
+      }
+      return '';
+    }
+    final lang = seg[4];
+    return [
+      for (var i = 1; i <= 3; i++)
+        {
+          'Id': 'os-$lang-$i',
+          'Name': '${byId[seg[1]]?['Name'] ?? 'Film'}.2019.1080p.BluRay.x264 ($i)',
+          'ProviderName': 'Open Subtitles',
+          'Format': 'srt',
+          'ThreeLetterISOLanguageName': lang,
+          'DownloadCount': 4000 ~/ i,
+          'CommunityRating': 9.0 - i,
+          'IsHashMatch': i == 2,
+          'HearingImpaired': i == 3,
+        },
+    ];
+  }
   // Titelmusik: jeder Titel hat eine (das Testvideo, nur der Ton zählt).
   if (seg.length == 3 && seg[0] == 'Items' && seg[2] == 'ThemeSongs') {
     return {

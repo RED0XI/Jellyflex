@@ -1027,6 +1027,32 @@ final class _Tr extends S {
   @override
   String get myLists => 'Listelerim';
   @override
+  String get searchSubtitles => 'Altyazı ara …';
+  @override
+  String get searchSubtitlesHint => 'Sunucun üzerinden, ör. OpenSubtitles eklentisiyle';
+  @override
+  String get subtitleSearchTitle => 'Altyazı ara';
+  @override
+  String get noSubtitlesFound => 'Altyazı bulunamadı';
+  @override
+  String get noSubtitlesFoundHint =>
+      'Sunucunda OpenSubtitles gibi bir altyazı eklentisi kurulu mu? Başka bir dil de işe yarayabilir.';
+  @override
+  String get subtitleSearchNotAllowed =>
+      'Hesabın altyazı indiremez. Bir yönetici Jellyfin’de „altyazı yönetimi“ne izin verebilir.';
+  @override
+  String get subtitleDownloaded => 'Altyazı indirildi – birazdan seçilecek.';
+  @override
+  String get loadSubtitle => 'Yükle';
+  @override
+  String get exactMatch => 'Tam eşleşme';
+  @override
+  String get hearingImpaired => 'İşitme engelliler için';
+  @override
+  String get machineTranslated => 'Makine çevirisi';
+  @override
+  String downloadsCount(int n) => '$n indirme';
+  @override
   String get general => 'Genel';
   @override
   String get appearance => 'Görünüm';

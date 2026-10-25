@@ -1031,6 +1031,32 @@ final class _Es extends S {
   @override
   String get myLists => 'Mis listas';
   @override
+  String get searchSubtitles => 'Buscar subtítulos …';
+  @override
+  String get searchSubtitlesHint => 'A través de tu servidor, p. ej. con el plugin OpenSubtitles';
+  @override
+  String get subtitleSearchTitle => 'Buscar subtítulos';
+  @override
+  String get noSubtitlesFound => 'No se encontraron subtítulos';
+  @override
+  String get noSubtitlesFoundHint =>
+      '¿Hay un plugin de subtítulos como OpenSubtitles configurado en tu servidor? Otro idioma también puede ayudar.';
+  @override
+  String get subtitleSearchNotAllowed =>
+      'Tu cuenta no puede descargar subtítulos. Un administrador puede permitir la «gestión de subtítulos» en Jellyfin.';
+  @override
+  String get subtitleDownloaded => 'Subtítulos descargados: se seleccionarán en un momento.';
+  @override
+  String get loadSubtitle => 'Cargar';
+  @override
+  String get exactMatch => 'Coincidencia exacta';
+  @override
+  String get hearingImpaired => 'Para personas sordas';
+  @override
+  String get machineTranslated => 'Traducción automática';
+  @override
+  String downloadsCount(int n) => '$n descargas';
+  @override
   String get general => 'General';
   @override
   String get appearance => 'Apariencia';

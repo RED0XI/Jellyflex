@@ -194,6 +194,26 @@ class MediaSource {
   List<MediaStream> get subtitleStreams => mediaStreams.where((s) => s.type == 'Subtitle').toList();
 }
 
+/// Treffer der Untertitelsuche des Servers (`/Items/{id}/RemoteSearch/Subtitles/{lang}`).
+class RemoteSubtitle {
+  RemoteSubtitle(this.raw);
+
+  final Json raw;
+
+  String get id => (raw['Id'] as String?) ?? '';
+  String get name => (raw['Name'] as String?) ?? '';
+  String? get provider => raw['ProviderName'] as String?;
+  String? get format => raw['Format'] as String?;
+  int? get downloads => (raw['DownloadCount'] as num?)?.toInt();
+  double? get rating => (raw['CommunityRating'] as num?)?.toDouble();
+
+  /// Passt genau zu dieser Datei (gleicher Datei-Hash).
+  bool get hashMatch => raw['IsHashMatch'] == true;
+  bool get forced => raw['Forced'] == true;
+  bool get hearingImpaired => raw['HearingImpaired'] == true;
+  bool get machineTranslated => raw['MachineTranslated'] == true || raw['AiTranslated'] == true;
+}
+
 class MediaStream {
   MediaStream(this.raw);
 
@@ -207,6 +227,9 @@ class MediaStream {
   bool get isExternal => raw['IsExternal'] == true;
   bool get isDefault => raw['IsDefault'] == true;
   bool get isForced => raw['IsForced'] == true;
+
+  /// Untertitel für Hörgeschädigte (SDH/CC, Jellyfin ab 10.9).
+  bool get isHearingImpaired => raw['IsHearingImpaired'] == true;
   int? get height => (raw['Height'] as num?)?.toInt();
   int? get width => (raw['Width'] as num?)?.toInt();
   String? get title => raw['Title'] as String?;

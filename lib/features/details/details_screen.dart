@@ -28,6 +28,7 @@ import '../home/home_providers.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/jf_image.dart';
 import 'media_info_dialog.dart';
+import 'subtitle_search_dialog.dart';
 import 'theme_music.dart';
 import '../lists/list_actions.dart';
 import '../../l10n/strings.dart';
@@ -553,6 +554,9 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
     if (chosen != null) widget.onSelectTracks(chosen, widget.subtitleIndex);
   }
 
+  /// Eintrag im Untertitel-Menü, der die Suche über den Server öffnet.
+  static const _searchSubtitles = -2;
+
   Future<void> _chooseSubtitle(BuildContext buttonContext, MediaSource source, int? current) async {
     final chosen = await _choose(
       buttonContext,
@@ -560,9 +564,43 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       options: [
         (value: -1, title: tr.off, details: ''),
         for (final s in source.subtitleStreams) (value: s.index, title: trackLabel(s), details: ''),
+        (value: _searchSubtitles, title: tr.searchSubtitles, details: tr.searchSubtitlesHint),
       ],
     );
-    if (chosen != null) widget.onSelectTracks(widget.audioIndex, chosen);
+    if (chosen == _searchSubtitles) {
+      if (mounted) await _searchSubtitlesOnServer(source);
+    } else if (chosen != null) {
+      widget.onSelectTracks(widget.audioIndex, chosen);
+    }
+  }
+
+  /// Untertitel über den Server suchen; der geladene wird danach gleich ausgewählt.
+  Future<void> _searchSubtitlesOnServer(MediaSource source) async {
+    final item = widget.item;
+    final before = {for (final s in source.subtitleStreams) s.index};
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (!await showSubtitleSearchDialog(context, item)) return;
+    messenger?.showSnackBar(
+      SnackBar(content: Text(tr.subtitleDownloaded), behavior: SnackBarBehavior.floating, width: 460),
+    );
+    // Der Server bindet die neue Datei mit kurzer Verzögerung ein – ein paar Mal nachsehen.
+    final api = ref.read(apiProvider);
+    for (var i = 0; i < 8 && mounted; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      try {
+        final fresh = await api.getItem(item.id);
+        final freshSource = fresh.mediaSources.where((s) => s.id == source.id).firstOrNull;
+        final added = freshSource?.subtitleStreams.where((s) => !before.contains(s.index)).firstOrNull;
+        if (added == null) continue;
+        if (!mounted) return;
+        ref.invalidate(itemProvider(item.id));
+        widget.onSelectTracks(widget.audioIndex, added.index);
+        return;
+      } catch (_) {
+        // Später nochmal.
+      }
+    }
+    if (mounted) ref.invalidate(itemProvider(item.id));
   }
 
   /// Knöpfe "Ton" und "Untertitel" – nur, wenn es etwas zu wählen gibt.
@@ -586,15 +624,15 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
             onPressed: () => _chooseAudio(buttonContext, source, audioStream?.index),
           ),
         ),
-      if (source.subtitleStreams.isNotEmpty)
-        Builder(
-          builder: (buttonContext) => OptionChip(
-            text: tr.subtitlesLabel(subtitleName),
-            value: subtitleName,
-            icon: Icons.subtitles_rounded,
-            onPressed: () => _chooseSubtitle(buttonContext, source, subtitleStream?.index),
-          ),
+      // Auch ohne Untertitel: im Menü lassen sich welche über den Server suchen.
+      Builder(
+        builder: (buttonContext) => OptionChip(
+          text: tr.subtitlesLabel(subtitleName),
+          value: subtitleName,
+          icon: Icons.subtitles_rounded,
+          onPressed: () => _chooseSubtitle(buttonContext, source, subtitleStream?.index),
         ),
+      ),
     ];
   }
 

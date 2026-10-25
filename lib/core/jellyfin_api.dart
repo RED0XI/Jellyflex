@@ -786,6 +786,17 @@ class JellyfinApi {
   /// Angekündigte Folgen der Serien in der Bibliothek (ab gestern), nach Erscheinungsdatum.
   Future<List<BaseItem>> getUpcoming({int limit = 200}) => _getItems('/Shows/Upcoming', {..._common, 'limit': limit});
 
+  /// Untertitel über die Plugins des Servers suchen (z. B. OpenSubtitles); [language] wie "ger".
+  /// Braucht das Recht "Untertitel verwalten" (sonst 403).
+  Future<List<RemoteSubtitle>> searchRemoteSubtitles(String itemId, String language) async {
+    final res = await dio.get('/Items/$itemId/RemoteSearch/Subtitles/$language');
+    return [for (final s in (res.data as List? ?? const [])) RemoteSubtitle((s as Map).cast<String, dynamic>())];
+  }
+
+  /// Gefundenen Untertitel auf dem Server speichern (danach eine Datei neben dem Video).
+  Future<void> downloadRemoteSubtitle(String itemId, String subtitleId) =>
+      dio.post('/Items/$itemId/RemoteSearch/Subtitles/${Uri.encodeComponent(subtitleId)}');
+
   /// Bibliotheken mit ihren Einstellungen (nur für Administratoren lesbar).
   Future<List<Json>> getVirtualFolders() async {
     final res = await dio.get('/Library/VirtualFolders');

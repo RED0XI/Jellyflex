@@ -286,6 +286,26 @@ class S {
   };
   String get watchlist => _t('Watchlist', 'Merkliste');
   String get myLists => _t('My lists', 'Meine Listen');
+  String get searchSubtitles => _t('Search subtitles …', 'Untertitel suchen …');
+  String get searchSubtitlesHint =>
+      _t('Via your server, e.g. the OpenSubtitles plugin', 'Über deinen Server, z. B. mit dem OpenSubtitles-Plugin');
+  String get subtitleSearchTitle => _t('Search subtitles', 'Untertitel suchen');
+  String get noSubtitlesFound => _t('No subtitles found', 'Keine Untertitel gefunden');
+  String get noSubtitlesFoundHint => _t(
+    'Is a subtitle plugin such as OpenSubtitles set up on your server? Another language may help, too.',
+    'Ist auf deinem Server ein Untertitel-Plugin wie OpenSubtitles eingerichtet? Sonst hilft vielleicht eine andere Sprache.',
+  );
+  String get subtitleSearchNotAllowed => _t(
+    'Your account may not download subtitles. An admin can allow “subtitle management” for it in Jellyfin.',
+    'Dein Konto darf keine Untertitel laden. Ein Admin kann ihm in Jellyfin die „Untertitelverwaltung“ erlauben.',
+  );
+  String get subtitleDownloaded =>
+      _t('Subtitles downloaded – selected in a moment.', 'Untertitel geladen – sie werden gleich ausgewählt.');
+  String get loadSubtitle => _t('Load', 'Laden');
+  String get exactMatch => _t('Exact match', 'Passt genau');
+  String get hearingImpaired => _t('Hearing impaired', 'Für Hörgeschädigte');
+  String get machineTranslated => _t('Machine-translated', 'Maschinell übersetzt');
+  String downloadsCount(int n) => _t('$n downloads', '$n Downloads');
   String get general => _t('General', 'Allgemein');
   String get appearance => _t('Appearance', 'Aussehen');
   String get advanced => _t('Advanced', 'Erweitert');

@@ -134,7 +134,7 @@ void main() {
     router.push('/item/series0_s1_e2');
     await pumpFor(tester, const Duration(seconds: 2));
     expect(find.text('Ton: Englisch'), findsOneWidget);
-    expect(find.textContaining('Untertitel:'), findsNothing, reason: 'Demo-Folgen haben keine Untertitel');
+    expect(find.text('Untertitel: Aus'), findsOneWidget, reason: 'Ohne Untertitel trotzdem da (zum Suchen)');
     expect(
       SeriesTracks.instance.get('$demoServer|user1', 'series0').subtitle,
       isNull,
