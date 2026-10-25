@@ -4,6 +4,30 @@ import '../l10n/strings.dart';
 /// Englisch und Deutsch; andere Sprachen zeigen Englisch. Neue Version: oben
 /// einen Eintrag ergänzen (Versionen ohne Eintrag erscheinen nicht).
 const changelog = <String, ({List<String> en, List<String> de})>{
+  '0.3.7': (
+    en: [
+      'Choose audio and subtitles right on the details page – for series they are remembered for the next episode.',
+      'Search and load subtitles through your server (e.g. the OpenSubtitles plugin) – on the details page and in the player.',
+      'Subtitles in the player are sharp and calmer: rendered at screen size with a finer font.',
+      'New “Upcoming” calendar with the next episodes of your shows.',
+      'Ratings with IMDb/TMDB and Rotten Tomatoes marks, depending on your server’s settings.',
+      'Browse by genre: picture tiles in the search and a page per genre.',
+      'Settings sorted into six sections, with a search field.',
+      'Fresher look: calmer buttons and switches, cast portraits, a livelier “Surprise me” and finer seasonal touches.',
+      'The movie quiz has been removed.',
+    ],
+    de: [
+      'Ton und Untertitel direkt auf der Detailseite wählen – bei Serien für die nächste Folge gemerkt.',
+      'Untertitel über deinen Server suchen und laden (z. B. OpenSubtitles-Plugin) – auf der Detailseite und im Player.',
+      'Untertitel im Player sind scharf und ruhiger: in Bildschirmgröße gezeichnet, mit feinerer Schrift.',
+      'Neuer Kalender „Demnächst“ mit den nächsten Folgen deiner Serien.',
+      'Bewertungen mit IMDb-/TMDB- und Rotten-Tomatoes-Zeichen, je nach Einstellung deines Servers.',
+      'Nach Genre stöbern: Bildkacheln in der Suche und eine eigene Seite je Genre.',
+      'Einstellungen in sechs Bereiche sortiert, mit Suchfeld.',
+      'Frischer Look: ruhigere Knöpfe und Schalter, Porträts der Besetzung, ein lebendigeres „Überrasch mich“ und feinere Saison-Akzente.',
+      'Das Film-Quiz wurde entfernt.',
+    ],
+  ),
   '0.3.6': (
     en: [
       'The first official macOS version – signed and checked by Apple, so it opens without warnings.',
