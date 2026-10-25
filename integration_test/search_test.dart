@@ -80,6 +80,19 @@ void main() {
     await pumpFor(tester, const Duration(milliseconds: 600));
     expect(container.read(searchHistoryProvider), isEmpty);
     expect(find.text('Letzte Suchen'), findsNothing);
+
+    // Leere Suche: Genres zum Stöbern; ein Genre zeigt seine Filme und Serien.
+    expect(find.text('Wonach ist dir heute?'), findsOneWidget);
+    await tester.tap(find.text('Drama').first);
+    await pumpFor(tester, const Duration(seconds: 2));
+    expect(find.text('Genre: Drama'), findsOneWidget);
+    expect(find.byType(PosterCard), findsWidgets);
+    expect(find.text('Folgen'), findsNothing, reason: 'Beim Stöbern nur Filme und Serien');
+    await saveShot(tester, 'search_genre');
+    // Chip schließt das Genre wieder.
+    await tester.tap(find.text('Genre: Drama'));
+    await pumpFor(tester, const Duration(seconds: 1));
+    expect(find.text('Wonach ist dir heute?'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 }
