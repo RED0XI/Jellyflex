@@ -1027,6 +1027,22 @@ final class _Tr extends S {
   @override
   String get myLists => 'Listelerim';
   @override
+  String get upcoming => 'Yakında';
+  @override
+  String get upcomingHint => 'Dizilerinin önümüzdeki haftalardaki yeni bölümleri.';
+  @override
+  String get noUpcoming => 'Dizilerin için şu anda duyurulmuş yeni bölüm yok.';
+  @override
+  String get today => 'Bugün';
+  @override
+  String get tomorrow => 'Yarın';
+  @override
+  String get yesterday => 'Dün';
+  @override
+  String weekdayShort(int weekday) => weekdays[weekday - 1].substring(0, 3);
+  @override
+  String episodesCount(int n) => '$n bölüm';
+  @override
   String get addToWatchlist => 'İzleme listesine ekle';
   @override
   String get removeFromWatchlist => 'İzleme listesinden çıkar';

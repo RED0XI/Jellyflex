@@ -70,7 +70,7 @@ class ProfileMenuButton extends ConsumerWidget {
   final GoRouter? router;
   final double size;
 
-  /// "Überrasch mich" mit ins Menü (für schlanke Leisten).
+  /// "Demnächst" und "Überrasch mich" mit ins Menü (für schlanke Leisten).
   final bool extraActions;
 
   @override
@@ -130,6 +130,7 @@ class ProfileMenuButton extends ConsumerWidget {
       ),
       const PopupMenuDivider(),
       if (extraActions) ...[
+        entry('/calendar', Icons.calendar_month_outlined, tr.upcoming),
         entry('/roulette', Icons.casino_outlined, tr.surpriseMe),
       ],
       entry('/lists', Icons.bookmarks_outlined, tr.myLists),
@@ -180,7 +181,7 @@ class Avatar extends ConsumerWidget {
 }
 
 /// Schwebende Leiste über der Startseite. Wird beim Herunterscrollen milchig-undurchsichtig.
-/// [minimal]: nur Name, Ziele und Suche – "Überrasch mich" wandert ins Profilmenü.
+/// [minimal]: nur Name, Ziele und Suche – "Demnächst" und "Überrasch mich" wandern ins Profilmenü.
 class TopNav extends ConsumerWidget {
   const TopNav({super.key, required this.scroll, this.minimal = false});
 
@@ -214,6 +215,12 @@ class TopNav extends ConsumerWidget {
               _NavLink(label: e.label, active: i == 0, minimal: minimal, onTap: e.onTap),
             const Spacer(),
             if (!minimal) ...[
+              IconButton(
+                tooltip: tr.upcoming,
+                icon: const Icon(Icons.calendar_month_outlined, size: 24),
+                onPressed: () => context.push('/calendar'),
+              ),
+              const SizedBox(width: 4),
               IconButton(
                 tooltip: tr.surpriseMe,
                 icon: const Icon(Icons.casino_outlined, size: 25),
@@ -381,6 +388,12 @@ class SideNav extends ConsumerWidget {
                 ),
                 const SizedBox(height: 14),
                 _SideHeading(tr.more),
+                _SideLink(
+                  icon: Icons.calendar_month_outlined,
+                  label: tr.upcoming,
+                  active: path == '/calendar',
+                  onTap: () => router.go('/calendar'),
+                ),
                 _SideLink(
                   icon: Icons.casino_outlined,
                   label: tr.surpriseMe,

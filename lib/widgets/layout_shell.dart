@@ -31,7 +31,7 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
   /// Seiten, neben denen die Seitenleiste steht (nicht Player, Glücksrad, Anmeldung …).
   static bool _isBrowsePage(String path) =>
       path == '/' ||
-      const ['/library/', '/item/', '/person/', '/downloads', '/search', '/settings', '/lists'].any(path.startsWith);
+      const ['/library/', '/item/', '/person/', '/downloads', '/search', '/settings', '/lists', '/calendar'].any(path.startsWith);
 
   /// Fokusbereich der Seitenleiste (für Pfeiltasten/Controller).
   final _sideScope = FocusScopeNode(debugLabel: 'Seitenleiste');

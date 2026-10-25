@@ -783,6 +783,9 @@ class JellyfinApi {
     return (res.data as Map).cast<String, dynamic>();
   }
 
+  /// Angekündigte Folgen der Serien in der Bibliothek (ab gestern), nach Erscheinungsdatum.
+  Future<List<BaseItem>> getUpcoming({int limit = 200}) => _getItems('/Shows/Upcoming', {..._common, 'limit': limit});
+
   /// Bibliotheken mit ihren Einstellungen (nur für Administratoren lesbar).
   Future<List<Json>> getVirtualFolders() async {
     final res = await dio.get('/Library/VirtualFolders');

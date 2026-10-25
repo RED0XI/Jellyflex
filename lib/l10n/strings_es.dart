@@ -1031,6 +1031,22 @@ final class _Es extends S {
   @override
   String get myLists => 'Mis listas';
   @override
+  String get upcoming => 'Próximamente';
+  @override
+  String get upcomingHint => 'Nuevos episodios de tus series en las próximas semanas.';
+  @override
+  String get noUpcoming => 'Ahora mismo no hay episodios nuevos anunciados para tus series.';
+  @override
+  String get today => 'Hoy';
+  @override
+  String get tomorrow => 'Mañana';
+  @override
+  String get yesterday => 'Ayer';
+  @override
+  String weekdayShort(int weekday) => weekdays[weekday - 1].substring(0, 3);
+  @override
+  String episodesCount(int n) => n == 1 ? '1 episodio' : '$n episodios';
+  @override
   String get addToWatchlist => 'Añadir a mi lista';
   @override
   String get removeFromWatchlist => 'Quitar de mi lista';

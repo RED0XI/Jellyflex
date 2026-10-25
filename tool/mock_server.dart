@@ -653,6 +653,25 @@ Object? _handle(HttpRequest req) {
         if (p['Type'] == 'Person' && (p['Name'] as String).toLowerCase().contains(term)) p,
     ], q);
   }
+  // Angekündigte Folgen: einige vorhandene Folgen mit Erscheinungsdatum in den nächsten Tagen.
+  if (path == '/Shows/Upcoming') {
+    final now = DateTime.now();
+    const picks = [
+      ('series1_s2_e6', 0),
+      ('series1_s2_e7', 1),
+      ('series2_s1_e8', 1),
+      ('series3_s2_e3', 3),
+      ('series3_s2_e4', 3),
+      ('series0_s2_e8', 6),
+      ('series4_s1_e2', 9),
+    ];
+    final items = [
+      for (final (id, days) in picks)
+        if (byId[id] case final ep?)
+          {...ep, 'PremiereDate': DateTime(now.year, now.month, now.day + days, 20).toUtc().toIso8601String()},
+    ];
+    return {'Items': items, 'TotalRecordCount': items.length};
+  }
   if (path == '/Users/Me') {
     return {
       'Id': 'user1',

@@ -286,6 +286,20 @@ class S {
   };
   String get watchlist => _t('Watchlist', 'Merkliste');
   String get myLists => _t('My lists', 'Meine Listen');
+  String get upcoming => _t('Upcoming', 'Demnächst');
+  String get upcomingHint =>
+      _t('New episodes of your shows in the coming weeks.', 'Neue Folgen deiner Serien in den nächsten Wochen.');
+  String get noUpcoming => _t(
+    'No new episodes announced for your shows right now.',
+    'Für deine Serien sind gerade keine neuen Folgen angekündigt.',
+  );
+  String get today => _t('Today', 'Heute');
+  String get tomorrow => _t('Tomorrow', 'Morgen');
+  String get yesterday => _t('Yesterday', 'Gestern');
+
+  /// Kurzer Wochentag für die Kalenderleiste ([weekday] wie DateTime.weekday): "Mo" bzw. "Mon".
+  String weekdayShort(int weekday) => weekdays[weekday - 1].substring(0, _de ? 2 : 3);
+  String episodesCount(int n) => _t(n == 1 ? '1 episode' : '$n episodes', n == 1 ? '1 Folge' : '$n Folgen');
   String get addToWatchlist => _t('Add to watchlist', 'Auf die Merkliste');
   String get removeFromWatchlist => _t('Remove from watchlist', 'Von der Merkliste nehmen');
   String addedToWatchlist(String name) => _t('“$name” is on your watchlist', '„$name“ steht auf der Merkliste');
@@ -442,10 +456,7 @@ class S {
     'Ein Bild (PNG, JPG …) – wird vor dem Namen und als Symbol in der Taskleiste gezeigt.',
   );
   String get sounds => _t('Sounds', 'Klänge');
-  String get soundsHint => _t(
-    'Ticks and a jingle in “Surprise me”.',
-    'Ticken und Melodie bei „Überrasch mich“.',
-  );
+  String get soundsHint => _t('Ticks and a jingle in “Surprise me”.', 'Ticken und Melodie bei „Überrasch mich“.');
   String get theme => _t('Theme', 'Theme');
   String get themeHint => _t('Colours of the whole app – changes instantly.', 'Farben der ganzen App – wirkt sofort.');
 
