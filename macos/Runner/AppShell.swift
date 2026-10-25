@@ -125,32 +125,40 @@ final class AppShell: NSObject {
 
   // MARK: Stammzertifikate
 
-  /// Stammzertifikate, denen macOS für TLS vertraut: die des Systems sowie selbst
-  /// hinzugefügte (Administrator/Benutzer), sofern sie dort als vertrauenswürdig markiert sind.
+  /// Stammzertifikate, denen macOS für TLS tatsächlich vertraut: die des Systems sowie
+  /// selbst hinzugefügte (Administrator/Benutzer) – jeweils nach der *wirksamen*
+  /// Vertrauenseinstellung. Wie macOS selbst entscheidet die erste Ebene in der Reihenfolge
+  /// Benutzer → Administrator → System, die eine klare Aussage macht; ein vom Benutzer
+  /// misstrautes System-Stammzertifikat bleibt also draußen.
   static func trustedRoots() -> [Data] {
+    let domains: [SecTrustSettingsDomain] = [.user, .admin, .system]
     var result: [Data] = []
     var seen = Set<Data>()
-    for domain in [SecTrustSettingsDomain.system, .admin, .user] {
+    for domain in domains.reversed() {
       var list: CFArray?
       guard SecTrustSettingsCopyCertificates(domain, &list) == errSecSuccess,
         let certificates = list as? [SecCertificate]
       else { continue }
       for certificate in certificates {
-        guard domain == .system || isTrustedRoot(certificate, domain: domain) else { continue }
         let der = SecCertificateCopyData(certificate) as Data
-        if seen.insert(der).inserted { result.append(der) }
+        guard seen.insert(der).inserted else { continue }
+        let verdict = domains.lazy.map { sslTrust(certificate, domain: $0) }.first { $0 != .unspecified }
+        if verdict == .trusted { result.append(der) }
       }
     }
     return result
   }
 
-  /// Gilt das Zertifikat laut Vertrauenseinstellungen als Stammzertifikat (für SSL oder allgemein)?
-  private static func isTrustedRoot(_ certificate: SecCertificate, domain: SecTrustSettingsDomain) -> Bool {
+  private enum SSLTrust { case trusted, denied, unspecified }
+
+  /// Was sagen die Vertrauenseinstellungen dieser Ebene über das Zertifikat als
+  /// Stammzertifikat für TLS? `.unspecified`: keine Aussage, die nächste Ebene entscheidet.
+  private static func sslTrust(_ certificate: SecCertificate, domain: SecTrustSettingsDomain) -> SSLTrust {
     var settings: CFArray?
-    guard SecTrustSettingsCopyTrustSettings(certificate, domain, &settings) == errSecSuccess else { return false }
+    guard SecTrustSettingsCopyTrustSettings(certificate, domain, &settings) == errSecSuccess else { return .unspecified }
     let entries = settings as? [[String: Any]] ?? []
     // Leere Liste = "immer vertrauen" (als Stammzertifikat).
-    if entries.isEmpty { return true }
+    if entries.isEmpty { return .trusted }
     for entry in entries {
       if let policy = entry[kSecTrustSettingsPolicy as String] {
         // Nur Einträge ohne Richtlinie oder für SSL zählen.
@@ -160,11 +168,13 @@ final class AppShell: NSObject {
       }
       let raw = (entry[kSecTrustSettingsResult as String] as? NSNumber)?.uint32Value
         ?? SecTrustSettingsResult.trustRoot.rawValue
+      if raw == SecTrustSettingsResult.deny.rawValue { return .denied }
+      // Vertrauen nur für bestimmte Servernamen kann der Player nicht nachbilden – nicht übernehmen.
+      if entry[kSecTrustSettingsPolicyString as String] != nil { continue }
       if raw == SecTrustSettingsResult.trustRoot.rawValue || raw == SecTrustSettingsResult.trustAsRoot.rawValue {
-        return true
+        return .trusted
       }
-      if raw == SecTrustSettingsResult.deny.rawValue { return false }
     }
-    return false
+    return .unspecified
   }
 }

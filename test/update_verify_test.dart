@@ -70,6 +70,7 @@ void main() {
   test('macOS: Update muss von Apple signiert sein und die Kennung von Jellyflex tragen', () {
     expect(UpdateCheck.macCodeRequirement, contains('anchor apple generic'));
     expect(UpdateCheck.macCodeRequirement, contains('identifier "io.github.red0xi.jellyflex"'));
+    expect(UpdateCheck.macCodeRequirement, contains('certificate leaf[subject.OU] = "WD2QB3M3TH"'));
   });
 
   test('Paketname je Betriebssystem', () {

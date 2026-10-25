@@ -35,10 +35,10 @@ abstract final class UpdateCheck {
   static const _assetPrefix = 'https://github.com/RED0XI/Jellyflex/releases/download/';
 
   /// macOS: Kennung und Apple-Team der echten Jellyflex-App. Ein Update muss genau damit
-  /// signiert sein – irgendeine gültig signierte App reicht nicht. Team-ID eintragen, sobald
-  /// die Mac-Releases mit dem eigenen Entwicklerkonto signiert werden.
+  /// signiert sein – irgendeine gültig signierte App reicht nicht. Die Team-ID gehört zum
+  /// Zertifikat "Developer ID Application: Utku Acikel" (developer.apple.com → Membership).
   static const macBundleId = 'io.github.red0xi.jellyflex';
-  static const macTeamId = '';
+  static const macTeamId = 'WD2QB3M3TH';
 
   /// Anforderung für `codesign --verify -R`.
   @visibleForTesting

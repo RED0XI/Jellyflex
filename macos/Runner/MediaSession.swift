@@ -14,6 +14,7 @@ final class MediaSession {
   private var info: [String: Any] = [:]
   private var artUrl = ""
   private var artTask: URLSessionDataTask?
+  private let artLoader = ArtworkLoader()
 
   func register(with messenger: FlutterBinaryMessenger) {
     channel = FlutterMethodChannel(name: "jellyflex/media_session", binaryMessenger: messenger)
@@ -97,14 +98,64 @@ final class MediaSession {
     info.removeValue(forKey: MPMediaItemPropertyArtwork)
     MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     guard let target = URL(string: url), target.scheme == "https" || target.scheme == "http" else { return }
-    artTask = URLSession.shared.dataTask(with: target) { [weak self] data, _, _ in
-      guard let data = data, data.count < 20 * 1024 * 1024, let image = NSImage(data: data) else { return }
+    artTask = artLoader.load(target) { [weak self] image in
       DispatchQueue.main.async {
         guard let self = self, self.artUrl == url else { return }
         self.info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = self.info
       }
     }
-    artTask?.resume()
+  }
+}
+
+/// Lädt Cover-Bilder höchstens bis [limit] Bytes: zu große Antworten werden schon
+/// während der Übertragung abgebrochen statt erst vollständig in den Speicher geladen.
+private final class ArtworkLoader: NSObject, URLSessionDataDelegate {
+  static let limit = 20 * 1024 * 1024
+
+  /// Alle Rückrufe der Session laufen nacheinander auf dieser Queue – `pending` braucht keine Sperre.
+  private let queue: OperationQueue = {
+    let queue = OperationQueue()
+    queue.maxConcurrentOperationCount = 1
+    return queue
+  }()
+  private lazy var session = URLSession(configuration: .default, delegate: self, delegateQueue: queue)
+  private var pending: [Int: (data: Data, done: (NSImage) -> Void)] = [:]
+
+  func load(_ url: URL, done: @escaping (NSImage) -> Void) -> URLSessionDataTask {
+    let task = session.dataTask(with: url)
+    // Erst eintragen, dann starten – beides auf der Queue, damit kein Rückruf zu früh kommt.
+    queue.addOperation {
+      self.pending[task.taskIdentifier] = (Data(), done)
+      task.resume()
+    }
+    return task
+  }
+
+  func urlSession(
+    _ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+    completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+  ) {
+    // Angekündigte Größe schon zu groß: gar nicht erst laden.
+    completionHandler(response.expectedContentLength > Int64(ArtworkLoader.limit) ? .cancel : .allow)
+  }
+
+  func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+    let id = dataTask.taskIdentifier
+    guard var entry = pending[id] else { return }
+    entry.data.append(data)
+    if entry.data.count > ArtworkLoader.limit {
+      pending[id] = nil
+      dataTask.cancel()
+      return
+    }
+    pending[id] = entry
+  }
+
+  func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    guard let entry = pending.removeValue(forKey: task.taskIdentifier), error == nil,
+      let image = NSImage(data: entry.data)
+    else { return }
+    entry.done(image)
   }
 }
