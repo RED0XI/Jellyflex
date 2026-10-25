@@ -64,7 +64,6 @@ class AppSettings {
     this.updateCheck = false,
     this.seasonalThemes = true,
     this.ambilight = AmbilightMode.window,
-    this.quizHighscore = 0,
     this.language = AppLanguage.en,
     this.themeId = 'midnight',
     this.soundEffects = true,
@@ -130,7 +129,7 @@ class AppSettings {
   /// Karten blättern beim Darüberfahren durch Szenen des Titels.
   final bool hoverPreview;
 
-  /// Klänge bei "Überrasch mich" und im Quiz.
+  /// Klänge bei "Überrasch mich".
   final bool soundEffects;
 
   /// Farbschema (siehe lib/core/themes.dart).
@@ -138,9 +137,6 @@ class AppSettings {
 
   /// Sprache der Oberfläche (Standard: Englisch).
   final AppLanguage language;
-
-  /// Bester Punktestand im Film-Quiz.
-  final int quizHighscore;
 
   /// Farbiges Leuchten aus dem Bild in den schwarzen Balken neben/über dem Video.
   final AmbilightMode ambilight;
@@ -219,7 +215,6 @@ class AppSettings {
     bool? updateCheck,
     bool? seasonalThemes,
     AmbilightMode? ambilight,
-    int? quizHighscore,
     AppLanguage? language,
     String? themeId,
     bool? soundEffects,
@@ -258,7 +253,6 @@ class AppSettings {
     updateCheck: updateCheck ?? this.updateCheck,
     seasonalThemes: seasonalThemes ?? this.seasonalThemes,
     ambilight: ambilight ?? this.ambilight,
-    quizHighscore: quizHighscore ?? this.quizHighscore,
     language: language ?? this.language,
     themeId: themeId ?? this.themeId,
     soundEffects: soundEffects ?? this.soundEffects,
@@ -299,7 +293,6 @@ class AppSettings {
     'updateCheck': updateCheck,
     'seasonalThemes': seasonalThemes,
     'ambilight': ambilight.name,
-    'quizHighscore': quizHighscore,
     'language': language.name,
     'themeId': themeId,
     'soundEffects': soundEffects,
@@ -340,7 +333,6 @@ class AppSettings {
     homeRows: HomeRows.encode(HomeRows.parse([for (final r in (json['homeRows'] as List?) ?? HomeRows.all) '$r'])),
     seasonalThemes: json['seasonalThemes'] as bool? ?? true,
     ambilight: AmbilightMode.values.asNameMap()[json['ambilight']] ?? AmbilightMode.window,
-    quizHighscore: (json['quizHighscore'] as num?)?.toInt() ?? 0,
     language: AppLanguage.values.asNameMap()[json['language']] ?? AppLanguage.en,
     themeId: json['themeId'] as String? ?? 'midnight',
     soundEffects: json['soundEffects'] as bool? ?? true,

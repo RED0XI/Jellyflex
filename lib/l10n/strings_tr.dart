@@ -429,7 +429,7 @@ final class _Tr extends S {
   @override
   String get sounds => 'Sesler';
   @override
-  String get soundsHint => '“Şaşırt beni” ve film testinde tık sesleri ve müzikler.';
+  String get soundsHint => '“Şaşırt beni” içinde tık sesleri ve müzik.';
   @override
   String get theme => 'Tema';
   @override
@@ -701,8 +701,6 @@ final class _Tr extends S {
   @override
   String get libraries => 'Kitaplıklar';
   @override
-  String get movieQuiz => 'Film testi';
-  @override
   String get surpriseMe => 'Şaşırt beni';
   @override
   String get searchCtrlF => _isMac ? 'Ara (⌘F)' : 'Ara (Ctrl+F)';
@@ -810,35 +808,8 @@ final class _Tr extends S {
   @override
   String get startSeries => 'Diziye başla';
 
-  // --- Quiz ---
-  @override
-  String get quizNeedsTitles => 'Test için arka plan görseli olan en az 4 film ya da dizi gerekir.';
-  @override
-  String roundOf(int n, int total) => 'Tur $n / $total';
-  @override
-  String points(int n) => '$n puan';
-  @override
-  String correctPlus(int n) => 'Doğru! +$n';
-  @override
-  String get notQuite => 'Tam değil';
-  @override
-  String get result => 'Sonuç';
   @override
   String get next => 'Sonraki';
-  @override
-  String get verdictPro => 'Film ustası! 🍿';
-  @override
-  String get verdictStrong => 'Harika iş! 🎬';
-  @override
-  String get verdictNotBad => 'Fena değil! 🎞️';
-  @override
-  String get verdictMore => 'Gelişmeye açık … 📼';
-  @override
-  String get newRecord => 'Yeni rekor!';
-  @override
-  String correctOf(int correct, int rounds, int record) => '$rounds sorudan $correct doğru  ·  Rekor: $record';
-  @override
-  String get playAgain => 'Tekrar oyna';
 
   // --- Jahresrückblick ---
   @override

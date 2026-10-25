@@ -70,7 +70,7 @@ class ProfileMenuButton extends ConsumerWidget {
   final GoRouter? router;
   final double size;
 
-  /// Quiz und "Überrasch mich" mit ins Menü (für schlanke Leisten).
+  /// "Überrasch mich" mit ins Menü (für schlanke Leisten).
   final bool extraActions;
 
   @override
@@ -130,7 +130,6 @@ class ProfileMenuButton extends ConsumerWidget {
       ),
       const PopupMenuDivider(),
       if (extraActions) ...[
-        entry('/quiz', Icons.quiz_outlined, tr.movieQuiz),
         entry('/roulette', Icons.casino_outlined, tr.surpriseMe),
       ],
       entry('/lists', Icons.bookmarks_outlined, tr.myLists),
@@ -181,7 +180,7 @@ class Avatar extends ConsumerWidget {
 }
 
 /// Schwebende Leiste über der Startseite. Wird beim Herunterscrollen milchig-undurchsichtig.
-/// [minimal]: nur Name, Ziele und Suche – Quiz & Co. wandern ins Profilmenü.
+/// [minimal]: nur Name, Ziele und Suche – "Überrasch mich" wandert ins Profilmenü.
 class TopNav extends ConsumerWidget {
   const TopNav({super.key, required this.scroll, this.minimal = false});
 
@@ -215,12 +214,6 @@ class TopNav extends ConsumerWidget {
               _NavLink(label: e.label, active: i == 0, minimal: minimal, onTap: e.onTap),
             const Spacer(),
             if (!minimal) ...[
-              IconButton(
-                tooltip: tr.movieQuiz,
-                icon: const Icon(Icons.quiz_outlined, size: 24),
-                onPressed: () => context.push('/quiz'),
-              ),
-              const SizedBox(width: 4),
               IconButton(
                 tooltip: tr.surpriseMe,
                 icon: const Icon(Icons.casino_outlined, size: 25),
@@ -393,12 +386,6 @@ class SideNav extends ConsumerWidget {
                   label: tr.surpriseMe,
                   active: false,
                   onTap: () => router.push('/roulette'),
-                ),
-                _SideLink(
-                  icon: Icons.quiz_outlined,
-                  label: tr.movieQuiz,
-                  active: false,
-                  onTap: () => router.push('/quiz'),
                 ),
                 _SideLink(
                   icon: Icons.auto_graph_rounded,

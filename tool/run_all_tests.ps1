@@ -6,7 +6,7 @@
 # wird einmal wiederholt.
 #
 # Start:  powershell -ExecutionPolicy Bypass -File tool/run_all_tests.ps1
-#         ... -File tool/run_all_tests.ps1 -Only roulette,quiz   (nur bestimmte App-Tests)
+#         ... -File tool/run_all_tests.ps1 -Only roulette,wrapped   (nur bestimmte App-Tests)
 
 param([string[]]$Only = @())
 

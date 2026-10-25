@@ -85,16 +85,6 @@ void main() {
       const _Note(783.99, 0.18, 0.9, volume: 0.32, decay: 4),
       const _Note(1046.5, 0.27, 1.1, volume: 0.36, decay: 3),
     ], 1.4),
-    // Quiz richtig: zwei steigende Glockentöne.
-    'correct': _render([
-      const _Note(880, 0.00, 0.5, volume: 0.35, decay: 6),
-      const _Note(1318.5, 0.10, 0.6, volume: 0.35, decay: 5),
-    ], 0.75),
-    // Quiz falsch: zwei weiche, fallende tiefe Töne.
-    'wrong': _render([
-      const _Note(311.1, 0.00, 0.35, volume: 0.35, decay: 7),
-      const _Note(233.1, 0.16, 0.45, volume: 0.35, decay: 6),
-    ], 0.65),
   };
   final dir = Directory('assets/sounds')..createSync(recursive: true);
   for (final e in sounds.entries) {

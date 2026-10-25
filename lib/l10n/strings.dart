@@ -443,8 +443,8 @@ class S {
   );
   String get sounds => _t('Sounds', 'Klänge');
   String get soundsHint => _t(
-    'Ticks and jingles in “Surprise me” and the movie quiz.',
-    'Ticken und Melodien bei „Überrasch mich“ und im Film-Quiz.',
+    'Ticks and a jingle in “Surprise me”.',
+    'Ticken und Melodie bei „Überrasch mich“.',
   );
   String get theme => _t('Theme', 'Theme');
   String get themeHint => _t('Colours of the whole app – changes instantly.', 'Farben der ganzen App – wirkt sofort.');
@@ -644,7 +644,6 @@ class S {
       _t('The home page couldn’t be loaded.\n$e', 'Die Startseite konnte nicht geladen werden.\n$e');
   String get viewDownloads => _t('View downloads', 'Downloads ansehen');
   String get libraries => _t('Libraries', 'Bibliotheken');
-  String get movieQuiz => _t('Movie quiz', 'Film-Quiz');
   String get surpriseMe => _t('Surprise me', 'Überrasch mich');
   String get searchCtrlF => _isMac ? _t('Search (⌘F)', 'Suchen (⌘F)') : _t('Search (Ctrl+F)', 'Suchen (Strg+F)');
   String get profile => _t('Profile', 'Profil');
@@ -717,26 +716,7 @@ class S {
   String finishedBy(String time) => _t('Finished by: $time', 'Fertig bis: $time');
   String get startSeries => _t('Start series', 'Serie starten');
 
-  // --- Film-Quiz -----------------------------------------------------------------------
-
-  String get quizNeedsTitles => _t(
-    'The quiz needs at least 4 movies or shows with a backdrop image.',
-    'Für das Quiz braucht es mindestens 4 Filme oder Serien mit Hintergrundbild.',
-  );
-  String roundOf(int n, int total) => _t('Round $n of $total', 'Runde $n von $total');
-  String points(int n) => _t('$n points', '$n Punkte');
-  String correctPlus(int n) => _t('Correct! +$n', 'Richtig! +$n');
-  String get notQuite => _t('Not quite', 'Leider nicht');
-  String get result => _t('Result', 'Ergebnis');
   String get next => _t('Next', 'Weiter');
-  String get verdictPro => _t('Movie pro! 🍿', 'Filmprofi! 🍿');
-  String get verdictStrong => _t('Strong showing! 🎬', 'Starke Leistung! 🎬');
-  String get verdictNotBad => _t('Not bad! 🎞️', 'Nicht schlecht! 🎞️');
-  String get verdictMore => _t('Room to grow … 📼', 'Da geht noch was … 📼');
-  String get newRecord => _t('New record!', 'Neuer Rekord!');
-  String correctOf(int correct, int rounds, int record) =>
-      _t('$correct of $rounds correct  ·  Record: $record', '$correct von $rounds richtig  ·  Rekord: $record');
-  String get playAgain => _t('Play again', 'Nochmal spielen');
 
   // --- Jahresrückblick -------------------------------------------------------------------
 

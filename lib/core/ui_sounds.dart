@@ -5,13 +5,11 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// Kleine Oberflächen-Klänge (Glücksrad, Quiz). Die WAV-Dateien erzeugt
+/// Kleine Oberflächen-Klänge (Glücksrad). Die WAV-Dateien erzeugt
 /// `tool/generate_sounds.dart`.
 enum UiSound {
   tick('tick'),
-  win('win'),
-  correct('correct'),
-  wrong('wrong');
+  win('win');
 
   const UiSound(this.file);
 

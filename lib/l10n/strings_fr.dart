@@ -429,7 +429,7 @@ final class _Fr extends S {
   @override
   String get sounds => 'Sons';
   @override
-  String get soundsHint => 'Tic-tac et jingles dans « Surprends-moi » et le quiz.';
+  String get soundsHint => 'Tic-tac et jingle dans « Surprends-moi ».';
   @override
   String get theme => 'Thème';
   @override
@@ -705,8 +705,6 @@ final class _Fr extends S {
   @override
   String get libraries => 'Bibliothèques';
   @override
-  String get movieQuiz => 'Quiz cinéma';
-  @override
   String get surpriseMe => 'Surprends-moi';
   @override
   String get searchCtrlF => _isMac ? 'Rechercher (⌘F)' : 'Rechercher (Ctrl+F)';
@@ -814,35 +812,8 @@ final class _Fr extends S {
   @override
   String get startSeries => 'Commencer la série';
 
-  // --- Quiz ---
-  @override
-  String get quizNeedsTitles => 'Le quiz a besoin d’au moins 4 films ou séries avec une image de fond.';
-  @override
-  String roundOf(int n, int total) => 'Manche $n sur $total';
-  @override
-  String points(int n) => '$n points';
-  @override
-  String correctPlus(int n) => 'Correct ! +$n';
-  @override
-  String get notQuite => 'Pas tout à fait';
-  @override
-  String get result => 'Résultat';
   @override
   String get next => 'Suivant';
-  @override
-  String get verdictPro => 'Pro du cinéma ! 🍿';
-  @override
-  String get verdictStrong => 'Très bien joué ! 🎬';
-  @override
-  String get verdictNotBad => 'Pas mal ! 🎞️';
-  @override
-  String get verdictMore => 'Peut mieux faire … 📼';
-  @override
-  String get newRecord => 'Nouveau record !';
-  @override
-  String correctOf(int correct, int rounds, int record) => '$correct sur $rounds justes  ·  Record : $record';
-  @override
-  String get playAgain => 'Rejouer';
 
   // --- Jahresrückblick ---
   @override

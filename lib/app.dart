@@ -22,7 +22,6 @@ import 'features/lists/lists_screen.dart';
 import 'features/login/login_screen.dart';
 import 'features/person/person_screen.dart';
 import 'features/player/player_screen.dart';
-import 'features/quiz/quiz_screen.dart';
 import 'features/roulette/roulette_screen.dart';
 import 'features/lock/idle_lock.dart';
 import 'features/screensaver/screensaver.dart';
@@ -79,7 +78,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       _route('/search', (_) => const SearchScreen()),
       _route('/downloads', (_) => const DownloadsScreen()),
       _route('/roulette', (_) => const RouletteScreen()),
-      _route('/quiz', (_) => const QuizScreen()),
       _route('/wrapped', (_) => const WrappedScreen()),
       _route('/settings', (_) => const SettingsScreen()),
       _route('/lists', (_) => const ListsScreen()),

@@ -28,7 +28,7 @@ class LayoutShell extends ConsumerStatefulWidget {
 }
 
 class _LayoutShellState extends ConsumerState<LayoutShell> {
-  /// Seiten, neben denen die Seitenleiste steht (nicht Player, Quiz, Anmeldung …).
+  /// Seiten, neben denen die Seitenleiste steht (nicht Player, Glücksrad, Anmeldung …).
   static bool _isBrowsePage(String path) =>
       path == '/' ||
       const ['/library/', '/item/', '/person/', '/downloads', '/search', '/settings', '/lists'].any(path.startsWith);

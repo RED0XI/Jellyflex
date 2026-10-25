@@ -91,7 +91,7 @@ Applications to the Trash.
 - 6 **layouts** (Cinema, Couch, Library, Magazine, Minimal, Retro VHS) and 8 color **themes**
 - Your own app name and logo
 - Languages: English, German, French, Spanish, Turkish
-- Extras: "Surprise me" slot machine, movie quiz, screensaver, seasonal touches, year in review, theme music
+- Extras: "Surprise me" slot machine, screensaver, seasonal touches, year in review, theme music
 
 ### Privacy & security
 
