@@ -116,8 +116,9 @@ final seasonalSectionProvider = FutureProvider.autoDispose<HomeSection?>((ref) a
   return HomeSection('${info.emoji}  ${season.title}', items, SectionStyle.poster, group: 'seasonal');
 });
 
-/// URL des Profilbilds des angemeldeten Benutzers (oder `null`).
-final userImageProvider = FutureProvider.autoDispose<String?>((ref) async {
+/// URL des Profilbilds des angemeldeten Benutzers (oder `null`). Einmal je Anmeldung geladen –
+/// nicht bei jedem Seitenwechsel (die Leiste mit dem Bild baut sich oft neu auf).
+final userImageProvider = FutureProvider<String?>((ref) async {
   final api = ref.watch(apiProvider);
   final user = await api.getCurrentUser();
   return api.userImageUrl(user['Id'] as String, user['PrimaryImageTag'] as String?);

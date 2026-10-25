@@ -211,6 +211,8 @@ class _LiveHandlerState extends ConsumerState<LiveHandler> with WindowListener {
     ref.invalidate(homeProvider);
     ref.invalidate(discoverProvider);
     ref.invalidate(libraryViewsProvider);
+    // Profilbild wird nur einmal geladen – nach einem Ausfall (offline beim Start) neu versuchen.
+    if (ref.read(userImageProvider).hasError) ref.invalidate(userImageProvider);
     ref.invalidate(itemProvider);
     ref.invalidate(seriesNextUpProvider);
     ref.invalidate(seasonsProvider);

@@ -236,8 +236,8 @@ class SessionController extends AsyncNotifier<AuthSession?> {
             : a,
     ]);
     await _storage.delete(key: _sessionKey);
+    // Die Profilliste lädt sich danach von selbst neu (sie hängt an der Anmeldung).
     state = const AsyncData(null);
-    ref.invalidate(savedAccountsProvider);
   }
 
   /// Zur Profilauswahl zurück, ohne das Konto zu vergessen.

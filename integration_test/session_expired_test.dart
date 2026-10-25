@@ -46,6 +46,8 @@ void main() {
     );
     await SecureStore.instance.write(key: 'jellyflex.session', value: jsonEncode(session.toJson()));
     await tester.runAsync(() => _revoke(false));
+    // Auch wenn der Test scheitert: Zugang wieder freigeben, sonst wären alle folgenden Tests abgemeldet.
+    addTearDown(() => _revoke(false));
 
     await tester.pumpWidget(
       ProviderScope(

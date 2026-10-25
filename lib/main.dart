@@ -13,6 +13,7 @@ import 'core/app_log.dart';
 import 'core/download_notify.dart';
 import 'core/app_shell.dart';
 import 'core/licenses.dart';
+import 'core/retry.dart';
 import 'core/window_memory.dart';
 
 Future<void> main(List<String> args) async {
@@ -66,5 +67,5 @@ Future<void> main(List<String> args) async {
     await windowManager.focus();
   });
 
-  runApp(const ProviderScope(child: JellyflexApp()));
+  runApp(const ProviderScope(retry: providerRetry, child: JellyflexApp()));
 }

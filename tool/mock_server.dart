@@ -652,6 +652,7 @@ Object? _handle(HttpRequest req) {
         if (p['Type'] == 'Person' && (p['Name'] as String).toLowerCase().contains(term)) p,
     ], q);
   }
+  if (path == '/Users/Me') return {'Id': 'user1', 'Name': 'Demo'};
   if (path == '/System/Info/Public') {
     return {'ServerName': 'Demo-Server', 'Version': '12.2.0', 'Id': 'mock-server', 'ProductName': 'Jellyfin Server'};
   }
