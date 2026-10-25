@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -32,13 +34,22 @@ class RouletteScreen extends ConsumerStatefulWidget {
 }
 
 class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProviderStateMixin {
-  static const _posterWidth = 170.0;
-  static const _gap = 22.0;
+  static const _posterWidth = 196.0;
+  static const _gap = 18.0;
 
   final _random = math.Random();
   final _scroll = ScrollController();
   late final _spin = AnimationController(vsync: this, duration: const Duration(milliseconds: 4800));
   late final _confetti = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
+
+  /// Ruhiges Pulsieren des Bühnenlichts hinter dem mittleren Poster.
+  late final _pulse = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat(reverse: true);
+
+  /// Wie viele Titel gerade zu den Filtern passen ("im Topf").
+  int? _potSize;
+
+  /// Titel, dessen Bild die Seite färbt (beim Drehen bleibt der letzte stehen).
+  BaseItem? _featured;
 
   _Kind _kind = _Kind.movies;
   bool _unplayedOnly = true;
@@ -68,7 +79,7 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
     });
     _spin.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        setState(() => _winner = _reel[_spinTo.round()]);
+        setState(() => _winner = _featured = _reel[_spinTo.round()]);
         _confetti.forward(from: 0);
         UiSounds.play(UiSound.win);
         // Infos zum Gewinner ins Bild holen (bei kleinen Fenstern).
@@ -90,6 +101,7 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
   void dispose() {
     _spin.dispose();
     _confetti.dispose();
+    _pulse.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -145,6 +157,8 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
         _reel = items;
         _offset = items.length > 2 ? 2 : 0;
         _winner = null;
+        _potSize = items.length;
+        _featured = items.isEmpty ? null : items[_offset.round()];
         _message = items.isEmpty ? tr.nothingFoundLoosen : null;
       });
     } catch (e) {
@@ -213,20 +227,27 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
   @override
   Widget build(BuildContext context) {
     final winner = _winner;
-    final backdrop = winner == null ? null : Images.backdrop(winner);
+    final featured = _featured;
+    final backdrop = featured == null ? null : Images.backdrop(featured);
     return Scaffold(
       body: Stack(
         children: [
-          // Hintergrund: Bild des Gewinners, sanft eingeblendet.
+          // Hintergrund: Bild des Titels in der Mitte (nach dem Drehen: des Gewinners) –
+          // vorher weich gezeichnet, beim Gewinner klar.
           Positioned.fill(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 900),
               child: backdrop == null
                   ? const SizedBox.expand(key: ValueKey('none'))
-                  : Opacity(
-                      key: ValueKey(winner!.id),
-                      opacity: 0.35,
-                      child: BackdropSlideshow(images: [backdrop]),
+                  : ImageFiltered(
+                      key: ValueKey('${featured!.id}-${winner != null}'),
+                      imageFilter: winner == null
+                          ? ImageFilter.blur(sigmaX: 30, sigmaY: 30, tileMode: TileMode.decal)
+                          : ImageFilter.blur(sigmaX: 0.01, sigmaY: 0.01),
+                      child: Opacity(
+                        opacity: winner == null ? 0.5 : 0.4,
+                        child: BackdropSlideshow(images: [backdrop]),
+                      ),
                     ),
             ),
           ),
@@ -245,66 +266,79 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
               ),
             ),
           ),
-          SingleChildScrollView(
-            controller: _scroll,
-            padding: const EdgeInsets.fromLTRB(0, kTitleBarHeight + 24, 0, 40),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      PageHeader(
-                        title: tr.surpriseMe,
-                        subtitle: tr.letChanceDecide,
-                        icon: Icons.casino_rounded,
-                        padding: EdgeInsets.zero,
+          LayoutBuilder(
+            builder: (context, viewport) => SingleChildScrollView(
+              controller: _scroll,
+              padding: const EdgeInsets.fromLTRB(0, kTitleBarHeight + 24, 0, 40),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: viewport.maxHeight - kTitleBarHeight - 64),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          PageHeader(
+                            title: tr.surpriseMe,
+                            subtitle: tr.letChanceDecide,
+                            icon: Icons.casino_rounded,
+                            padding: EdgeInsets.zero,
+                          ),
+                          const SizedBox(height: 20),
+                          _filters(),
+                        ],
                       ),
-                      const SizedBox(height: 20),
-                      _filters(),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 26),
-                _ReelView(
-                  items: _reel,
-                  offset: _offset,
-                  posterWidth: _posterWidth,
-                  gap: _gap,
-                  spinning: _spin.isAnimating,
-                  winnerFound: winner != null,
-                  confetti: _confetti,
-                ),
-                const SizedBox(height: 26),
-                Center(
-                  child: PrimaryButton(
-                    label: _spin.isAnimating ? tr.spinning : (winner == null ? tr.spin : tr.spinAgain),
-                    icon: Icons.casino_rounded,
-                    loading: _loading,
-                    onPressed: _spin.isAnimating ? null : _spinNow,
-                  ),
-                ),
-                if (_message != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 18),
-                    child: Center(
-                      child: Text(_message!, style: TextStyle(color: AppColors.textSecondary)),
                     ),
-                  ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 400),
-                  child: winner == null
-                      ? const SizedBox(height: 40)
-                      : _WinnerCard(
-                          key: ValueKey(winner.id),
-                          item: winner,
-                          onPlay: () => _play(winner),
-                          onDetails: () => context.push('/item/${winner.id}'),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 30),
+                        _ReelView(
+                          items: _reel,
+                          offset: _offset,
+                          posterWidth: _posterWidth,
+                          gap: _gap,
+                          spinning: _spin.isAnimating,
+                          winnerFound: winner != null,
+                          confetti: _confetti,
+                          pulse: _pulse,
                         ),
+                        const SizedBox(height: 30),
+                        Center(
+                          child: PrimaryButton(
+                            label: _spin.isAnimating ? tr.spinning : (winner == null ? tr.spin : tr.spinAgain),
+                            icon: Icons.casino_rounded,
+                            loading: _loading,
+                            onPressed: _spin.isAnimating ? null : _spinNow,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Center(
+                          child: Text(
+                            _message ?? (_potSize == null || winner != null ? ' ' : tr.inThePot(_potSize!)),
+                            style: TextStyle(color: AppColors.textSecondary),
+                          ),
+                        ),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 400),
+                          child: winner == null
+                              ? const SizedBox(height: 10)
+                              : _WinnerCard(
+                                  key: ValueKey(winner.id),
+                                  item: winner,
+                                  onPlay: () => _play(winner),
+                                  onDetails: () => context.push('/item/${winner.id}'),
+                                ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -371,8 +405,10 @@ class _ReelView extends ConsumerWidget {
     required this.spinning,
     required this.winnerFound,
     required this.confetti,
+    required this.pulse,
   });
 
+  final Animation<double> pulse;
   final List<BaseItem> items;
   final double offset;
   final double posterWidth;
@@ -396,6 +432,25 @@ class _ReelView extends ConsumerWidget {
           return Stack(
             clipBehavior: Clip.none,
             children: [
+              // Bühnenlicht hinter dem mittleren Poster, atmet langsam.
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: pulse,
+                    builder: (context, _) => DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          radius: 0.42 + 0.06 * pulse.value,
+                          colors: [
+                            AppColors.accent.withValues(alpha: (winnerFound ? 0.42 : 0.24) + 0.08 * pulse.value),
+                            AppColors.accent.withValues(alpha: 0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               for (var i = first; i <= last; i++)
                 () {
                   final distance = (i - offset).abs();
@@ -408,8 +463,13 @@ class _ReelView extends ConsumerWidget {
                     top: 10 + (posterHeight * 1.2 - posterHeight) / 2,
                     width: posterWidth,
                     height: posterHeight,
-                    child: Transform.scale(
-                      scale: scale,
+                    // Coverflow: Seitenposter drehen sich leicht zur Mitte.
+                    child: Transform(
+                      alignment: Alignment.center,
+                      transform: Matrix4.identity()
+                        ..setEntry(3, 2, 0.0011)
+                        ..rotateY(((i - offset) * -0.32).clamp(-0.6, 0.6))
+                        ..scaleByDouble(scale, scale, 1, 1),
                       child: Opacity(
                         opacity: (1 - distance * 0.18).clamp(0.35, 1.0),
                         child: Container(

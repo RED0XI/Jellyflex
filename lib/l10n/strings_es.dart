@@ -818,6 +818,8 @@ final class _Es extends S {
   @override
   String finishedBy(String time) => 'Termina hacia: $time';
   @override
+  String inThePot(int n) => '$n títulos en el bombo';
+  @override
   String get startSeries => 'Empezar la serie';
 
   @override

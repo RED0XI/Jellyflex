@@ -814,6 +814,8 @@ final class _Tr extends S {
   @override
   String finishedBy(String time) => 'Bitiş: $time';
   @override
+  String inThePot(int n) => 'Torbada $n başlık';
+  @override
   String get startSeries => 'Diziye başla';
 
   @override

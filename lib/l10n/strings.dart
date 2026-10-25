@@ -777,6 +777,8 @@ class S {
   String genreLabel(String g) => _t('Genre: $g', 'Genre: $g');
   String finishedBy(String time) => _t('Finished by: $time', 'Fertig bis: $time');
   String get startSeries => _t('Start series', 'Serie starten');
+  String inThePot(int n) =>
+      _t(n == 1 ? '1 title in the pot' : '$n titles in the pot', n == 1 ? '1 Titel im Topf' : '$n Titel im Topf');
 
   String get next => _t('Next', 'Weiter');
 

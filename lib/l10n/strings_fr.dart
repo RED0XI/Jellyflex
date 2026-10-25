@@ -818,6 +818,8 @@ final class _Fr extends S {
   @override
   String finishedBy(String time) => 'Terminé vers : $time';
   @override
+  String inThePot(int n) => '$n titres en jeu';
+  @override
   String get startSeries => 'Commencer la série';
 
   @override
