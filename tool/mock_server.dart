@@ -45,6 +45,11 @@ var _imageRequests = 0;
 /// Simuliert einen nicht erreichbaren Server.
 var _offline = false;
 
+/// Anmeldung widerrufen (wie "abmelden" im Jellyfin-Dashboard): alles außer den öffentlichen
+/// Adressen antwortet mit 401, bis sich jemand neu anmeldet. Zählt die abgelehnten Anfragen.
+var _revoked = false;
+var _rejected = 0;
+
 /// Testvideo für alle Streams (siehe lib/dev/player_harness.dart).
 final _videoFile = File(
   Platform.environment['JELLYFLEX_TEST_VIDEO'] ??
@@ -864,6 +869,23 @@ Future<void> main() async {
       if (req.uri.path == '/debug/throttle') {
         _throttleBps = int.tryParse(req.uri.queryParameters['bps'] ?? '') ?? 0;
         res.write('{"bps": $_throttleBps}');
+        await res.close();
+        continue;
+      }
+      if (req.uri.path == '/debug/revoke') {
+        if (req.uri.queryParameters.containsKey('on')) {
+          _revoked = req.uri.queryParameters['on'] == '1';
+          _rejected = 0;
+        }
+        res.write('{"revoked": $_revoked, "rejected": $_rejected}');
+        await res.close();
+        continue;
+      }
+      if (_revoked && req.uri.path == '/Users/AuthenticateByName') _revoked = false;
+      const public = {'/System/Info/Public', '/System/Ping', '/Users/Public', '/QuickConnect/Enabled'};
+      if (_revoked && !public.contains(req.uri.path) && !req.uri.path.contains('/Images/')) {
+        _rejected++;
+        res.statusCode = 401;
         await res.close();
         continue;
       }

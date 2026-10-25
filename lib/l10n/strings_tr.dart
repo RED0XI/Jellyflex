@@ -1377,4 +1377,10 @@ final class _Tr extends S {
   String get shortcutZoomWheel => 'Serbest yakınlaştırma';
   @override
   String get keyCtrlWheel => 'Ctrl + fare tekerleği';
+
+  // --- Anmeldung abgelaufen ---
+  @override
+  String get sessionExpired => 'Oturumunun süresi doldu – lütfen şifreni tekrar gir.';
+  @override
+  String get signInAgain => 'Yeniden giriş yap';
 }

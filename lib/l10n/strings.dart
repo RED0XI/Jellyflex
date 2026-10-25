@@ -1113,4 +1113,12 @@ class S {
   String get shortcutZoom => _t('Fit / fill picture', 'Bild einpassen / ausfüllen');
   String get shortcutZoomWheel => _t('Zoom freely', 'Stufenlos zoomen');
   String get keyCtrlWheel => _t('Ctrl + mouse wheel', 'Strg + Mausrad');
+
+  // --- Anmeldung abgelaufen ---------------------------------------------------------
+
+  String get sessionExpired => _t(
+    'Your sign-in has expired – please enter your password again.',
+    'Deine Anmeldung ist abgelaufen – bitte gib dein Passwort erneut ein.',
+  );
+  String get signInAgain => _t('Sign in again', 'Neu anmelden');
 }

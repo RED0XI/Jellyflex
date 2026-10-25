@@ -1392,4 +1392,10 @@ final class _Fr extends S {
   String get shortcutZoomWheel => 'Zoom libre';
   @override
   String get keyCtrlWheel => 'Ctrl + molette';
+
+  // --- Anmeldung abgelaufen ---
+  @override
+  String get sessionExpired => 'Votre connexion a expiré – veuillez saisir à nouveau votre mot de passe.';
+  @override
+  String get signInAgain => 'Se reconnecter';
 }

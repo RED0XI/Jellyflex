@@ -1386,4 +1386,10 @@ final class _Es extends S {
   String get shortcutZoomWheel => 'Zoom libre';
   @override
   String get keyCtrlWheel => 'Ctrl + rueda';
+
+  // --- Anmeldung abgelaufen ---
+  @override
+  String get sessionExpired => 'Tu sesión ha caducado; vuelve a introducir tu contraseña.';
+  @override
+  String get signInAgain => 'Volver a iniciar sesión';
 }

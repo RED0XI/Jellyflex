@@ -266,6 +266,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// Profil öffnen – mit PIN-Abfrage, falls eine gesetzt ist.
   Future<void> _openProfile(AuthSession account) async {
     if (!await _checkPin(account)) return;
+    // Anmeldung abgelaufen: Server und Name sind bekannt, nur das Passwort fehlt.
+    if (account.token.isEmpty) {
+      _serverCtrl.text = account.serverUrl;
+      _userCtrl.text = account.userName;
+      setState(() => _addingAccount = true);
+      await _connect();
+      if (mounted && _server != null) {
+        setState(() => _error = tr.sessionExpired);
+        _passFocus.requestFocus();
+      }
+      return;
+    }
     await ref.read(sessionProvider.notifier).activate(account, pinChecked: account.hasPin);
   }
 
@@ -290,7 +302,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             for (final a in accounts)
               _ProfileTile(
                 name: a.userName,
-                subtitle: a.serverName,
+                subtitle: a.token.isEmpty ? tr.signInAgain : a.serverName,
                 imageUrl: a.userImageUrl,
                 locked: a.hasPin,
                 onTap: () => _openProfile(a),

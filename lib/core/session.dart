@@ -214,6 +214,32 @@ class SessionController extends AsyncNotifier<AuthSession?> {
     state = AsyncData(session);
   }
 
+  /// Der Server nimmt die Anmeldung von [session] nicht mehr an (abgelaufen, Passwort geändert,
+  /// im Dashboard abgemeldet): zur Anmeldung zurück. Das Profil bleibt in der Auswahl (mit PIN),
+  /// aber ohne Zugang – ein Klick darauf fragt nach dem Passwort.
+  Future<void> sessionExpired(AuthSession session) async {
+    if (state.value?.token != session.token) return; // schon erledigt
+    final saved = await loadSavedAccounts();
+    await _saveAccounts([
+      for (final a in saved)
+        a.accountKey == session.accountKey
+            ? AuthSession(
+                serverUrl: a.serverUrl,
+                serverName: a.serverName,
+                userId: a.userId,
+                userName: a.userName,
+                token: '',
+                deviceId: a.deviceId,
+                userImageTag: a.userImageTag,
+                pinHash: a.pinHash,
+              )
+            : a,
+    ]);
+    await _storage.delete(key: _sessionKey);
+    state = const AsyncData(null);
+    ref.invalidate(savedAccountsProvider);
+  }
+
   /// Zur Profilauswahl zurück, ohne das Konto zu vergessen.
   Future<void> switchUser() async {
     await _storage.delete(key: _sessionKey);
@@ -273,5 +299,5 @@ final apiProvider = Provider<JellyfinApi>((ref) {
     deviceId: session.deviceId,
     token: session.token,
     userId: session.userId,
-  );
+  )..onUnauthorized = () => ref.read(sessionProvider.notifier).sessionExpired(session);
 });

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:uuid/uuid.dart';
 
 import 'images.dart';
@@ -99,7 +100,38 @@ class JellyfinApi {
       ) {
     dio.options.headers['Authorization'] = authorizationHeader;
     registerSecret(token);
+    // Server sagt "nicht (mehr) angemeldet": Anmeldung abgelaufen oder widerrufen – einmal melden,
+    // statt immer wieder vergeblich zu fragen.
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onError: (error, handler) {
+          final expired =
+              error.response?.statusCode == HttpStatus.unauthorized &&
+              token != null &&
+              !error.requestOptions.path.endsWith('/Sessions/Logout');
+          if (expired) onUnauthorized?.call();
+          handler.next(error);
+        },
+      ),
+    );
+    if (debugObserver case final observe?) {
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            observe(options);
+            handler.next(options);
+          },
+        ),
+      );
+    }
   }
+
+  /// Wird aufgerufen, wenn der Server die Anmeldung nicht (mehr) annimmt (HTTP 401).
+  void Function()? onUnauthorized;
+
+  /// Nur für Messungen: sieht jede Anfrage an den Server (z. B. um doppelte zu zählen).
+  @visibleForTesting
+  static void Function(RequestOptions request)? debugObserver;
 
   static const clientName = 'Jellyflex';
   static const clientVersion = appVersion;

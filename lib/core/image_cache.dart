@@ -36,6 +36,9 @@ class ImageDiskCache {
     // Nicht mit Dutzenden gleichzeitigen Verbindungen auf den Server einprügeln.
     ..maxConnectionsPerHost = 12;
 
+  /// Vom Server geladene Bilder (nicht aus dem Zwischenspeicher) – für Messungen.
+  int downloads = 0;
+
   int? _knownSize;
   Future<void>? _trimming;
 
@@ -123,6 +126,7 @@ class ImageDiskCache {
   }
 
   Future<Uint8List> _download(String url, Map<String, String> headers) async {
+    downloads++;
     final origin = Uri.parse(url);
     var uri = origin;
     HttpClientResponse response;
