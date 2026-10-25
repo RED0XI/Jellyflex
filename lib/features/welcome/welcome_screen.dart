@@ -186,6 +186,12 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
             onChanged: (v) => ctrl.update((s) => s.copyWith(bannerTrailers: v)),
           ),
           _Option(
+            title: tr.seasonalThemes,
+            hint: tr.seasonalThemesHint,
+            value: s.seasonalThemes,
+            onChanged: (v) => ctrl.update((s) => s.copyWith(seasonalThemes: v)),
+          ),
+          _Option(
             title: tr.sounds,
             hint: tr.soundsHint,
             value: s.soundEffects,
