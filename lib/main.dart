@@ -18,6 +18,7 @@ import 'core/platform/device.dart';
 import 'core/power.dart';
 import 'core/retry.dart';
 import 'core/window_memory.dart';
+import 'core/platform/platform_info.dart';
 
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +42,8 @@ Future<void> main(List<String> args) async {
     AppLog.add('FEHLER: $error\n${stack.toString().split('\n').take(6).join('\n')}');
     return false;
   };
+  // Android: App-Ordner holen, bevor irgendetwas Einstellungen liest.
+  await PlatformInfo.init();
   MediaKit.ensureInitialized();
   // Akku/Stromsparmodus und ob Jellyflex vorne ist – steuert das Energiesparen.
   Power.init();
@@ -48,17 +51,19 @@ Future<void> main(List<String> args) async {
   UiSounds.preload();
   // Stammzertifikate für den Video-Player schon beim Start bereitlegen.
   SystemCerts.caFile();
-  if (isMobile) {
-    // iPhone/iPad: kein Fenster. Inhalt bis unter Statusleiste und Home-Leiste, helle Symbole
-    // auf dem dunklen Hintergrund.
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
-    SystemChrome.setPreferredOrientations(mobileOrientations);
+  if (!isDesktop) {
+    if (isMobile) {
+      // iPhone/iPad: kein Fenster. Inhalt bis unter Statusleiste und Home-Leiste, helle Symbole
+      // auf dem dunklen Hintergrund.
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+      SystemChrome.setPreferredOrientations(mobileOrientations);
+    }
+    // Fernseher: die App füllt ohnehin den ganzen Bildschirm.
     runApp(const ProviderScope(retry: providerRetry, child: JellyflexApp()));
     return;
   }
   await windowManager.ensureInitialized();
-  // Fenster wie beim letzten Mal (Größe, Lage, maximiert).
   final saved = await WindowMemory.load();
 
   final options = WindowOptions(
@@ -80,6 +85,4 @@ Future<void> main(List<String> args) async {
     await windowManager.show();
     await windowManager.focus();
   });
-
-  runApp(const ProviderScope(retry: providerRetry, child: JellyflexApp()));
 }

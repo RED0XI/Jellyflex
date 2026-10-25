@@ -14,8 +14,15 @@ import 'dart:io';
 ///
 /// Unter Windows bleiben alle Pfade exakt wie in früheren Versionen – vorhandene
 /// Einstellungen, Anmeldungen und Downloads werden weiter gefunden.
+/// Unter Android liegen alle Ordner im privaten Bereich der App (siehe [androidPaths]).
 abstract final class AppPaths {
   static const appFolder = 'Jellyflex';
+
+  /// Android: Ordner der App, beim Start von [PlatformInfo.init] geholt
+  /// (`files`, `cache`, `movies`, `pictures`, `downloads`).
+  static Map<String, String> androidPaths = const {};
+
+  static String _android(String key) => androidPaths[key] ?? androidPaths['files'] ?? Directory.systemTemp.path;
 
   /// Trennzeichen des Systems (`\` oder `/`).
   static String get sep => Platform.pathSeparator;
@@ -38,12 +45,14 @@ abstract final class AppPaths {
   /// Benutzerordner (`%USERPROFILE%` bzw. `$HOME`). iOS: der Container der App – Dart kennt dort
   /// kein `$HOME`, aber der Temp-Ordner liegt direkt darin. Nie `tmp` selbst: den leert iOS jederzeit.
   static String get home {
+    if (Platform.isAndroid) return _android('files');
     if (Platform.isIOS) return _env('HOME') ?? Directory.systemTemp.parent.path;
     return (Platform.isWindows ? _env('USERPROFILE') : _env('HOME')) ?? Directory.systemTemp.path;
   }
 
   /// Einstellungen, Anmeldung, Downloadliste, eigenes Logo.
   static Directory get appData {
+    if (Platform.isAndroid) return Directory(_android('files'));
     if (Platform.isWindows) return Directory(join(_env('APPDATA') ?? Directory.systemTemp.path, appFolder));
     if (Platform.isMacOS || Platform.isIOS) return Directory(join(home, 'Library', 'Application Support', appFolder));
     return Directory(join(_env('XDG_CONFIG_HOME') ?? join(home, '.config'), appFolder.toLowerCase()));
@@ -51,19 +60,24 @@ abstract final class AppPaths {
 
   /// Zwischenspeicher, der nicht gesichert/synchronisiert werden muss (z. B. Bilder).
   static Directory get cache {
+    if (Platform.isAndroid) return Directory(_android('cache'));
     if (Platform.isWindows) return Directory(join(_env('LOCALAPPDATA') ?? Directory.systemTemp.path, appFolder));
     if (Platform.isMacOS || Platform.isIOS) return Directory(join(home, 'Library', 'Caches', appFolder));
     return Directory(join(_env('XDG_CACHE_HOME') ?? join(home, '.cache'), appFolder.toLowerCase()));
   }
 
   /// Ordner für Videos (Standard-Downloadort liegt darin).
-  static String get videos => join(home, Platform.isIOS ? 'Documents' : (Platform.isMacOS ? 'Movies' : 'Videos'));
+  static String get videos => Platform.isAndroid
+      ? _android('movies')
+      : join(home, Platform.isIOS ? 'Documents' : (Platform.isMacOS ? 'Movies' : 'Videos'));
 
   /// Downloads-Ordner (Leistungstest-Berichte) – anders als „Dokumente“ selten in OneDrive umgeleitet.
-  static String get downloads => join(home, Platform.isIOS ? 'Documents' : 'Downloads');
+  static String get downloads =>
+      Platform.isAndroid ? _android('downloads') : join(home, Platform.isIOS ? 'Documents' : 'Downloads');
 
   /// Ordner für Bilder (Bildschirmfotos, Jahresrückblick).
-  static String get pictures => join(home, Platform.isIOS ? 'Documents' : 'Pictures');
+  static String get pictures =>
+      Platform.isAndroid ? _android('pictures') : join(home, Platform.isIOS ? 'Documents' : 'Pictures');
 
   /// Pfad für Vergleiche: absolut, ohne abschließendes Trennzeichen, klein geschrieben
   /// (Windows und macOS unterscheiden standardmäßig nicht nach Groß-/Kleinschreibung).

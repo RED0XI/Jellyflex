@@ -3,11 +3,18 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'platform_info.dart';
+
 /// Desktop (Windows, macOS): eigenes Fenster mit Titelleiste, Maus und Tastatur.
 final bool isDesktop = Platform.isWindows || Platform.isMacOS || Platform.isLinux;
 
-/// iPhone/iPad: Bedienung per Touch, kein Fenster, sichere Bereiche (Notch, Home-Leiste).
-final bool isMobile = Platform.isIOS || Platform.isAndroid;
+/// iPhone/iPad (später Android-Handys): Bedienung per Touch, kein Fenster, sichere Bereiche
+/// (Notch, Home-Leiste). Fernseher zählen nicht dazu – dort gilt das Desktop-Layout (siehe [isTv]).
+bool get isMobile => Platform.isIOS || (Platform.isAndroid && !PlatformInfo.isTv);
+
+/// Fernseher (Android TV, Fire TV): kein Fenster, keine Touch-Bedienung – nur die Fernbedienung.
+/// Erst nach [PlatformInfo.init] verlässlich.
+bool get isTv => PlatformInfo.isTv;
 
 /// Apple-Systeme (macOS, iOS): Systemschrift, Schlüsselbund, ⌘-Kürzel.
 final bool isApple = Platform.isMacOS || Platform.isIOS;

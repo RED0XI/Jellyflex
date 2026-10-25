@@ -44,9 +44,13 @@ abstract final class SystemCerts {
   static const _shell = MethodChannel('jellyflex/shell');
 
   static Future<String?> _export() async {
-    if (!Platform.isWindows && !Platform.isMacOS) return null;
+    if (!Platform.isWindows && !Platform.isMacOS && !Platform.isAndroid) return null;
     try {
-      final pem = Platform.isWindows ? _windowsRootsAsPem() : await _macRootsAsPem();
+      final pem = Platform.isWindows
+          ? _windowsRootsAsPem()
+          : Platform.isAndroid
+          ? await androidRootsAsPem()
+          : await _macRootsAsPem();
       if (pem.isEmpty) return null;
       final dir = appDataDir;
       await dir.create(recursive: true);
@@ -77,6 +81,24 @@ abstract final class SystemCerts {
       if (der is Uint8List && !usesBrokenHash(der)) out.write(derToPem(der));
     }
     return out.toString();
+  }
+
+  /// Android: die Stammzertifikate des Systems (`/system/etc/security/cacerts`, eine Datei je
+  /// Zertifikat, nach dem PEM-Block steht noch Klartext) – nur die PEM-Blöcke übernehmen.
+  static Future<String> androidRootsAsPem([String folder = '/system/etc/security/cacerts']) async {
+    final pem = RegExp(r'-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----');
+    final buffer = StringBuffer();
+    final files = Directory(folder).listSync().whereType<File>().toList()..sort((a, b) => a.path.compareTo(b.path));
+    for (final file in files) {
+      try {
+        for (final m in pem.allMatches(await file.readAsString())) {
+          buffer.writeln(m.group(0));
+        }
+      } catch (_) {
+        // Unlesbare Einzeldatei überspringen.
+      }
+    }
+    return buffer.toString();
   }
 
   /// Ein Zertifikat (DER) als PEM-Block.

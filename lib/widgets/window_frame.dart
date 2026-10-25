@@ -125,11 +125,11 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
   @override
   void initState() {
     super.initState();
-    windowManager.addListener(this);
     widget.router.routerDelegate.addListener(_onRouteChanged);
     GamepadInput.start(_onPadAction);
     HardwareKeyboard.instance.addHandler(_onHardwareKey);
     if (isDesktop) {
+      windowManager.addListener(this);
       windowManager.isMaximized().then((v) {
         if (mounted) setState(() => _maximized = v);
       });
@@ -153,7 +153,7 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
   @override
   void dispose() {
     if (isMacOS) _chromeVisibility.removeListener(_syncMacButtons);
-    windowManager.removeListener(this);
+    if (isDesktop) windowManager.removeListener(this);
     widget.router.routerDelegate.removeListener(_onRouteChanged);
     GamepadInput.stop();
     HardwareKeyboard.instance.removeHandler(_onHardwareKey);
@@ -371,7 +371,8 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
   }
 
   Widget _buildFrame(bool showBack, {required bool inPlayer}) {
-    if (!isDesktop) return _buildMobileFrame(showBack);
+    // Fernseher: keine Titelleiste – zurück geht mit der Zurück-Taste der Fernbedienung.
+    if (!isDesktop) return isTv ? widget.child : _buildMobileFrame(showBack);
     return Stack(
       children: [
         Positioned.fill(child: widget.child),
