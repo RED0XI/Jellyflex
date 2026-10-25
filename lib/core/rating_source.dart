@@ -13,14 +13,15 @@ const _tmdbFetcher = 'TheMovieDb';
 const _omdbFetcher = 'The Open Movie Database';
 
 /// Quelle je Elementtyp ("Movie", "Series", "Episode" …) aus `/Library/VirtualFolders`.
-/// Gibt es mehrere Bibliotheken für einen Typ, zählt die erste.
+/// Sind mehrere Bibliotheken eines Typs verschieden eingestellt, ist die Quelle unbekannt
+/// (welche Bibliothek ein Titel hat, verrät Jellyfin der App nicht ohne Weiteres).
 Map<String, RatingSource> ratingSourcesFromFolders(List<Json> folders) {
   final result = <String, RatingSource>{};
   for (final folder in folders) {
     final types = (folder['LibraryOptions'] as Map?)?['TypeOptions'] as List? ?? const [];
     for (final t in types.whereType<Map>()) {
       final type = t['Type'] as String?;
-      if (type == null || result.containsKey(type)) continue;
+      if (type == null) continue;
       final enabled = {for (final f in (t['MetadataFetchers'] as List? ?? const [])) '$f'};
       final order = [for (final f in (t['MetadataFetcherOrder'] as List? ?? const [])) '$f'];
       // Der erste eingeschaltete der beiden Anbieter setzt die Bewertung.
@@ -28,11 +29,12 @@ Map<String, RatingSource> ratingSourcesFromFolders(List<Json> folders) {
         ...order,
         ...enabled,
       ].where((f) => enabled.contains(f) && (f == _tmdbFetcher || f == _omdbFetcher)).firstOrNull;
-      result[type] = switch (first) {
+      final source = switch (first) {
         _tmdbFetcher => RatingSource.tmdb,
         _omdbFetcher => RatingSource.imdb,
         _ => RatingSource.unknown,
       };
+      result[type] = result[type] == null || result[type] == source ? source : RatingSource.unknown;
     }
   }
   return result;

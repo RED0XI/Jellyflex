@@ -20,12 +20,19 @@ void main() {
       ),
       _folder('Series', enabled: ['TheMovieDb'], order: ['The Open Movie Database', 'TheMovieDb']),
       _folder('Episode', enabled: ['TheTVDB'], order: ['TheTVDB']),
-      // Zweite Filmbibliothek zählt nicht.
-      _folder('Movie', enabled: ['TheMovieDb'], order: ['TheMovieDb']),
+      _folder('Series', enabled: ['TheMovieDb'], order: ['TheMovieDb']),
     ]);
     expect(sources['Movie'], RatingSource.imdb);
     expect(sources['Series'], RatingSource.tmdb, reason: 'OMDb steht vorne, ist aber aus');
     expect(sources['Episode'], RatingSource.unknown);
+  });
+
+  test('Verschieden eingestellte Bibliotheken: neutraler Stern', () {
+    final sources = ratingSourcesFromFolders([
+      _folder('Movie', enabled: ['The Open Movie Database', 'TheMovieDb'], order: ['The Open Movie Database']),
+      _folder('Movie', enabled: ['TheMovieDb'], order: ['TheMovieDb']),
+    ]);
+    expect(sources['Movie'], RatingSource.unknown);
   });
 
   test('Ohne Einstellungen: Jellyfin-Standard, ohne Leserecht: unbekannt', () {

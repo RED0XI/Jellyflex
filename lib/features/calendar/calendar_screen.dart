@@ -22,6 +22,10 @@ const _stripDays = 14;
 
 DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 
+/// Abstand in Kalendertagen – über UTC, damit Zeitumstellungen (23/25-Stunden-Tage) nicht stören.
+int _daysBetween(DateTime from, DateTime to) =>
+    DateTime.utc(to.year, to.month, to.day).difference(DateTime.utc(from.year, from.month, from.day)).inDays;
+
 /// "Demnächst": neue Folgen der eigenen Serien – oben eine Leiste mit den nächsten
 /// zwei Wochen, darunter je Tag die Folgen als Bildkarten. Rein zum Nachschauen,
 /// ohne Benachrichtigungen.
@@ -114,11 +118,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                           ),
                         )
                       else
-                        SliverList.list(
-                          children: [
-                            for (final e in days.entries)
-                              _DaySection(key: _dayKeys[e.key], day: e.key, today: today, episodes: e.value),
-                          ],
+                        // Alle Tage gleich aufbauen (es sind nur wenige) – sonst fände der Sprung
+                        // aus der Leiste weiter unten liegende Tage nicht.
+                        SliverToBoxAdapter(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (final e in days.entries)
+                                _DaySection(key: _dayKeys[e.key], day: e.key, today: today, episodes: e.value),
+                            ],
+                          ),
                         ),
                     ];
                   },
@@ -135,7 +144,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 }
 
 /// "Heute", "Morgen", "Gestern" oder "Donnerstag, 29. Oktober".
-String _dayLabel(DateTime day, DateTime today) => switch (day.difference(today).inDays) {
+String _dayLabel(DateTime day, DateTime today) => switch (_daysBetween(today, day)) {
   0 => tr.today,
   1 => tr.tomorrow,
   -1 => tr.yesterday,
@@ -271,7 +280,7 @@ class _DaySection extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Text(_dayLabel(day, today), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-              if (day.difference(today).inDays.abs() <= 1) ...[
+              if (_daysBetween(today, day).abs() <= 1) ...[
                 const SizedBox(width: 10),
                 Text(tr.weekdayDate(day), style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
               ],

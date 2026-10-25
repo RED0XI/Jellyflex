@@ -83,6 +83,7 @@ String trackLabel(MediaStream s) {
   final known = parts.join(' ').toLowerCase();
   if (hasLanguage && title.isNotEmpty && !_repeats(title.toLowerCase(), known)) parts.add(title);
   if (s.isForced) parts.add(tr.forced);
+  if (s.isHearingImpaired && !title.toLowerCase().contains('sdh')) parts.add(tr.hearingImpaired);
   if (s.isDefault) parts.add(tr.defaultTrack);
   if (s.isExternal) parts.add(tr.file);
   return parts.join(' · ');
@@ -90,7 +91,7 @@ String trackLabel(MediaStream s) {
 
 /// Titel wie "German", "Deutsch DTS 5.1" oder "Forced" sagen nichts Neues.
 bool _repeats(String title, String known) {
-  const noise = {'default', 'standard', 'forced', 'erzwungen', 'stereo', 'mono', 'sdh', 'full', 'komplett'};
+  const noise = {'default', 'standard', 'forced', 'erzwungen', 'stereo', 'mono', 'full', 'komplett'};
   final words = title.split(RegExp(r'[^\p{L}\p{N}.:+-]+', unicode: true)).where((w) => w.isNotEmpty);
   return words.every((w) => known.contains(w) || noise.contains(w) || RegExp(r'^\d(\.\d)?$').hasMatch(w));
 }

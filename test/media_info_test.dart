@@ -84,5 +84,14 @@ void main() {
       'Deutsch · SRT · Datei',
     );
     expect(trackLabel(track({'Type': 'Subtitle', 'Codec': 'pgssub', 'Title': 'Signs & Songs'})), 'Signs & Songs · PGS');
+    // Zwei sonst gleiche Spuren bleiben unterscheidbar.
+    expect(
+      trackLabel(track({'Type': 'Subtitle', 'Language': 'eng', 'Codec': 'subrip', 'Title': 'English SDH'})),
+      'Englisch · SRT · English SDH',
+    );
+    expect(
+      trackLabel(track({'Type': 'Subtitle', 'Language': 'eng', 'Codec': 'subrip', 'IsHearingImpaired': true})),
+      'Englisch · SRT · Für Hörgeschädigte',
+    );
   });
 }

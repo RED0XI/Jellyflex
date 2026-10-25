@@ -543,6 +543,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       // Schon auf der Detailseite gewählte Spuren (nur, wenn es sie in dieser Fassung gibt).
       final chosenAudio = validAudioIndex(source, widget.audioIndex);
       final chosenSubtitle = validSubtitleIndex(source, widget.subtitleIndex);
+      // Die kleinere Download-Fassung hat nur eine Tonspur und manche Untertitel: Fehlt die
+      // gewählte, lieber vom Server streamen – sofern er erreichbar ist.
+      final online = info.mediaSources.isNotEmpty;
+      final missingInDownload =
+          _localConverted &&
+          ((chosenAudio != null && chosenAudio != _convertedAudioIndex) ||
+              (chosenSubtitle != null &&
+                  chosenSubtitle >= 0 &&
+                  !_convertedSubtitles.any((s) => s.index == chosenSubtitle)));
+      if (missingInDownload && online) {
+        _localFile = null;
+        _localConverted = false;
+        _convertedSubtitles = const [];
+        maxBitrate = settings.maxBitrate;
+        if (maxBitrate != null && (source.bitrate ?? 0) > 0 && source.bitrate! <= maxBitrate) maxBitrate = null;
+      }
       setState(() {
         _item = item;
         _source = source;

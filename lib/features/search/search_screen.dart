@@ -120,6 +120,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   /// Filme und Serien eines Genres zeigen (Suchfeld wird geleert).
   Future<void> _browseGenre(String genre) async {
     final id = ++_requestId;
+    _debounce?.cancel();
     _remember?.cancel();
     _controller.clear();
     setState(() {
