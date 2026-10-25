@@ -167,8 +167,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Timer? _zoomOsdTimer;
 
   /// Kurze Lautstärke-Anzeige in der Bildmitte (Mausrad, Pfeiltasten); `null` = ausgeblendet.
-  final _volumeOsd = ValueNotifier<double?>(null);
-  Timer? _volumeOsdTimer;
   Timer? _hideTimer;
   Timer? _progressTimer;
 
@@ -470,8 +468,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     SleepTimer.instance.removeListener(_onSleepTimerChanged);
     _sleepTick?.cancel();
     _sleepLeft.dispose();
-    _volumeOsdTimer?.cancel();
-    _volumeOsd.dispose();
     _zoomOsdTimer?.cancel();
     _zoomOsd.dispose();
     if (MediaSession.onButton == _onMediaButton) {
@@ -1107,15 +1103,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _player.seek(target);
   }
 
-  void _setVolume(double v, {bool osd = false}) {
+  /// [showBar]: Steuerleiste kurz einblenden, damit man den Regler sieht (Mausrad, Pfeiltasten).
+  void _setVolume(double v, {bool showBar = false}) {
     final volume = v.clamp(0, PlayerScreen.maxVolume).toDouble();
     _pendingVolume = volume;
     _player.setVolume(volume);
-    if (osd) {
-      _volumeOsd.value = volume;
-      _volumeOsdTimer?.cancel();
-      _volumeOsdTimer = Timer(const Duration(milliseconds: 1200), () => _volumeOsd.value = null);
-    }
+    if (showBar) _showControls();
     // Gebündelt speichern (Pfeiltaste gedrückt halten = viele Änderungen).
     _volumeSaveTimer?.cancel();
     _volumeSaveTimer = Timer(const Duration(milliseconds: 800), _saveVolume);
@@ -1187,9 +1180,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     } else if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.keyL) {
       _seekBy(_seekStep);
     } else if (key == LogicalKeyboardKey.arrowUp) {
-      _setVolume(_volume + 5, osd: !_controlsVisible);
+      _setVolume(_volume + 5, showBar: true);
     } else if (key == LogicalKeyboardKey.arrowDown) {
-      _setVolume(_volume - 5, osd: !_controlsVisible);
+      _setVolume(_volume - 5, showBar: true);
     } else if (isRepeat) {
       return KeyEventResult.ignored;
     } else if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.keyK) {
@@ -1261,7 +1254,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 _setCustomZoom(_zoomScale(box) + (event.scrollDelta.dy < 0 ? 0.05 : -0.05));
                 return;
               }
-              _setVolume(_volume + (event.scrollDelta.dy < 0 ? 5 : -5), osd: true);
+              _setVolume(_volume + (event.scrollDelta.dy < 0 ? 5 : -5), showBar: true);
             },
             child: Stack(
               children: [
@@ -1304,7 +1297,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     onDoubleTap: () => _mini ? _toggleMini() : _toggleFullscreen(),
                   ),
                 ),
-                Center(child: _VolumeOsd(volume: _volumeOsd)),
                 if (_error == null)
                   Center(
                     child: StreamBuilder<bool>(

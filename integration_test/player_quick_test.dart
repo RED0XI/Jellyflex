@@ -69,7 +69,7 @@ void main() {
     final p = await waitForPlayer(tester);
     expect(p.state.position.inSeconds, inInclusiveRange(54, 57), reason: '5 Sekunden zurück');
 
-    // Mausrad auf dem Bild: lauter, mit Anzeige; höchstens 150 %.
+    // Mausrad auf dem Bild: lauter (die Steuerleiste zeigt den Regler); höchstens 150 %.
     final start = p.state.volume;
     final mouse = TestPointer(1, PointerDeviceKind.mouse);
     final center = tester.getCenter(find.byType(PlayerScreen));
@@ -77,8 +77,9 @@ void main() {
     await tester.sendEventToBinding(mouse.scroll(const Offset(0, -100)));
     await pumpFor(tester, const Duration(milliseconds: 300));
     expect(p.state.volume, start + 5);
-    expect(find.text('${(start + 5).round()} %'), findsOneWidget, reason: 'Anzeige in der Mitte');
-    await saveShot(tester, 'player_volume_osd');
+    expect(find.text('${(start + 5).round()} %'), findsNothing, reason: 'keine Anzeige in der Bildmitte');
+    expect(find.byIcon(Icons.volume_up_rounded), findsWidgets, reason: 'Steuerleiste mit Regler sichtbar');
+    await saveShot(tester, 'player_volume_wheel');
     for (var i = 0; i < 20; i++) {
       await tester.sendEventToBinding(mouse.scroll(const Offset(0, -100)));
     }
