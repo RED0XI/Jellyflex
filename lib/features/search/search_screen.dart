@@ -14,6 +14,7 @@ import '../../widgets/people_row.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/states.dart';
 import '../../widgets/top_scrim.dart';
+import '../genre/genre_screen.dart';
 import '../../l10n/strings.dart';
 
 /// Was die Suche zeigt.
@@ -43,8 +44,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   _Filter _filter = _Filter.all;
   bool _onlyUnwatched = false;
 
-  /// Gewähltes Genre (Stöbern ohne Suchbegriff) und alle Genres der Bibliotheken.
-  String? _genre;
+  /// Alle Genres der Bibliotheken (Kacheln zum Stöbern ohne Suchbegriff).
   List<String> _genres = const [];
 
   @override
@@ -80,12 +80,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _search(String term) async {
-    if (term == _term && _genre == null) return;
+    if (term == _term) return;
     final id = ++_requestId;
     _remember?.cancel();
     setState(() {
       _term = term;
-      _genre = null;
       _error = null;
       _loading = term.isNotEmpty;
       if (term.isEmpty) {
@@ -116,39 +115,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       if (mounted && id == _requestId) setState(() => _loading = false);
     }
   }
-
-  /// Filme und Serien eines Genres zeigen (Suchfeld wird geleert).
-  Future<void> _browseGenre(String genre) async {
-    final id = ++_requestId;
-    _debounce?.cancel();
-    _remember?.cancel();
-    _controller.clear();
-    setState(() {
-      _term = '';
-      _genre = genre;
-      _error = null;
-      _loading = true;
-      _results = const [];
-      _people = const [];
-      if (_filter == _Filter.episodes || _filter == _Filter.people) _filter = _Filter.all;
-    });
-    try {
-      final results = await ref.read(apiProvider).getByGenre(genre, limit: 120);
-      if (mounted && id == _requestId) setState(() => _results = results);
-    } catch (e) {
-      if (mounted && id == _requestId) setState(() => _error = e);
-    } finally {
-      if (mounted && id == _requestId) setState(() => _loading = false);
-    }
-  }
-
-  /// Genres als anklickbare Chips.
-  Widget _genreChips({WrapAlignment alignment = WrapAlignment.start}) => Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    alignment: alignment,
-    children: [for (final g in _genres) _Chip(label: g, selected: false, onTap: () => _browseGenre(g))],
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -214,7 +180,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     ),
                   ),
                 ),
-                if (_term.isNotEmpty || _genre != null)
+                if (_term.isNotEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 20),
@@ -223,20 +189,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         runSpacing: 8,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          if (_genre case final genre?) ...[
-                            _Chip(
-                              label: tr.genreLabel(genre),
-                              icon: Icons.close_rounded,
-                              selected: true,
-                              onTap: () => _search(''),
-                            ),
-                            const SizedBox(width: 12),
-                          ],
                           for (final (f, label) in [
                             (_Filter.all, tr.filterAll),
                             (_Filter.movies, tr.movies),
                             (_Filter.shows, tr.shows),
-                            if (_genre == null) ...[(_Filter.episodes, tr.episodes), (_Filter.people, tr.people)],
+                            (_Filter.episodes, tr.episodes),
+                            (_Filter.people, tr.people),
                           ])
                             _Chip(label: label, selected: _filter == f, onTap: () => setState(() => _filter = f)),
                           const SizedBox(width: 12),
@@ -254,37 +212,33 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   SliverToBoxAdapter(
                     child: EmptyState(icon: Icons.cloud_off_rounded, title: tr.searchFailed(_error!)),
                   )
-                else if (_term.isEmpty && _genre == null)
+                else if (_term.isEmpty)
                   SliverToBoxAdapter(
-                    child: recent.isEmpty
+                    child: recent.isEmpty && _genres.isEmpty
                         ? EmptyState(
                             icon: Icons.movie_filter_rounded,
                             title: tr.whatDoYouFeelLike,
                             hint: tr.searchEmptyHint,
-                            child: _genres.isEmpty ? null : _genreChips(alignment: WrapAlignment.center),
                           )
                         : Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _RecentSearches(terms: recent, onUse: _useRecent, onRemove: _forget),
+                              if (recent.isNotEmpty)
+                                _RecentSearches(terms: recent, onUse: _useRecent, onRemove: _forget),
                               if (_genres.isNotEmpty)
                                 Padding(
-                                  padding: const EdgeInsets.fromLTRB(kPageGutter, 34, kPageGutter, 40),
+                                  padding: EdgeInsets.fromLTRB(kPageGutter, recent.isEmpty ? 16 : 34, kPageGutter, 48),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Row(
-                                        children: [
-                                          Icon(Icons.theater_comedy_outlined, size: 20, color: AppColors.textSecondary),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            tr.browseByGenre,
-                                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-                                          ),
-                                        ],
+                                      Text(
+                                        tr.browseByGenre,
+                                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                                       ),
-                                      const SizedBox(height: 14),
-                                      _genreChips(),
+                                      const SizedBox(height: 4),
+                                      Text(tr.browseByGenreHint, style: TextStyle(color: AppColors.textSecondary)),
+                                      const SizedBox(height: 18),
+                                      GenreTiles(genres: _genres),
                                     ],
                                   ),
                                 ),
@@ -293,7 +247,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   )
                 else if (!_loading && nothing)
                   SliverToBoxAdapter(
-                    child: EmptyState(icon: Icons.search_off_rounded, title: tr.nothingFoundFor(_genre ?? _term)),
+                    child: EmptyState(icon: Icons.search_off_rounded, title: tr.nothingFoundFor(_term)),
                   )
                 else
                   SliverList.list(

@@ -1071,6 +1071,16 @@ final class _Es extends S {
   @override
   String noSettingFound(String q) => 'Ningún ajuste coincide con «$q».';
   @override
+  String get browseByGenreHint => 'Tus películas y series, ordenadas por estado de ánimo.';
+  @override
+  String get genreTopRated => 'Mejor valorados';
+  @override
+  String get genreNewest => 'Añadidos recientemente';
+  @override
+  String get genreUnwatched => 'Aún no vistos';
+  @override
+  String genreHeroCaption(String title) => 'En la imagen: $title';
+  @override
   String get browseByGenre => 'Explorar por género';
   @override
   String get searchEmptyHint => 'Busca títulos, episodios o personas, o elige un género.';

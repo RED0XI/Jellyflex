@@ -11,6 +11,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:jellyflex/app.dart';
 import 'package:jellyflex/core/search_history.dart';
 import 'package:jellyflex/core/session.dart';
+import 'package:jellyflex/features/genre/genre_screen.dart';
 import 'package:jellyflex/core/settings.dart';
 import 'package:jellyflex/features/person/person_screen.dart';
 import 'package:jellyflex/widgets/media_cards.dart';
@@ -81,18 +82,18 @@ void main() {
     expect(container.read(searchHistoryProvider), isEmpty);
     expect(find.text('Letzte Suchen'), findsNothing);
 
-    // Leere Suche: Genres zum Stöbern; ein Genre zeigt seine Filme und Serien.
-    expect(find.text('Wonach ist dir heute?'), findsOneWidget);
+    // Leere Suche: Genre-Kacheln; eine Kachel öffnet die Genre-Seite mit Reihen.
+    expect(find.text('Nach Genre stöbern'), findsOneWidget);
     await tester.tap(find.text('Drama').first);
-    await pumpFor(tester, const Duration(seconds: 2));
-    expect(find.text('Genre: Drama'), findsOneWidget);
+    await pumpFor(tester, const Duration(seconds: 3));
+    expect(find.byType(GenreScreen), findsOneWidget);
+    expect(find.text('Am besten bewertet'), findsOneWidget);
+    expect(find.text('Zufällig abspielen'), findsOneWidget);
     expect(find.byType(PosterCard), findsWidgets);
-    expect(find.text('Folgen'), findsNothing, reason: 'Beim Stöbern nur Filme und Serien');
-    await saveShot(tester, 'search_genre');
-    // Chip schließt das Genre wieder.
-    await tester.tap(find.text('Genre: Drama'));
+    await saveShot(tester, 'genre_page');
+    container.read(routerProvider).pop();
     await pumpFor(tester, const Duration(seconds: 1));
-    expect(find.text('Wonach ist dir heute?'), findsOneWidget);
+    await saveShot(tester, 'search_genres');
     await tester.pumpWidget(const SizedBox());
   });
 }

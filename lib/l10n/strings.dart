@@ -709,6 +709,12 @@ class S {
   String get clear => _t('Clear', 'Leeren');
   String searchFailed(Object e) => _t('Search failed: $e', 'Suche fehlgeschlagen: $e');
   String get browseByGenre => _t('Browse by genre', 'Nach Genre stöbern');
+  String get browseByGenreHint =>
+      _t('Your movies and shows, sorted by mood.', 'Deine Filme und Serien, nach Stimmung sortiert.');
+  String get genreTopRated => _t('Top rated', 'Am besten bewertet');
+  String get genreNewest => _t('Recently added', 'Neu hinzugefügt');
+  String get genreUnwatched => _t('Not watched yet', 'Noch nicht gesehen');
+  String genreHeroCaption(String title) => _t('Pictured: $title', 'Im Bild: $title');
   String get searchEmptyHint => _t(
     'Search for titles, episodes or people – or pick a genre.',
     'Suche nach Titeln, Folgen oder Personen – oder wähle ein Genre.',

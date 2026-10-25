@@ -70,7 +70,7 @@ String playPath(String itemId, {int startTicks = 0, String? mediaSourceId, int? 
 /// "Zufällig abspielen": Titel unterhalb von [parentId] mischen und nacheinander abspielen.
 Future<void> playShuffled(
   BuildContext context, {
-  required String parentId,
+  String? parentId,
   required String includeItemTypes,
   bool unplayedOnly = false,
   String? genre,

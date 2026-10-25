@@ -40,6 +40,7 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
         '/settings',
         '/lists',
         '/calendar',
+        '/genre/',
       ].any(path.startsWith);
 
   /// Fokusbereich der Seitenleiste (für Pfeiltasten/Controller).

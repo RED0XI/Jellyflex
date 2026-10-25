@@ -1073,6 +1073,16 @@ final class _Fr extends S {
   @override
   String noSettingFound(String q) => 'Aucun réglage ne correspond à « $q ».';
   @override
+  String get browseByGenreHint => 'Vos films et séries, classés par ambiance.';
+  @override
+  String get genreTopRated => 'Les mieux notés';
+  @override
+  String get genreNewest => 'Ajoutés récemment';
+  @override
+  String get genreUnwatched => 'Pas encore vus';
+  @override
+  String genreHeroCaption(String title) => 'À l’image : $title';
+  @override
   String get browseByGenre => 'Parcourir par genre';
   @override
   String get searchEmptyHint => 'Cherchez des titres, des épisodes ou des personnes – ou choisissez un genre.';

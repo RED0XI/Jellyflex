@@ -480,14 +480,14 @@ class JellyfinApi {
   /// Gemischte Titel unterhalb von [parentId] (Serie, Staffel, Sammlung, Bibliothek) für
   /// "Zufällig abspielen" – ohne fehlende Folgen.
   Future<List<BaseItem>> getShuffled(
-    String parentId, {
+    String? parentId, {
     required String includeItemTypes,
     bool unplayedOnly = false,
     String? genre,
     int limit = 200,
   }) => _getItems('/Items', {
     ..._common,
-    'parentId': parentId,
+    'parentId': ?parentId,
     'includeItemTypes': includeItemTypes,
     'recursive': true,
     'sortBy': 'Random',
@@ -782,6 +782,36 @@ class JellyfinApi {
     final res = await dio.get('/Users/Me');
     return (res.data as Map).cast<String, dynamic>();
   }
+
+  /// Titel eines Genres über alle Bibliotheken (Genre-Seite).
+  Future<List<BaseItem>> getGenreItems(
+    String genre, {
+    String includeItemTypes = 'Movie,Series',
+    String sortBy = 'Random',
+    bool descending = false,
+    bool unplayedOnly = false,
+    int limit = 30,
+  }) => _getItems('/Items', {
+    ..._common,
+    'genres': genre,
+    'includeItemTypes': includeItemTypes,
+    'recursive': true,
+    'isMissing': false,
+    'sortBy': sortBy,
+    if (descending) 'sortOrder': 'Descending',
+    if (unplayedOnly) 'filters': 'IsUnplayed',
+    'limit': limit,
+  });
+
+  /// Zufällige Filme und Serien mit Hintergrundbild (Bilder für die Genre-Kacheln).
+  Future<List<BaseItem>> getRandomWithBackdrops({int limit = 300}) => _getItems('/Items', {
+    ..._common,
+    'includeItemTypes': 'Movie,Series',
+    'recursive': true,
+    'imageTypes': 'Backdrop',
+    'sortBy': 'Random',
+    'limit': limit,
+  });
 
   /// Angekündigte Folgen der Serien in der Bibliothek (ab gestern), nach Erscheinungsdatum.
   Future<List<BaseItem>> getUpcoming({int limit = 200}) => _getItems('/Shows/Upcoming', {..._common, 'limit': limit});

@@ -1067,6 +1067,16 @@ final class _Tr extends S {
   @override
   String noSettingFound(String q) => '“$q” ile eşleşen ayar yok.';
   @override
+  String get browseByGenreHint => 'Film ve dizilerin, ruh haline göre.';
+  @override
+  String get genreTopRated => 'En yüksek puanlılar';
+  @override
+  String get genreNewest => 'Yeni eklenenler';
+  @override
+  String get genreUnwatched => 'Henüz izlenmedi';
+  @override
+  String genreHeroCaption(String title) => 'Görselde: $title';
+  @override
   String get browseByGenre => 'Türe göre göz at';
   @override
   String get searchEmptyHint => 'Başlık, bölüm ya da kişi ara – ya da bir tür seç.';
