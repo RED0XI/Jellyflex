@@ -1757,7 +1757,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     ];
   }
 
-  String? _selectedAudioId() => _transcoding ? 'jf:$_audioIndex' : _player.state.track.audio.id;
+  String? _selectedAudioId() {
+    if (_transcoding) return 'jf:$_audioIndex';
+    final id = _player.state.track.audio.id;
+    if (id != 'auto') return id;
+    // mpv wählt selbst (die Standardspur der Datei, sonst die erste) – die als gewählt zeigen.
+    final source = _source;
+    return (source == null || _localConverted ? null : _mpvIdFor(source, 'Audio', source.defaultAudioStreamIndex)) ??
+        '1';
+  }
 
   String? _selectedSubtitleId() {
     if (_transcoding) return (_subtitleIndex ?? -1) < 0 ? 'no' : 'jf:$_subtitleIndex';

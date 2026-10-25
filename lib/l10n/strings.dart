@@ -576,7 +576,7 @@ class S {
   String get noDownloadsYet => _t('No downloads yet.', 'Noch keine Downloads.');
   String get noDownloadsHint => _t(
     'Click “Download” on a details page or via right-click.',
-    'Auf einer Detailseite oder per Rechtsklick auf „Herunterladen“ tippen.',
+    'Auf einer Detailseite oder per Rechtsklick auf „Herunterladen“ klicken.',
   );
   String get downloading => _t('Downloading', 'Wird heruntergeladen');
   String get readyOffline => _t('Ready to watch offline', 'Bereit zum Offline-Schauen');
