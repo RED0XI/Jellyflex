@@ -1824,37 +1824,56 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _setTrackPanel(false);
     final wasPlaying = _player.state.playing;
     if (wasPlaying) await _player.pause();
-    final before = {for (final s in source.subtitleStreams) s.index};
+    final before = subtitleKeys(source);
     final loaded = mounted && await showSubtitleSearchDialog(context, item);
     _focus.requestFocus();
-    if (loaded) {
-      appMessengerKey.currentState?.showSnackBar(
-        SnackBar(content: Text(tr.subtitleDownloaded), behavior: SnackBarBehavior.floating, width: 460),
-      );
-      // Der Server bindet die neue Datei mit kurzer Verzögerung ein – ein paar Mal nachsehen.
-      for (var i = 0; i < 8 && mounted && !_closing; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 1200));
-        try {
-          final info = await _api.getPlaybackInfo(widget.itemId);
-          final fresh = info.mediaSources.where((s) => s.id == source.id).firstOrNull;
-          final added = fresh?.subtitleStreams.where((s) => !before.contains(s.index)).firstOrNull;
-          if (fresh == null || added == null) continue;
-          if (!mounted || _closing) return;
-          setState(() => _source = fresh);
-          _rememberSubtitle(added.index);
-          if (_transcoding) {
-            await _switchStream(() => _subtitleIndex = added.index);
-          } else {
-            await _player.setSubtitleTrack(_externalTrack(added));
-            _subtitleIndex = added.index;
-          }
-          break;
-        } catch (_) {
-          // Später nochmal.
-        }
-      }
-    }
+    // Gleich weiterschauen – der Untertitel kommt dazu, sobald der Server ihn eingebunden hat.
     if (wasPlaying && mounted && !_closing) await _player.play();
+    if (!loaded) return;
+    void snack(String text) => appMessengerKey.currentState?.showSnackBar(
+      SnackBar(content: Text(text), behavior: SnackBarBehavior.floating, width: 460),
+    );
+    snack(tr.subtitleDownloaded);
+    final found = await waitForNewSubtitle(
+      _api,
+      widget.itemId,
+      source.id,
+      before,
+      cancelled: () => !mounted || _closing,
+    );
+    if (!mounted || _closing) return;
+    if (found == null) {
+      snack(tr.subtitleStillProcessing);
+      _refreshTracksOnOpen = true;
+      return;
+    }
+    final (fresh, added) = found;
+    setState(() => _source = fresh);
+    _rememberSubtitle(added.index);
+    if (_transcoding) {
+      await _switchStream(() => _subtitleIndex = added.index);
+    } else {
+      await _player.setSubtitleTrack(_externalTrack(added));
+      _subtitleIndex = added.index;
+    }
+  }
+
+  /// Ein geladener Untertitel war beim Warten noch nicht eingebunden: beim nächsten Öffnen
+  /// des Spur-Panels die Spuren vom Server neu holen.
+  bool _refreshTracksOnOpen = false;
+
+  Future<void> _refreshSource() async {
+    final source = _source;
+    if (source == null) return;
+    try {
+      final item = await _api.getItem(widget.itemId);
+      final fresh = item.mediaSources.where((s) => s.id == source.id).firstOrNull;
+      if (fresh == null || !mounted) return;
+      _refreshTracksOnOpen = false;
+      setState(() => _source = fresh);
+    } catch (_) {
+      // Ohne Server bleibt die bisherige Liste.
+    }
   }
 
   void _selectAudio(String id) {
@@ -1903,6 +1922,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   void _setTrackPanel(bool open) {
+    if (open && _refreshTracksOnOpen) _refreshSource();
     setState(() {
       _trackPanelOpen = open;
       if (open) _playbackPanelOpen = _chaptersOpen = false;

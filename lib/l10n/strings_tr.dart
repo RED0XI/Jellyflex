@@ -1041,7 +1041,9 @@ final class _Tr extends S {
   String get subtitleSearchNotAllowed =>
       'Hesabın altyazı indiremez. Bir yönetici Jellyfin’de „altyazı yönetimi“ne izin verebilir.';
   @override
-  String get subtitleDownloaded => 'Altyazı indirildi – birazdan seçilecek.';
+  String get subtitleDownloaded => 'Altyazı yüklendi – sunucun ekler eklemez seçilecek.';
+  @override
+  String get subtitleStillProcessing => 'Sunucun altyazıyı hâlâ ekliyor – birazdan listede görünecek.';
   @override
   String get loadSubtitle => 'Yükle';
   @override

@@ -10,7 +10,8 @@ import 'focusable.dart';
 import 'jf_image.dart';
 import 'media_row.dart';
 
-/// Reihe runder Personenbilder (Besetzung, Suchergebnisse) – Klick öffnet die Personenseite.
+/// Reihe von Personenbildern (Besetzung, Suchergebnisse) – Klick öffnet die Personenseite.
+/// Hochformat statt Kreis: Jellyfins Porträts sind 2:3, im Kreis fehlten Haare und Kinn.
 class PeopleRow extends ConsumerWidget {
   const PeopleRow({super.key, required this.title, required this.people});
 
@@ -25,7 +26,7 @@ class PeopleRow extends ConsumerWidget {
       child: MediaRow(
         title: title,
         itemCount: people.length,
-        height: 190,
+        height: 236,
         spacing: 22,
         itemBuilder: (context, i) {
           final p = people[i];
@@ -42,16 +43,17 @@ class PeopleRow extends ConsumerWidget {
                     curve: Curves.easeOutCubic,
                     child: Container(
                       foregroundDecoration: BoxDecoration(
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: hovered ? Colors.white.withValues(alpha: 0.9) : Colors.transparent,
-                          width: 2,
+                          color: hovered ? Colors.white.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.06),
+                          width: hovered ? 2 : 1,
                         ),
                       ),
-                      child: ClipOval(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
                         child: SizedBox(
                           width: 120,
-                          height: 120,
+                          height: 160,
                           child: JfImage(
                             url: api.imageUrlOrNull(Images.person(p), fillWidth: 240, fillHeight: 360),
                             blurHash: p.blurHash,

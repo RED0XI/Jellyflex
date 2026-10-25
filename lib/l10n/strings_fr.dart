@@ -1045,7 +1045,11 @@ final class _Fr extends S {
   String get subtitleSearchNotAllowed =>
       'Votre compte ne peut pas télécharger de sous-titres. Un admin peut autoriser la « gestion des sous-titres » dans Jellyfin.';
   @override
-  String get subtitleDownloaded => 'Sous-titres téléchargés – ils seront sélectionnés dans un instant.';
+  String get subtitleDownloaded =>
+      'Sous-titres chargés – ils seront sélectionnés dès que votre serveur les aura intégrés.';
+  @override
+  String get subtitleStillProcessing =>
+      'Votre serveur intègre encore les sous-titres – ils apparaîtront bientôt dans la liste.';
   @override
   String get loadSubtitle => 'Charger';
   @override

@@ -58,7 +58,8 @@ void main() {
     expect(find.text('Für Hörgeschädigte'), findsOneWidget);
     await saveShot(tester, 'subtitle_search');
     await tester.tap(find.text('Laden').first);
-    await pumpFor(tester, const Duration(seconds: 5));
+    // Der Demo-Server bindet die Datei (wie Jellyfin) erst nach ein paar Sekunden ein.
+    await pumpFor(tester, const Duration(seconds: 10));
 
     // Geladen und gleich ausgewählt.
     expect(find.text('Untertitel suchen'), findsNothing, reason: 'Fenster geschlossen');
@@ -104,7 +105,8 @@ void main() {
     expect(find.text('Untertitel suchen'), findsOneWidget);
     expect(p.state.playing, isFalse, reason: 'Video pausiert während der Suche');
     await tester.tap(find.text('Laden').first);
-    await pumpFor(tester, const Duration(seconds: 5));
+    // Der Demo-Server bindet die Datei (wie Jellyfin) erst nach ein paar Sekunden ein.
+    await pumpFor(tester, const Duration(seconds: 10));
 
     // Der geladene Untertitel läuft, das Video spielt weiter.
     debugPrint('Untertitel: ${p.state.track.subtitle.id} ${p.state.track.subtitle.language}');

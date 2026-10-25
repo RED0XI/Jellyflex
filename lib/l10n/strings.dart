@@ -299,9 +299,15 @@ class S {
     'Your account may not download subtitles. An admin can allow “subtitle management” for it in Jellyfin.',
     'Dein Konto darf keine Untertitel laden. Ein Admin kann ihm in Jellyfin die „Untertitelverwaltung“ erlauben.',
   );
-  String get subtitleDownloaded =>
-      _t('Subtitles downloaded – selected in a moment.', 'Untertitel geladen – sie werden gleich ausgewählt.');
+  String get subtitleDownloaded => _t(
+    'Subtitles loaded – they are selected as soon as your server has added them.',
+    'Untertitel geladen – sie werden ausgewählt, sobald dein Server sie eingebunden hat.',
+  );
   String get loadSubtitle => _t('Load', 'Laden');
+  String get subtitleStillProcessing => _t(
+    'Your server is still adding the subtitles – they will show up in the list shortly.',
+    'Dein Server bindet die Untertitel noch ein – sie erscheinen gleich in der Auswahl.',
+  );
   String get exactMatch => _t('Exact match', 'Passt genau');
   String get hearingImpaired => _t('Hearing impaired', 'Für Hörgeschädigte');
   String get machineTranslated => _t('Machine-translated', 'Maschinell übersetzt');

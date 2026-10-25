@@ -644,18 +644,21 @@ Object? _handle(HttpRequest req) {
     if (req.method == 'POST') {
       final item = byId[seg[1]];
       final language = seg[4].split('-').elementAtOrNull(1) ?? 'ger';
-      for (final source in (item?['MediaSources'] as List? ?? const [])) {
-        final streams = (source as Map)['MediaStreams'] as List;
-        final next = streams.fold<int>(0, (m, s) => ((s as Map)['Index'] as int) > m ? s['Index'] as int : m) + 1;
-        streams.add({
-          'Type': 'Subtitle',
-          'Index': next,
-          'Language': language,
-          'Codec': 'srt',
-          'IsExternal': true,
-          'Title': 'OpenSubtitles',
-        });
-      }
+      // Wie Jellyfin: die Datei kommt erst nach einer Weile (Aktualisierungs-Warteschlange) dazu.
+      Future<void>.delayed(const Duration(seconds: 4), () {
+        for (final source in (item?['MediaSources'] as List? ?? const [])) {
+          final streams = (source as Map)['MediaStreams'] as List;
+          final next = streams.fold<int>(0, (m, s) => ((s as Map)['Index'] as int) > m ? s['Index'] as int : m) + 1;
+          streams.add({
+            'Type': 'Subtitle',
+            'Index': next,
+            'Language': language,
+            'Codec': 'srt',
+            'IsExternal': true,
+            'Title': 'OpenSubtitles',
+          });
+        }
+      });
       return '';
     }
     final lang = seg[4];

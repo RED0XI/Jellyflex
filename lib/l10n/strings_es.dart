@@ -1045,7 +1045,9 @@ final class _Es extends S {
   String get subtitleSearchNotAllowed =>
       'Tu cuenta no puede descargar subtítulos. Un administrador puede permitir la «gestión de subtítulos» en Jellyfin.';
   @override
-  String get subtitleDownloaded => 'Subtítulos descargados: se seleccionarán en un momento.';
+  String get subtitleDownloaded => 'Subtítulos cargados: se seleccionarán en cuanto tu servidor los haya añadido.';
+  @override
+  String get subtitleStillProcessing => 'Tu servidor aún está añadiendo los subtítulos; aparecerán pronto en la lista.';
   @override
   String get loadSubtitle => 'Cargar';
   @override

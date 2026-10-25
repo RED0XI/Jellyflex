@@ -577,30 +577,26 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
   /// Untertitel über den Server suchen; der geladene wird danach gleich ausgewählt.
   Future<void> _searchSubtitlesOnServer(MediaSource source) async {
     final item = widget.item;
-    final before = {for (final s in source.subtitleStreams) s.index};
+    final before = subtitleKeys(source);
     final messenger = ScaffoldMessenger.maybeOf(context);
     if (!await showSubtitleSearchDialog(context, item)) return;
-    messenger?.showSnackBar(
-      SnackBar(content: Text(tr.subtitleDownloaded), behavior: SnackBarBehavior.floating, width: 460),
+    void snack(String text) =>
+        messenger?.showSnackBar(SnackBar(content: Text(text), behavior: SnackBarBehavior.floating, width: 460));
+    snack(tr.subtitleDownloaded);
+    final found = await waitForNewSubtitle(
+      ref.read(apiProvider),
+      item.id,
+      source.id,
+      before,
+      cancelled: () => !mounted,
     );
-    // Der Server bindet die neue Datei mit kurzer Verzögerung ein – ein paar Mal nachsehen.
-    final api = ref.read(apiProvider);
-    for (var i = 0; i < 8 && mounted; i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 1200));
-      try {
-        final fresh = await api.getItem(item.id);
-        final freshSource = fresh.mediaSources.where((s) => s.id == source.id).firstOrNull;
-        final added = freshSource?.subtitleStreams.where((s) => !before.contains(s.index)).firstOrNull;
-        if (added == null) continue;
-        if (!mounted) return;
-        ref.invalidate(itemProvider(item.id));
-        widget.onSelectTracks(widget.audioIndex, added.index);
-        return;
-      } catch (_) {
-        // Später nochmal.
-      }
+    if (!mounted) return;
+    ref.invalidate(itemProvider(item.id));
+    if (found == null) {
+      snack(tr.subtitleStillProcessing);
+      return;
     }
-    if (mounted) ref.invalidate(itemProvider(item.id));
+    widget.onSelectTracks(widget.audioIndex, found.$2.index);
   }
 
   /// Knöpfe "Ton" und "Untertitel" – nur, wenn es etwas zu wählen gibt.

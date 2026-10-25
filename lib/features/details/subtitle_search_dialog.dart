@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format.dart';
+import '../../core/jellyfin_api.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../core/settings.dart';
@@ -19,6 +20,48 @@ Future<bool> showSubtitleSearchDialog(BuildContext context, BaseItem item) async
     builder: (context) => _SubtitleSearchDialog(item: item),
   );
   return loaded ?? false;
+}
+
+/// Merkmale der Untertitel einer Fassung – zum Erkennen eines neu dazugekommenen
+/// (unabhängig davon, wie der Server die Spuren danach nummeriert).
+Set<String> subtitleKeys(MediaSource source) => {for (final s in source.subtitleStreams) _subtitleKey(s)};
+
+String _subtitleKey(MediaStream s) => [
+  s.isExternal,
+  s.raw['Path'] ?? '',
+  s.language ?? '',
+  s.codec ?? '',
+  s.title ?? '',
+  if (!s.isExternal) s.index,
+].join('|');
+
+/// Wartet, bis der Server einen geladenen Untertitel eingebunden hat. Jellyfin speichert die
+/// Datei sofort, nimmt sie aber erst über seine Aktualisierungs-Warteschlange in den Titel auf –
+/// auf einem vollen Server dauert das. Ergebnis: Fassung und neue Spur, oder `null` nach [timeout].
+Future<(MediaSource, MediaStream)?> waitForNewSubtitle(
+  JellyfinApi api,
+  String itemId,
+  String sourceId,
+  Set<String> before, {
+  Duration timeout = const Duration(seconds: 120),
+  bool Function()? cancelled,
+}) async {
+  final end = DateTime.now().add(timeout);
+  var delay = const Duration(seconds: 1);
+  while (DateTime.now().isBefore(end) && !(cancelled?.call() ?? false)) {
+    await Future<void>.delayed(delay);
+    if (delay < const Duration(seconds: 4)) delay *= 2;
+    if (cancelled?.call() ?? false) return null;
+    try {
+      final item = await api.getItem(itemId);
+      final source = item.mediaSources.where((s) => s.id == sourceId).firstOrNull ?? item.mediaSources.firstOrNull;
+      final added = source?.subtitleStreams.where((s) => !before.contains(_subtitleKey(s))).firstOrNull;
+      if (source != null && added != null) return (source, added);
+    } catch (_) {
+      // Kurz nicht erreichbar – weiter versuchen.
+    }
+  }
+  return null;
 }
 
 /// Sprache, mit der die Suche beginnt: bevorzugte Untertitel, sonst die Sprache der App.
