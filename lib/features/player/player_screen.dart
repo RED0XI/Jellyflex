@@ -19,7 +19,7 @@ import '../../core/gamepad_input.dart';
 import '../../core/images.dart';
 import '../../core/jellyfin_api.dart';
 import '../../core/live_connection.dart';
-import '../../core/media_info.dart' show trackLabel;
+import '../../core/media_info.dart' show codecLabel, trackLabel;
 import '../../core/media_session.dart';
 import '../../core/models.dart';
 import '../../core/play_queue.dart';
@@ -896,7 +896,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   String _trackLabel(String type, String id, String? title, String? language, String? codec) {
     final stream = _jellyfinStreamFor(type, id);
     if (stream != null) return trackLabel(stream);
-    return [?title, languageName(language), ?codec?.toUpperCase()].join(' · ');
+    return [?title, languageName(language), if (codec != null) codecLabel(codec)].join(' · ');
   }
 
   // --- Schließen -------------------------------------------------------------

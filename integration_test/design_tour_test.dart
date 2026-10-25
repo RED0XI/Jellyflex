@@ -123,13 +123,9 @@ void main() {
       await open('/lists', 'lists');
       await open('/downloads', 'downloads');
       await open('/calendar', 'calendar');
-      await open('/settings', 'settings');
-      await scrollDown(900);
-      await shot('settings_2');
-      await scrollDown(900);
-      await shot('settings_3');
-      await scrollDown(900);
-      await shot('settings_4');
+      for (final section in ['general', 'playback', 'appearance', 'downloads', 'advanced', 'about']) {
+        await open('/settings?section=$section', 'settings_$section');
+      }
       await open('/roulette', 'roulette');
       await open('/wrapped', 'wrapped', ms: 4000);
 

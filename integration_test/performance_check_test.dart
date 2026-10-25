@@ -44,7 +44,7 @@ void main() {
     );
     await pumpFor(tester, const Duration(seconds: 2));
     final container = ProviderScope.containerOf(tester.element(find.byType(JellyflexApp)));
-    container.read(routerProvider).push('/settings');
+    container.read(routerProvider).push('/settings?section=about');
     await pumpFor(tester, const Duration(seconds: 1));
     await tester.ensureVisible(find.byType(AboutRows));
     await pumpFor(tester, const Duration(milliseconds: 600));

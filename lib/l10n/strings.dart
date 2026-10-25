@@ -286,6 +286,12 @@ class S {
   };
   String get watchlist => _t('Watchlist', 'Merkliste');
   String get myLists => _t('My lists', 'Meine Listen');
+  String get general => _t('General', 'Allgemein');
+  String get appearance => _t('Appearance', 'Aussehen');
+  String get advanced => _t('Advanced', 'Erweitert');
+  String get nameAndLogo => _t('Name & logo', 'Name & Logo');
+  String get searchSettings => _t('Search settings …', 'Einstellung suchen …');
+  String noSettingFound(String q) => _t('No setting matches “$q”.', 'Keine Einstellung passt zu „$q“.');
   String get upcoming => _t('Upcoming', 'Demnächst');
   String get upcomingHint =>
       _t('New episodes of your shows in the coming weeks.', 'Neue Folgen deiner Serien in den nächsten Wochen.');

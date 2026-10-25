@@ -58,7 +58,7 @@ void main() {
       expect(find.text('Home'), findsOneWidget);
       await saveShot(tester, 'language_home_en');
 
-      container.read(routerProvider).push('/settings');
+      container.read(routerProvider).push('/settings?section=general');
       await pumpFor(tester, const Duration(seconds: 1));
       expect(find.text('Settings'), findsOneWidget);
       expect(find.text('App language'), findsOneWidget);

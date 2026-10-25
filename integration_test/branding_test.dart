@@ -71,12 +71,12 @@ void main() {
       expect(await tester.runAsync(windowManager.getTitle), 'Mein Kino');
       await saveShot(tester, 'branding_home');
 
-      container.read(routerProvider).push('/settings');
+      container.read(routerProvider).push('/settings?section=advanced');
       await pumpFor(tester, const Duration(seconds: 1));
       final reset = find.text('Auf Jellyflex zurücksetzen');
       await tester.ensureVisible(reset);
       await pumpFor(tester, const Duration(milliseconds: 600));
-      expect(find.text('Personalisieren'), findsOneWidget);
+      expect(find.text('Name & Logo'), findsOneWidget);
       await saveShot(tester, 'branding_settings');
 
       // Zurücksetzen → wieder Jellyflex.

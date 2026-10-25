@@ -80,7 +80,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       _route('/downloads', (_) => const DownloadsScreen()),
       _route('/roulette', (_) => const RouletteScreen()),
       _route('/wrapped', (_) => const WrappedScreen()),
-      _route('/settings', (_) => const SettingsScreen()),
+      _route(
+        '/settings',
+        (state) =>
+            SettingsScreen(initialSection: SettingsSection.values.asNameMap()[state.uri.queryParameters['section']]),
+      ),
       _route('/lists', (_) => const ListsScreen()),
       _route('/calendar', (_) => const CalendarScreen()),
       _route(

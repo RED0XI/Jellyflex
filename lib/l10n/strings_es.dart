@@ -1031,6 +1031,18 @@ final class _Es extends S {
   @override
   String get myLists => 'Mis listas';
   @override
+  String get general => 'General';
+  @override
+  String get appearance => 'Apariencia';
+  @override
+  String get advanced => 'Avanzado';
+  @override
+  String get nameAndLogo => 'Nombre y logotipo';
+  @override
+  String get searchSettings => 'Buscar un ajuste …';
+  @override
+  String noSettingFound(String q) => 'Ningún ajuste coincide con «$q».';
+  @override
   String get browseByGenre => 'Explorar por género';
   @override
   String get searchEmptyHint => 'Busca títulos, episodios o personas, o elige un género.';

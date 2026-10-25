@@ -1031,6 +1031,18 @@ final class _Fr extends S {
   @override
   String get myLists => 'Mes listes';
   @override
+  String get general => 'Général';
+  @override
+  String get appearance => 'Apparence';
+  @override
+  String get advanced => 'Avancé';
+  @override
+  String get nameAndLogo => 'Nom et logo';
+  @override
+  String get searchSettings => 'Rechercher un réglage …';
+  @override
+  String noSettingFound(String q) => 'Aucun réglage ne correspond à « $q ».';
+  @override
   String get browseByGenre => 'Parcourir par genre';
   @override
   String get searchEmptyHint => 'Cherchez des titres, des épisodes ou des personnes – ou choisissez un genre.';

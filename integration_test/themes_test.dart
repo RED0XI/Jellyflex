@@ -53,7 +53,7 @@ void main() {
       final router = container.read(routerProvider);
 
       // Einstellungen: Theme-Auswahl sichtbar.
-      router.push('/settings');
+      router.push('/settings?section=appearance');
       await pumpFor(tester, const Duration(seconds: 1));
       await tester.ensureVisible(find.byType(ThemePicker));
       await pumpFor(tester, const Duration(milliseconds: 600));

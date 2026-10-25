@@ -51,7 +51,7 @@ void main() {
     final container = ProviderScope.containerOf(tester.element(find.byType(JellyflexApp)));
 
     // Festlegen (zweimal eingeben).
-    container.read(routerProvider).push('/settings');
+    container.read(routerProvider).push('/settings?section=general');
     await pumpFor(tester, const Duration(seconds: 1));
     await tester.ensureVisible(find.text('PIN festlegen'));
     await pumpFor(tester, const Duration(milliseconds: 500));

@@ -49,7 +49,7 @@ void main() {
       final router = container.read(routerProvider);
 
       // Auswahl in den Einstellungen.
-      router.push('/settings');
+      router.push('/settings?section=appearance');
       await pumpFor(tester, const Duration(seconds: 1));
       await tester.ensureVisible(find.byType(LayoutPicker));
       await pumpFor(tester, const Duration(milliseconds: 600));

@@ -59,7 +59,7 @@ void main() {
     await saveShot(tester, 'home_rows');
 
     // Einstellungen: Dialog "Anpassen".
-    container.read(routerProvider).push('/settings');
+    container.read(routerProvider).push('/settings?section=appearance');
     await pumpFor(tester, const Duration(seconds: 1));
     await tester.ensureVisible(find.text('Anpassen'));
     await pumpFor(tester, const Duration(milliseconds: 400));
