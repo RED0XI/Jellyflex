@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'core/branding.dart';
 import 'core/changelog.dart';
 import 'core/version.dart';
+import 'widgets/tv_scale.dart';
 import 'widgets/whats_new_dialog.dart';
 import 'core/download_notify.dart';
 import 'core/update_check.dart';
@@ -213,19 +214,22 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
       routerConfig: router,
       scrollBehavior: const _AppScrollBehavior(),
       scaffoldMessengerKey: appMessengerKey,
-      builder: (context, child) => Screensaver(
-        router: router,
-        child: IdleLock(
+      // Fernseher: Oberfläche auf 1280×720 aufbauen und passend verkleinern (siehe TvScale).
+      builder: (context, child) => TvScale(
+        child: Screensaver(
           router: router,
-          child: LiveHandler(
+          child: IdleLock(
             router: router,
-            child: DownloadNotifier(
-              messenger: appMessengerKey,
-              child: WindowFrame(
-                router: router,
-                child: LayoutShell(
+            child: LiveHandler(
+              router: router,
+              child: DownloadNotifier(
+                messenger: appMessengerKey,
+                child: WindowFrame(
                   router: router,
-                  child: OfflineBanner(router: router, child: child!),
+                  child: LayoutShell(
+                    router: router,
+                    child: OfflineBanner(router: router, child: child!),
+                  ),
                 ),
               ),
             ),

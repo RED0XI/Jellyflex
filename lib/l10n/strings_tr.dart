@@ -708,6 +708,8 @@ final class _Tr extends S {
   @override
   String get taglineMobile => 'Sinema salonun. Her yerde.';
   @override
+  String get taglineTv => 'Sinema salonun. Büyük ekranda.';
+  @override
   String get whoIsWatching => 'Kim izliyor?';
   @override
   String get addAccount => 'Hesap ekle';

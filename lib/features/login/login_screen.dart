@@ -216,7 +216,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   const BrandLogo(size: 42),
                   const SizedBox(height: 8),
-                  Text(isMobile ? tr.taglineMobile : tr.tagline, style: TextStyle(color: AppColors.textSecondary)),
+                  Text(
+                    isTv ? tr.taglineTv : (isMobile ? tr.taglineMobile : tr.tagline),
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
                   const SizedBox(height: 36),
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
@@ -340,7 +343,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         const SizedBox(height: 24),
         TextField(
           controller: _serverCtrl,
-          autofocus: true,
+          // Fernseher: Tastatur erst auf Klick, nicht sofort über die ganze Seite.
+          autofocus: !isTv,
           // Bildschirmtastatur (iPhone/iPad): Adress-Tastatur, nichts automatisch "verbessern".
           keyboardType: TextInputType.url,
           autocorrect: false,

@@ -709,6 +709,8 @@ final class _Es extends S {
   @override
   String get taglineMobile => 'Tu cine. Donde estés.';
   @override
+  String get taglineTv => 'Tu cine. En la pantalla grande.';
+  @override
   String get whoIsWatching => '¿Quién está viendo?';
   @override
   String get addAccount => 'Añadir cuenta';

@@ -685,6 +685,7 @@ class S {
       _t('Quick Connect couldn’t be started.', 'Quick Connect konnte nicht gestartet werden.');
   String get tagline => _t('Your cinema. On your desktop.', 'Dein Kino. Auf dem Desktop.');
   String get taglineMobile => _t('Your cinema. Wherever you are.', 'Dein Kino. Überall dabei.');
+  String get taglineTv => _t('Your cinema. On the big screen.', 'Dein Kino. Auf der großen Leinwand.');
   String get whoIsWatching => _t('Who’s watching?', 'Wer schaut?');
   String get addAccount => _t('Add account', 'Konto hinzufügen');
   String get toProfileSelection => _t('Back to profiles', 'Zur Profilauswahl');

@@ -709,6 +709,8 @@ final class _Fr extends S {
   @override
   String get taglineMobile => 'Votre cinéma. Partout avec vous.';
   @override
+  String get taglineTv => 'Votre cinéma. Sur grand écran.';
+  @override
   String get whoIsWatching => 'Qui regarde ?';
   @override
   String get addAccount => 'Ajouter un compte';

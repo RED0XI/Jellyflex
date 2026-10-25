@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/platform/platform_info.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../core/search_history.dart';
@@ -143,7 +144,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     padding: EdgeInsets.fromLTRB(kPageGutter, topInset(context) + 28, kPageGutter, 16),
                     child: TextField(
                       controller: _controller,
-                      autofocus: true,
+                      // Fernseher: Tastatur erst auf Klick, nicht sofort über die ganze Seite.
+                      autofocus: !PlatformInfo.isTv,
                       onChanged: _onChanged,
                       onSubmitted: (v) {
                         _search(v.trim());
