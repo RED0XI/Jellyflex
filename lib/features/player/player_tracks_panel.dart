@@ -119,7 +119,8 @@ class _TrackColumn extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
           child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         ),
-        if (entries.isEmpty || (entries.length == 1 && entries.first.id == 'no'))
+        // "Aus" und "Untertitel suchen …" zählen nicht als Spur.
+        if (!entries.any((e) => e.id != 'no' && e.id != 'search'))
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(emptyText, style: TextStyle(color: AppColors.textMuted)),

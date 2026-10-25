@@ -32,6 +32,7 @@ import '../../theme.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/window_frame.dart';
 import '../details/details_screen.dart';
+import '../details/subtitle_search_dialog.dart';
 import 'player_overlays.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/jf_image.dart';
@@ -1793,6 +1794,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         (id: 'no', label: tr.off),
         for (final s in _source?.mediaStreams.where((s) => s.type == 'Subtitle') ?? const <MediaStream>[])
           (id: 'jf:${s.index}', label: trackLabel(s)),
+        (id: _searchEntry, label: tr.searchSubtitles),
       ];
     }
     // Nur eingebettete Spuren aus mpv; nachgeladene Dateien zeigen wir separat
@@ -1807,7 +1809,52 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       for (final t in tracks) (id: t.id, label: _trackLabel('Subtitle', t.id, t.title, t.language, t.codec)),
       for (final s in _externalSubtitles)
         (id: _subtitleUri(s), label: s.isExternal ? trackLabel(s) : '${trackLabel(s)} · ${tr.file}'),
+      (id: _searchEntry, label: tr.searchSubtitles),
     ];
+  }
+
+  /// Eintrag im Untertitel-Panel, der die Suche über den Server öffnet.
+  static const _searchEntry = 'search';
+
+  /// Untertitel über den Server suchen (z. B. OpenSubtitles-Plugin) und den geladenen gleich einschalten.
+  Future<void> _searchSubtitles() async {
+    final item = _item;
+    final source = _source;
+    if (item == null || source == null) return;
+    _setTrackPanel(false);
+    final wasPlaying = _player.state.playing;
+    if (wasPlaying) await _player.pause();
+    final before = {for (final s in source.subtitleStreams) s.index};
+    final loaded = mounted && await showSubtitleSearchDialog(context, item);
+    _focus.requestFocus();
+    if (loaded) {
+      appMessengerKey.currentState?.showSnackBar(
+        SnackBar(content: Text(tr.subtitleDownloaded), behavior: SnackBarBehavior.floating, width: 460),
+      );
+      // Der Server bindet die neue Datei mit kurzer Verzögerung ein – ein paar Mal nachsehen.
+      for (var i = 0; i < 8 && mounted && !_closing; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 1200));
+        try {
+          final info = await _api.getPlaybackInfo(widget.itemId);
+          final fresh = info.mediaSources.where((s) => s.id == source.id).firstOrNull;
+          final added = fresh?.subtitleStreams.where((s) => !before.contains(s.index)).firstOrNull;
+          if (fresh == null || added == null) continue;
+          if (!mounted || _closing) return;
+          setState(() => _source = fresh);
+          _rememberSubtitle(added.index);
+          if (_transcoding) {
+            await _switchStream(() => _subtitleIndex = added.index);
+          } else {
+            await _player.setSubtitleTrack(_externalTrack(added));
+            _subtitleIndex = added.index;
+          }
+          break;
+        } catch (_) {
+          // Später nochmal.
+        }
+      }
+    }
+    if (wasPlaying && mounted && !_closing) await _player.play();
   }
 
   void _selectAudio(String id) {
@@ -1825,6 +1872,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   void _selectSubtitle(String id) {
+    if (id == _searchEntry) {
+      _searchSubtitles();
+      return;
+    }
     if (_transcoding) {
       final index = id == 'no' ? -1 : int.parse(id.substring(3));
       _rememberSubtitle(index);
