@@ -321,6 +321,8 @@ class S {
   String get upcoming => _t('Upcoming', 'Demnächst');
   String get upcomingHint =>
       _t('New episodes of your shows in the coming weeks.', 'Neue Folgen deiner Serien in den nächsten Wochen.');
+  String get nextEpisodeAirs => _t('Next episode', 'Nächste Folge');
+  String inDays(int n) => _t('In $n days', 'In $n Tagen');
   String get noUpcomingTitle => _t('Nothing announced', 'Nichts angekündigt');
   String get noUpcoming => _t(
     'No new episodes announced for your shows right now.',

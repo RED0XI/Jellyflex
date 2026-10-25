@@ -42,9 +42,10 @@ void main() {
     await tester.tap(find.byTooltip('Demnächst'));
     await pumpFor(tester, const Duration(seconds: 2));
     expect(find.text('Demnächst'), findsWidgets);
-    expect(find.text('Heute'), findsOneWidget);
-    expect(find.text('Morgen'), findsOneWidget);
-    expect(find.text('·  2 Folgen'), findsWidgets, reason: 'Morgen zwei Folgen');
+    expect(find.text('Nächste Folge  ·  Heute'), findsOneWidget, reason: 'Großes Bild der nächsten Folge');
+    expect(find.text('HEUTE'), findsOneWidget);
+    expect(find.text('MORGEN'), findsOneWidget);
+    expect(find.text('2 Folgen'), findsWidgets, reason: 'Morgen zwei Folgen');
     await saveShot(tester, 'calendar_midnight');
 
     // Andere Themen: gleiche Seite in deren Farben.

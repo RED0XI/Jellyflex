@@ -1087,6 +1087,10 @@ final class _Fr extends S {
   @override
   String get searchEmptyHint => 'Cherchez des titres, des épisodes ou des personnes – ou choisissez un genre.';
   @override
+  String get nextEpisodeAirs => 'Prochain épisode';
+  @override
+  String inDays(int n) => 'Dans $n jours';
+  @override
   String get noUpcomingTitle => 'Rien d’annoncé';
   @override
   String get upcoming => 'À venir';

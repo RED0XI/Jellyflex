@@ -1081,6 +1081,10 @@ final class _Tr extends S {
   @override
   String get searchEmptyHint => 'Başlık, bölüm ya da kişi ara – ya da bir tür seç.';
   @override
+  String get nextEpisodeAirs => 'Sonraki bölüm';
+  @override
+  String inDays(int n) => '$n gün sonra';
+  @override
   String get noUpcomingTitle => 'Duyurulmuş bir şey yok';
   @override
   String get upcoming => 'Yakında';
