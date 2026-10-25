@@ -4,6 +4,20 @@ import '../l10n/strings.dart';
 /// Englisch und Deutsch; andere Sprachen zeigen Englisch. Neue Version: oben
 /// einen Eintrag ergänzen (Versionen ohne Eintrag erscheinen nicht).
 const changelog = <String, ({List<String> en, List<String> de})>{
+  '0.3.6': (
+    en: [
+      'The first official macOS version – signed and checked by Apple, so it opens without warnings.',
+      'macOS: fullscreen via the green button works properly, and trackpad scrolling glides out smoothly.',
+      'New performance test (Settings → About): measures your server and Jellyflex and saves a report without personal data.',
+      'Changing the volume with the mouse wheel shows the control bar instead of a box in the middle of the picture.',
+    ],
+    de: [
+      'Die erste offizielle macOS-Version – von Apple signiert und geprüft, öffnet ohne Warnung.',
+      'macOS: Vollbild über den grünen Knopf klappt richtig, und Scrollen mit dem Trackpad gleitet sanft aus.',
+      'Neuer Leistungstest (Einstellungen → Über): misst deinen Server und Jellyflex und speichert einen Bericht ohne persönliche Daten.',
+      'Lautstärke mit dem Mausrad zeigt die Steuerleiste statt eines Kastens in der Bildmitte.',
+    ],
+  ),
   '0.3.5': (
     en: [
       'Player: picture size – fit, fill without black bars (Z) or zoom freely (Ctrl + mouse wheel); remembered per series.',

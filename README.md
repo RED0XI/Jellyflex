@@ -29,17 +29,17 @@ Jellyfin server you can sign in to.
 
 1. Open the [latest release](https://github.com/RED0XI/Jellyflex/releases/latest) and download
    - **Windows:** **`Jellyflex-Setup-<version>.exe`**
-   - **macOS:** **`Jellyflex-<version>.dmg`** – *signed Mac downloads are coming; until then,
-     [build it yourself](#build-from-source)*
+   - **macOS:** **`Jellyflex-<version>.dmg`**
 
    (The `.sig` files and the `-macOS.zip` are only for the app's own update check.)
 2. Install:
    - **Windows:** run the installer. No admin rights needed.
      If Windows shows *"Windows protected your PC"*, click **More info → Run anyway**
      (the installer isn't signed with a paid Microsoft certificate).
-   - **macOS:** open the `.dmg` and drag **Jellyflex** into **Applications**. Once Mac releases
-     are published they will be signed and notarized by Apple. A version you build yourself is
-     not – macOS warns the first time, so right-click the app → **Open**.
+   - **macOS:** open the `.dmg` and drag **Jellyflex** into **Applications**. The app is signed
+     and notarized by Apple, so it opens without warnings. (A version you
+     [build yourself](#build-from-source) is not – macOS warns the first time, so right-click
+     the app → **Open**.)
 3. Start Jellyflex, enter your server address (for example `https://jellyfin.example.com`)
    and sign in – with your password or **Quick Connect**.
 
