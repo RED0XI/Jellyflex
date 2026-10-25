@@ -244,6 +244,14 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
     WindowMemory.scheduleSave();
   }
 
+  // macOS schaltet über den grünen Knopf und das Menü (⌃⌘F) selbst ins Vollbild,
+  // ohne setWindowFullscreen – sonst bliebe z. B. Platz für die Ampelknöpfe frei.
+  @override
+  void onWindowEnterFullScreen() => windowFullscreen.value = true;
+
+  @override
+  void onWindowLeaveFullScreen() => windowFullscreen.value = false;
+
   @override
   void onWindowResized() => WindowMemory.scheduleSave();
 

@@ -1,5 +1,7 @@
 #include "../../Flutter/Flutter-Debug.xcconfig"
 #include "Warnings.xcconfig"
 
-// Hardened Runtime (Voraussetzung für die Notarisierung durch Apple).
-ENABLE_HARDENED_RUNTIME = YES
+// Kein ENABLE_HARDENED_RUNTIME hier: Ad hoc signiert (ohne Team-ID) würde macOS dann die
+// eingebetteten Frameworks (z. B. Ass.framework) nicht laden und die App stürzt beim Start ab.
+// Die Hardened Runtime setzt tool/build_macos.sh beim Signieren mit der Developer ID
+// (codesign --options runtime) – nur dort wird sie für die Notarisierung gebraucht.
