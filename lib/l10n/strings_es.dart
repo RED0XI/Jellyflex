@@ -1046,6 +1046,8 @@ final class _Es extends S {
   @override
   String get myLists => 'Mis listas';
   @override
+  String get listsTab => 'Listas';
+  @override
   String get searchSubtitles => 'Buscar subtítulos …';
   @override
   String get searchSubtitlesHint => 'A través de tu servidor, p. ej. con el plugin OpenSubtitles';

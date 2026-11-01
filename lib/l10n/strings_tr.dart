@@ -1042,6 +1042,8 @@ final class _Tr extends S {
   @override
   String get myLists => 'Listelerim';
   @override
+  String get listsTab => 'Listeler';
+  @override
   String get searchSubtitles => 'Altyazı ara …';
   @override
   String get searchSubtitlesHint => 'Sunucun üzerinden, ör. OpenSubtitles eklentisiyle';

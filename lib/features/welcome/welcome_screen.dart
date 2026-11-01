@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/platform/device.dart';
 import '../../core/settings.dart';
 import '../../l10n/strings.dart';
 import '../../theme.dart';
@@ -203,12 +204,14 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
             value: s.soundEffects,
             onChanged: (v) => ctrl.update((s) => s.copyWith(soundEffects: v)),
           ),
-          _Option(
-            title: tr.updateCheck,
-            hint: tr.updateCheckHint,
-            value: s.updateCheck,
-            onChanged: (v) => ctrl.update((s) => s.copyWith(updateCheck: v)),
-          ),
+          // iPhone/iPad bekommen Updates über den App Store.
+          if (isDesktop)
+            _Option(
+              title: tr.updateCheck,
+              hint: tr.updateCheckHint,
+              value: s.updateCheck,
+              onChanged: (v) => ctrl.update((s) => s.copyWith(updateCheck: v)),
+            ),
         ],
       ),
     ),

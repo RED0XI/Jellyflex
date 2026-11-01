@@ -680,6 +680,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       builder: (context, box) {
                         // Breites Fenster: Bereiche links als Liste; schmal: oben als Reiter.
                         final wide = box.maxWidth >= 900;
+                        // Ganz schmal (iPhone): Suchfeld unter den Titel statt daneben.
+                        final narrow = box.maxWidth < 560;
                         final nav = _SectionNav(
                           selected: query.isEmpty ? _section : null,
                           vertical: wide,
@@ -691,8 +693,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             PageHeader(
                               title: tr.settings,
                               padding: EdgeInsets.zero,
-                              actions: [SizedBox(width: wide ? 300 : 220, child: _searchField())],
+                              actions: [if (!narrow) SizedBox(width: wide ? 300 : 220, child: _searchField())],
                             ),
+                            if (narrow) ...[const SizedBox(height: 16), _searchField()],
                             const SizedBox(height: 28),
                             if (wide)
                               Row(
@@ -905,25 +908,36 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
+        if (subtitle != null) ...[
+          const SizedBox(height: 3),
+          Text(subtitle!, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        ],
+      ],
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, box) {
+          // Schmal (iPhone): Auswahlknöpfe unter den Text, damit er nicht in eine dünne Spalte rutscht.
+          // Schalter und kleine Knöpfe bleiben daneben.
+          if (box.maxWidth < 420 && trailing is! _Toggle) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 3),
-                  Text(subtitle!, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 20),
-          trailing,
-        ],
+              children: [text, const SizedBox(height: 10), trailing],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: text),
+              const SizedBox(width: 20),
+              trailing,
+            ],
+          );
+        },
       ),
     );
   }

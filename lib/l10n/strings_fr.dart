@@ -1046,6 +1046,8 @@ final class _Fr extends S {
   @override
   String get myLists => 'Mes listes';
   @override
+  String get listsTab => 'Listes';
+  @override
   String get searchSubtitles => 'Rechercher des sous-titres …';
   @override
   String get searchSubtitlesHint => 'Via votre serveur, p. ex. le plugin OpenSubtitles';

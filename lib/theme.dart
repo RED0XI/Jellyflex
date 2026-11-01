@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
 import 'core/layouts.dart';
@@ -78,6 +79,8 @@ ThemeData buildTheme([String? key]) {
         TargetPlatform.macOS: _FadeScaleTransitionsBuilder(),
         TargetPlatform.linux: _FadeScaleTransitionsBuilder(),
         TargetPlatform.android: _FadeScaleTransitionsBuilder(),
+        // iPhone/iPad: der gewohnte Schiebe-Übergang – mit Wischen vom linken Rand zurück.
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
       },
     ),
     // "Aus" ruhig und grau, "An" in der Themenfarbe – so springt ins Auge, was eingeschaltet ist.

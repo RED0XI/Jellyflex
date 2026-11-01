@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/image_cache.dart';
 import '../../core/layouts.dart';
 import '../../core/models.dart';
+import '../../core/platform/device.dart';
 import '../../core/seasons.dart';
 import '../../core/session.dart';
 import '../../l10n/strings.dart';
@@ -190,6 +191,7 @@ class TopNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (isPhone(context)) return _buildPhone(context, ref);
     final entries = navEntries(() => GoRouter.of(context), ref);
     return Positioned(
       top: 0,
@@ -240,6 +242,32 @@ class TopNav extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// iPhone: nur Logo und Profil – Suche, Listen und Downloads stehen in der Tab-Leiste unten,
+/// "Demnächst" und "Überrasch mich" im Profilmenü, die Bibliotheken als Reihe auf der Seite.
+extension on TopNav {
+  Widget _buildPhone(BuildContext context, WidgetRef ref) => Positioned(
+    top: 0,
+    left: 0,
+    right: 0,
+    child: _FrostedBar(
+      scroll: scroll,
+      height: topInset(context) + 52,
+      child: Row(
+        children: [
+          const BrandLogo(size: 22),
+          if (ref.watch(activeSeasonProvider) case final season?)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Text(seasonInfo[season]!.emoji, style: const TextStyle(fontSize: 18)),
+            ),
+          const Spacer(),
+          const ProfileMenuButton(size: 34, extraActions: true),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Große Reiter in der Mitte – gut lesbar vom Sofa, mit Controller leicht zu treffen.

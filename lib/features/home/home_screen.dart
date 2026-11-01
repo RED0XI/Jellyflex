@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_shell.dart';
 import '../../core/home_rows.dart';
+import '../../core/platform/device.dart';
 import '../../core/images.dart';
 import '../../core/lists.dart';
 import '../../core/settings.dart';
@@ -62,11 +63,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final minHero = layout.nav == NavStyle.tabs ? 580.0 : 520.0;
     final heroHeight = (screenHeight * layout.heroHeight).clamp(minHero, 920.0);
     // Kopf je nach Layout: großes Banner, Titelgeschichte oder nur eine Begrüßung.
+    final phone = isPhone(context);
     final Widget header = switch (layout.hero) {
       HeroStyle.banner => HeroBanner(height: heroHeight),
+      // Die geteilte Titelgeschichte braucht Breite – auf dem iPhone das große Banner.
+      HeroStyle.split when phone => HeroBanner(height: heroHeight),
       HeroStyle.split => MagazineHero(height: heroHeight),
       HeroStyle.none => GreetingHeader(
-        top: layout.nav == NavStyle.sidebar ? topInset(context) + 28 : topInset(context) + 96,
+        top: switch (layout.nav) {
+          _ when phone => topInset(context) + 64,
+          NavStyle.sidebar => topInset(context) + 28,
+          _ => topInset(context) + 96,
+        },
       ),
     };
 
@@ -141,6 +149,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
           switch (layout.nav) {
+            // iPhone: schlanke Leiste, die Ziele stehen in der Tab-Leiste unten.
+            _ when phone => TopNav(scroll: _scroll),
             NavStyle.top => TopNav(scroll: _scroll),
             NavStyle.minimal => TopNav(scroll: _scroll, minimal: true),
             NavStyle.tabs => TabsNav(scroll: _scroll),

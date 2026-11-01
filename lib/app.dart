@@ -9,6 +9,7 @@ import 'core/version.dart';
 import 'widgets/whats_new_dialog.dart';
 import 'core/download_notify.dart';
 import 'core/update_check.dart';
+import 'core/platform/device.dart';
 import 'features/settings/about_section.dart';
 import 'core/route_observer.dart';
 import 'core/session.dart';
@@ -156,7 +157,8 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
   void initState() {
     super.initState();
     // Freiwillige Update-Prüfung (Standard: aus) – einmal pro Start, etwas verzögert.
-    if (ref.read(settingsProvider).updateCheck) {
+    // iPhone/iPad bekommen Updates über den App Store.
+    if (isDesktop && ref.read(settingsProvider).updateCheck) {
       Future<void>.delayed(const Duration(seconds: 8), () async {
         final latest = await UpdateCheck.latestRelease();
         if (!mounted || latest == null || !UpdateCheck.isNewer(latest.version)) return;

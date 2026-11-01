@@ -286,6 +286,7 @@ class S {
   };
   String get watchlist => _t('Watchlist', 'Merkliste');
   String get myLists => _t('My lists', 'Meine Listen');
+  String get listsTab => _t('Lists', 'Listen');
   String get searchSubtitles => _t('Search subtitles …', 'Untertitel suchen …');
   String get searchSubtitlesHint =>
       _t('Via your server, e.g. the OpenSubtitles plugin', 'Über deinen Server, z. B. mit dem OpenSubtitles-Plugin');

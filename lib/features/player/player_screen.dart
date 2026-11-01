@@ -42,6 +42,7 @@ import '../../l10n/strings.dart';
 import '../../core/system_certs.dart';
 import '../../core/redact.dart';
 import '../../core/platform/app_paths.dart';
+import '../../core/platform/device.dart';
 
 part 'player_tracks_panel.dart';
 part 'player_extras.dart';
@@ -72,6 +73,9 @@ class PlayerScreen extends ConsumerStatefulWidget {
   /// So viele Folgen liefen nacheinander von selbst, ohne dass jemand etwas bedient hat.
   /// Ab [stillWatchingAfter] fragt der Player "Schaust du noch?", statt weiterzuspielen.
   static int autoPlayedInARow = 0;
+
+  /// Offene Player auf iPhone/iPad – beim Wechsel zur nächsten Folge kurz zwei zugleich.
+  static int _mobileSessions = 0;
   static const stillWatchingAfter = 3;
 
   /// Lauter als 100 % verstärkt mpv in Software (für leise Filme); gemerkt werden höchstens 100 %.
@@ -219,6 +223,51 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     Power.energySaving.addListener(_applyEnergySaving);
     _sleepTick = Timer.periodic(const Duration(seconds: 1), (_) => _checkSleepTimer());
     _checkSleepTimer();
+    if (isMobile) _enterMobilePlayback();
+  }
+
+  // --- iPhone/iPad -------------------------------------------------------------
+
+  /// Das Bild füllt den Bildschirm: Status- und Home-Leiste aus, auf dem iPhone im Querformat.
+  void _enterMobilePlayback() {
+    PlayerScreen._mobileSessions++;
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    if (isPhoneDevice) {
+      SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    }
+  }
+
+  /// Zurück zur normalen Darstellung – erst, wenn kein Player mehr offen ist (beim Wechsel zur
+  /// nächsten Folge baut sich der neue auf, bevor der alte geht).
+  static void _leaveMobilePlayback() {
+    if (--PlayerScreen._mobileSessions > 0) return;
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations(mobileOrientations);
+  }
+
+  /// Position des letzten Doppeltipps (Touch: links zurück, rechts vor, Mitte Pause).
+  double? _doubleTapX;
+
+  void _onDoubleTapTouch() {
+    final width = MediaQuery.sizeOf(context).width;
+    final x = _doubleTapX ?? width / 2;
+    HapticFeedback.lightImpact();
+    if (x < width / 3) {
+      _seekBy(-_seekStep);
+      _flashOsd('−${_seekStep.inSeconds} s');
+    } else if (x > width * 2 / 3) {
+      _seekBy(_seekStep);
+      _flashOsd('+${_seekStep.inSeconds} s');
+    } else {
+      _player.playOrPause();
+    }
+  }
+
+  /// Kurzer Hinweis in der Bildmitte (Zoom, Spulen per Doppeltipp).
+  void _flashOsd(String label) {
+    _zoomOsd.value = label;
+    _zoomOsdTimer?.cancel();
+    _zoomOsdTimer = Timer(const Duration(milliseconds: 1400), () => _zoomOsd.value = null);
   }
 
   // --- Schlaf-Timer ------------------------------------------------------------
@@ -451,6 +500,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
+    if (isMobile) _leaveMobilePlayback();
     Power.energySaving.removeListener(_applyEnergySaving);
     _hideTimer?.cancel();
     _outputSizeTimer?.cancel();
@@ -1059,13 +1109,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _applyZoom(_ZoomMode mode) {
     setState(() => _zoomMode = mode);
-    _zoomOsd.value = switch (mode) {
+    _flashOsd(switch (mode) {
       _ZoomMode.fit => tr.zoomFit,
       _ZoomMode.fill => tr.zoomFill,
       _ZoomMode.custom => tr.zoomPercent((_customZoom * 100).round()),
-    };
-    _zoomOsdTimer?.cancel();
-    _zoomOsdTimer = Timer(const Duration(milliseconds: 1400), () => _zoomOsd.value = null);
+    });
     // Für die nächsten Folgen dieser Serie merken.
     final item = _item;
     final account = _trackAccount;
@@ -1151,6 +1199,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     } else {
       _hideTimer?.cancel();
     }
+  }
+
+  void _hideControlsNow() {
+    _hideTimer?.cancel();
+    if (!_controlsVisible) return;
+    setState(() => _controlsVisible = false);
+    _syncWindowChrome();
   }
 
   void _scheduleHide() {
@@ -1376,12 +1431,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       _focus.requestFocus();
                       if (_anyPanelOpen) {
                         _closePanels();
+                      } else if (isMobile) {
+                        // Touch: Tippen zeigt bzw. verbirgt die Bedienung (Pause gibt es dort).
+                        _controlsVisible ? _hideControlsNow() : _showControls(autoHide: _player.state.playing);
                       } else {
                         _player.playOrPause();
                       }
                     },
+                    onDoubleTapDown: isMobile ? (details) => _doubleTapX = details.localPosition.dx : null,
                     // Im Mini-Player holt ein Doppelklick das große Fenster zurück.
-                    onDoubleTap: () => _mini ? _toggleMini() : _toggleFullscreen(),
+                    onDoubleTap: () {
+                      _userActive();
+                      if (isMobile) return _onDoubleTapTouch();
+                      _mini ? _toggleMini() : _toggleFullscreen();
+                    },
                   ),
                 ),
                 if (_error == null)
@@ -1772,16 +1835,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       tooltip: tr.zoomTooltip,
                       onPressed: _cycleZoom,
                     ),
-                    _PlayerIconButton(
-                      icon: Icons.picture_in_picture_alt_rounded,
-                      tooltip: tr.miniPlayer,
-                      onPressed: _toggleMini,
-                    ),
-                    _PlayerIconButton(
-                      icon: _fullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
-                      tooltip: _fullscreen ? tr.exitFullscreen : tr.fullscreen,
-                      onPressed: _toggleFullscreen,
-                    ),
+                    // iPhone/iPad: der Player füllt ohnehin den Bildschirm, ein Mini-Fenster gibt es nicht.
+                    if (isDesktop) ...[
+                      _PlayerIconButton(
+                        icon: Icons.picture_in_picture_alt_rounded,
+                        tooltip: tr.miniPlayer,
+                        onPressed: _toggleMini,
+                      ),
+                      _PlayerIconButton(
+                        icon: _fullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
+                        tooltip: _fullscreen ? tr.exitFullscreen : tr.fullscreen,
+                        onPressed: _toggleFullscreen,
+                      ),
+                    ],
                   ],
                 ),
               ],

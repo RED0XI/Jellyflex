@@ -5,15 +5,18 @@ import 'package:go_router/go_router.dart';
 
 import '../core/app_lock.dart';
 import '../core/layouts.dart';
+import '../core/platform/device.dart';
 import '../core/route_observer.dart';
 import '../core/settings.dart';
 import '../features/home/home_nav.dart';
 import 'focus_navigation.dart';
+import 'mobile_tab_bar.dart';
 import 'window_frame.dart';
 
 /// Rahmen um alle Seiten, der vom Layout abhängt:
 /// - "Bibliothek": feste Seitenleiste links neben allen Übersichtsseiten
 /// - "Retro VHS": Bildzeilen und Vignette über der Oberfläche
+/// - iPhone: Tab-Leiste unten statt Seitenleiste
 ///
 /// Der Seiten-Navigator ([child]) bleibt dabei immer an derselben Stelle im
 /// Baum – ein Layout-Wechsel verliert also nie den Seitenverlauf.
@@ -46,6 +49,9 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
   /// Fokusbereich der Seitenleiste (für Pfeiltasten/Controller).
   final _sideScope = FocusScopeNode(debugLabel: 'Seitenleiste');
   bool _sidebarShown = false;
+
+  /// Zuletzt gewählter Tab (iPhone) – bleibt auf Unterseiten hervorgehoben.
+  int _lastTab = 0;
 
   @override
   void initState() {
@@ -96,52 +102,70 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     final layout = layoutById(ref.watch(settingsProvider.select((s) => s.layoutId)));
     final router = widget.router;
     final path = router.routerDelegate.currentConfiguration.isEmpty ? '' : router.state.uri.path;
-    final sidebar = layout.nav == NavStyle.sidebar && _isBrowsePage(path) && windowChromeVisible.value;
+    final media = MediaQuery.of(context);
+    final phone = isPhone(context);
+    final browse = _isBrowsePage(path) && windowChromeVisible.value;
+    final sidebar = !phone && layout.nav == NavStyle.sidebar && browse;
+    // Während getippt wird (Tastatur offen), macht die Leiste der Tastatur Platz.
+    final tabBar = phone && browse && media.viewInsets.bottom == 0;
+    _lastTab = MobileTabBar.indexFor(path) ?? _lastTab;
     _sidebarShown = sidebar;
     final scanlines = layout.retro && !path.startsWith('/play');
-    final media = MediaQuery.of(context);
     final width = sidebar ? SideNav.width : 0.0;
+    final barHeight = tabBar ? MobileTabBar.height + media.padding.bottom : 0.0;
     return Stack(
       children: [
-        Row(
+        Column(
           children: [
-            SizedBox(
-              width: width,
-              // Außerhalb des Navigators gibt es kein Material (Textstil, Tintenflecken).
-              child: sidebar
-                  ? ValueListenableBuilder<int>(
-                      valueListenable: popupTracker.open,
-                      // Solange ein Dialog/Menü offen ist, ist die Leiste gesperrt und abgedunkelt
-                      // (wie der Rest der Seite hinter dem Dialog).
-                      builder: (context, popups, child) => IgnorePointer(
-                        ignoring: popups > 0,
-                        child: ExcludeFocus(
-                          excluding: popups > 0,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              child!,
-                              if (popups > 0) const ColoredBox(color: Color(0x8A000000)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      child: Material(
-                        type: MaterialType.transparency,
-                        child: FocusScope(
-                          node: _sideScope,
-                          child: SideNav(router: router, path: path),
-                        ),
-                      ),
-                    )
-                  : null,
-            ),
             Expanded(
-              child: MediaQuery(
-                data: media.copyWith(size: Size(media.size.width - width, media.size.height)),
-                child: widget.child,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: width,
+                    // Außerhalb des Navigators gibt es kein Material (Textstil, Tintenflecken).
+                    child: sidebar
+                        ? ValueListenableBuilder<int>(
+                            valueListenable: popupTracker.open,
+                            // Solange ein Dialog/Menü offen ist, ist die Leiste gesperrt und abgedunkelt
+                            // (wie der Rest der Seite hinter dem Dialog).
+                            builder: (context, popups, child) => IgnorePointer(
+                              ignoring: popups > 0,
+                              child: ExcludeFocus(
+                                excluding: popups > 0,
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    child!,
+                                    if (popups > 0) const ColoredBox(color: Color(0x8A000000)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            child: Material(
+                              type: MaterialType.transparency,
+                              child: FocusScope(
+                                node: _sideScope,
+                                child: SideNav(router: router, path: path),
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                  Expanded(
+                    child: MediaQuery(
+                      data: media.copyWith(
+                        size: Size(media.size.width - width, media.size.height - barHeight),
+                        // Die Tab-Leiste hält den Abstand zur Home-Leiste schon selbst.
+                        padding: tabBar ? media.padding.copyWith(bottom: 0) : null,
+                        viewPadding: tabBar ? media.viewPadding.copyWith(bottom: 0) : null,
+                      ),
+                      child: widget.child,
+                    ),
+                  ),
+                ],
               ),
             ),
+            if (tabBar) MobileTabBar(router: router, active: _lastTab),
           ],
         ),
         Positioned.fill(

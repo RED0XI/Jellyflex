@@ -689,8 +689,10 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       );
     } else {
       final resuming = item.userData.hasResumePosition;
-      playButtons = Row(
-        mainAxisSize: MainAxisSize.min,
+      // Wrap: Auf schmalen Bildschirmen (iPhone) rutscht "Von vorn" in die nächste Zeile.
+      playButtons = Wrap(
+        spacing: 12,
+        runSpacing: 12,
         children: [
           PrimaryButton(
             label: resuming ? '${tr.resume}  ·  ${remainingLabel(item) ?? ''}' : tr.play,
@@ -703,8 +705,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
               subtitleIndex: widget.subtitleIndex,
             ),
           ),
-          if (resuming) ...[
-            const SizedBox(width: 12),
+          if (resuming)
             GlassButton(
               label: tr.fromStart,
               icon: Icons.replay_rounded,
@@ -717,7 +718,6 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
                 subtitleIndex: widget.subtitleIndex,
               ),
             ),
-          ],
         ],
       );
     }

@@ -472,13 +472,17 @@ class LandscapeCard extends ConsumerWidget {
                     fallback: _TitleFallback(cardTitle(item)),
                   ),
                   HoverPreview(item: item, active: hovered),
-                  AnimatedOpacity(
-                    opacity: hovered ? 1 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: Container(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      alignment: Alignment.center,
-                      child: _PlayCircle(onTap: () => playItem(context, item)),
+                  // Unsichtbar nicht antippbar – sonst startet ein Fingertipp aufs Bild sofort das Video.
+                  IgnorePointer(
+                    ignoring: !hovered,
+                    child: AnimatedOpacity(
+                      opacity: hovered ? 1 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        alignment: Alignment.center,
+                        child: _PlayCircle(onTap: () => playItem(context, item)),
+                      ),
                     ),
                   ),
                   _Badge(item),

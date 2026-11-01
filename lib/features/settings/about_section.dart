@@ -16,6 +16,7 @@ import '../../theme.dart';
 import '../live_handler.dart';
 import 'performance_dialog.dart';
 import '../../core/platform/app_paths.dart';
+import '../../core/platform/device.dart';
 
 void _notice(String text, {required String action, required VoidCallback onAction}) {
   appMessengerKey.currentState?.showSnackBar(
@@ -260,22 +261,24 @@ class AboutRows extends ConsumerWidget {
             style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
           ),
         ),
-        row(
-          title: tr.updateCheck,
-          subtitle: tr.updateCheckHint,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextButton(onPressed: () => checkForUpdateNow(context), child: Text(tr.checkNow)),
-              const SizedBox(width: 6),
-              toggle(
-                value: s.updateCheck,
-                onChanged: (v) => ctrl.update((s) => s.copyWith(updateCheck: v)),
-              ),
-            ],
+        // iPhone/iPad bekommen Updates über den App Store.
+        if (isDesktop)
+          row(
+            title: tr.updateCheck,
+            subtitle: tr.updateCheckHint,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(onPressed: () => checkForUpdateNow(context), child: Text(tr.checkNow)),
+                const SizedBox(width: 6),
+                toggle(
+                  value: s.updateCheck,
+                  onChanged: (v) => ctrl.update((s) => s.copyWith(updateCheck: v)),
+                ),
+              ],
+            ),
           ),
-        ),
-        if (s.updateCheck)
+        if (isDesktop && s.updateCheck)
           row(
             title: tr.autoUpdate,
             subtitle: tr.autoUpdateHint,

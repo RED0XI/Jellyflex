@@ -53,6 +53,7 @@ Future<void> main(List<String> args) async {
     // auf dem dunklen Hintergrund.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+    SystemChrome.setPreferredOrientations(mobileOrientations);
     runApp(const ProviderScope(retry: providerRetry, child: JellyflexApp()));
     return;
   }
