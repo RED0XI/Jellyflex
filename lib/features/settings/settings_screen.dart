@@ -1,9 +1,12 @@
+import 'dart:io' show Platform;
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/branding.dart';
 import '../../core/jellyfin_api.dart';
+import '../../core/power.dart';
 import '../../core/session.dart';
 import '../../core/settings.dart';
 import '../screensaver/screensaver.dart';
@@ -115,6 +118,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               trailing: _Toggle(
                 value: s.soundEffects,
                 onChanged: (v) => ctrl.update((s) => s.copyWith(soundEffects: v)),
+              ),
+            ),
+            _Keywords(
+              text: '${tr.energySaver} ${tr.energySaverHint}',
+              child: ValueListenableBuilder<bool>(
+                valueListenable: Power.energySaving,
+                builder: (context, saving, _) => _Row(
+                  title: tr.energySaver,
+                  subtitle: saving ? '${tr.energySaverHint} ${tr.energySaverActive}' : tr.energySaverHint,
+                  trailing: _Choice<EnergySaver>(
+                    value: s.energySaver,
+                    label: switch (s.energySaver) {
+                      // Den Akku meldet bisher nur der macOS-Runner.
+                      EnergySaver.auto => Platform.isMacOS ? tr.energySaverOnBattery : tr.off,
+                      EnergySaver.on => tr.always,
+                      EnergySaver.off => tr.off,
+                    },
+                    options: [
+                      if (Platform.isMacOS) (EnergySaver.auto, tr.energySaverOnBattery),
+                      (EnergySaver.on, tr.always),
+                      (EnergySaver.off, tr.off),
+                    ],
+                    onChanged: (v) => ctrl.update((s) => s.copyWith(energySaver: v)),
+                  ),
+                ),
               ),
             ),
           ],

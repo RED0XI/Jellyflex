@@ -431,6 +431,15 @@ final class _Fr extends S {
   @override
   String get soundsHint => 'Tic-tac et jingle dans « Surprends-moi ».';
   @override
+  String get energySaver => 'Économie d’énergie';
+  @override
+  String get energySaverHint =>
+      'Ménage la batterie : pas de bandes-annonces dans la bannière, ni Ambilight ni aperçu des scènes, arrière-plans calmes et mise à l’échelle vidéo plus légère.';
+  @override
+  String get energySaverOnBattery => 'Sur batterie';
+  @override
+  String get energySaverActive => 'Actif en ce moment.';
+  @override
   String get theme => 'Thème';
   @override
   String get themeHint => 'Couleurs de toute l’app – change immédiatement.';

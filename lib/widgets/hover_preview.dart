@@ -7,6 +7,7 @@ import '../core/image_cache.dart';
 import '../core/images.dart';
 import '../core/jellyfin_api.dart';
 import '../core/models.dart';
+import '../core/power.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
 import 'jf_image.dart';
@@ -60,7 +61,8 @@ class _HoverPreviewState extends ConsumerState<HoverPreview> {
   }
 
   void _schedule() {
-    if (!ref.read(settingsProvider).hoverPreview) return;
+    // Beim Energiesparen nicht: jede Szene ist ein eigenes Bild vom Server.
+    if (!ref.read(settingsProvider).hoverPreview || Power.energySaving.value) return;
     _startTimer?.cancel();
     _startTimer = Timer(HoverPreview.delay, _start);
   }

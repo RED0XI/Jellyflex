@@ -7,6 +7,7 @@ import '../../core/format.dart';
 import '../../core/images.dart';
 import '../../core/layouts.dart';
 import '../../core/models.dart';
+import '../../core/power.dart';
 import '../../core/session.dart';
 import '../../l10n/strings.dart';
 import '../../theme.dart';
@@ -68,7 +69,8 @@ class _MagazineHeroState extends ConsumerState<MagazineHero> {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 12), (_) {
       final count = ref.read(featuredProvider).value?.length ?? 0;
-      if (count > 1 && mounted) setState(() => _index = (_index + 1) % count);
+      // Im Hintergrund schaut niemand zu.
+      if (count > 1 && mounted && Power.appActive.value) setState(() => _index = (_index + 1) % count);
     });
   }
 

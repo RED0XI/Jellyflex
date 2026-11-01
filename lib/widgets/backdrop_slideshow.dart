@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/images.dart';
+import '../core/power.dart';
 import '../core/session.dart';
 import 'jf_image.dart';
 import '../core/image_cache.dart';
@@ -49,6 +50,9 @@ class _BackdropSlideshowState extends ConsumerState<BackdropSlideshow> {
     _timer?.cancel();
     if (widget.images.length < 2) return;
     _timer = Timer.periodic(widget.interval, (_) {
+      // Beim Energiesparen und im Hintergrund bleibt das Bild stehen (die Überblendung zeichnet
+      // jedes Mal gut eine Sekunde lang jedes Bild neu).
+      if (!Power.ambientMotion.value) return;
       if (mounted) setState(() => _index = (_index + 1) % widget.images.length);
     });
   }

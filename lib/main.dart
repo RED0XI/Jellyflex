@@ -13,6 +13,7 @@ import 'core/app_log.dart';
 import 'core/download_notify.dart';
 import 'core/app_shell.dart';
 import 'core/licenses.dart';
+import 'core/power.dart';
 import 'core/retry.dart';
 import 'core/window_memory.dart';
 
@@ -39,6 +40,8 @@ Future<void> main(List<String> args) async {
     return false;
   };
   MediaKit.ensureInitialized();
+  // Akku/Stromsparmodus und ob Jellyflex vorne ist – steuert das Energiesparen.
+  Power.init();
   registerThirdPartyLicenses();
   UiSounds.preload();
   // Stammzertifikate für den Video-Player schon beim Start bereitlegen.

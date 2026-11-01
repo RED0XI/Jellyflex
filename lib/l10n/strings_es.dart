@@ -432,6 +432,15 @@ final class _Es extends S {
   @override
   String get soundsHint => 'Tics y melodía en «Sorpréndeme».';
   @override
+  String get energySaver => 'Ahorro de energía';
+  @override
+  String get energySaverHint =>
+      'Cuida la batería: sin tráileres en el banner, sin Ambilight ni vista previa de escenas, fondos tranquilos y escalado de vídeo más ligero.';
+  @override
+  String get energySaverOnBattery => 'Con batería';
+  @override
+  String get energySaverActive => 'Activo ahora mismo.';
+  @override
   String get theme => 'Tema';
   @override
   String get themeHint => 'Colores de toda la app – cambia al instante.';

@@ -11,6 +11,7 @@ import '../../core/format.dart';
 import '../../core/gamepad_input.dart';
 import '../../core/images.dart';
 import '../../core/models.dart';
+import '../../core/power.dart';
 import '../../core/session.dart';
 import '../../core/settings.dart';
 import '../../widgets/brand_logo.dart';
@@ -80,7 +81,13 @@ class _ScreensaverState extends ConsumerState<Screensaver> {
     final loggedIn = ref.read(sessionProvider).value != null;
     final config = widget.router.routerDelegate.currentConfiguration;
     final path = config.isEmpty ? '' : widget.router.state.uri.path;
-    if (!loggedIn || path.startsWith('/play') || path == '/login' || path == '/splash' || path == '/welcome') {
+    // Ist eine andere App vorne, arbeitet jemand dort – kein Bildschirmschoner im Hintergrund.
+    if (!loggedIn ||
+        !Power.appActive.value ||
+        path.startsWith('/play') ||
+        path == '/login' ||
+        path == '/splash' ||
+        path == '/welcome') {
       _restartTimer();
       return;
     }
@@ -207,6 +214,9 @@ class _ScreensaverViewState extends ConsumerState<_ScreensaverView> with TickerP
 
   late final _fadeIn = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..forward();
   late final _kenBurns = AnimationController(vsync: this, duration: _slide);
+
+  /// Weiterblättern ohne Zoom (beim Energiesparen).
+  Timer? _slideTimer;
   final _random = math.Random();
   List<BaseItem> _items = const [];
   int _index = 0;
@@ -223,6 +233,7 @@ class _ScreensaverViewState extends ConsumerState<_ScreensaverView> with TickerP
 
   @override
   void dispose() {
+    _slideTimer?.cancel();
     _fadeIn.dispose();
     _kenBurns.dispose();
     super.dispose();
@@ -235,7 +246,7 @@ class _ScreensaverViewState extends ConsumerState<_ScreensaverView> with TickerP
       setState(() => _items = items.where((i) => Images.backdrop(i) != null).toList());
       if (_items.isNotEmpty) {
         _drift = _randomDrift();
-        _kenBurns.forward(from: 0);
+        _play();
       }
     } catch (_) {
       // Ohne Server: nur Uhr auf dunklem Verlauf.
@@ -253,8 +264,20 @@ class _ScreensaverViewState extends ConsumerState<_ScreensaverView> with TickerP
       _index = (_index + 1) % _items.length;
       _drift = _randomDrift();
     });
-    _kenBurns.forward(from: 0);
+    _play();
     _precacheNext();
+  }
+
+  /// Bild langsam zoomen und danach weiterblättern. Beim Energiesparen steht es still –
+  /// der Zoom würde 14 s lang jedes Bild neu zeichnen.
+  void _play() {
+    _slideTimer?.cancel();
+    if (Power.ambientMotion.value) {
+      _kenBurns.forward(from: 0);
+    } else {
+      _kenBurns.value = 0;
+      _slideTimer = Timer(_slide, _next);
+    }
   }
 
   void _precacheNext() {
