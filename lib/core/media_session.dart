@@ -49,7 +49,9 @@ abstract final class MediaSession {
     {'position': position.inMilliseconds / 1000, 'duration': duration.inMilliseconds / 1000, 'rate': rate},
   );
 
-  static Future<void> clear() => _invoke('clear');
+  /// Anzeige entfernen. [keepAudio]: die Audio-Sitzung offen lassen (iOS: Apples Player
+  /// übernimmt gerade und spielt weiter).
+  static Future<void> clear({bool keepAudio = false}) => _invoke('clear', keepAudio);
 
   static Future<void> _invoke(String method, [Object? args]) async {
     _ensureInitialized();

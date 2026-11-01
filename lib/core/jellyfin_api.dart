@@ -669,6 +669,58 @@ class JellyfinApi {
     return PlaybackInfo((res.data as Map).cast<String, dynamic>());
   }
 
+  /// HLS-Fassung für Apples eigenen Player (iOS: Bild-in-Bild, AirPlay). Passen Bild- und
+  /// Tonformat, packt der Server nur um statt umzurechnen – das kostet ihn kaum etwas.
+  /// Text-Untertitel kommen als WebVTT im Stream mit, Bild-Untertitel werden eingebrannt.
+  Future<PlaybackInfo> getApplePlaybackInfo(
+    String id, {
+    required String mediaSourceId,
+    int maxBitrate = 120000000,
+    int? audioIndex,
+    int? subtitleIndex,
+  }) async {
+    final res = await dio.post(
+      '/Items/$id/PlaybackInfo',
+      queryParameters: {'userId': userId},
+      data: {
+        'UserId': userId,
+        'MediaSourceId': mediaSourceId,
+        'MaxStreamingBitrate': maxBitrate,
+        'AudioStreamIndex': ?audioIndex,
+        'SubtitleStreamIndex': ?subtitleIndex,
+        'EnableDirectPlay': false,
+        'EnableDirectStream': false,
+        'EnableTranscoding': true,
+        'AllowVideoStreamCopy': true,
+        'AllowAudioStreamCopy': true,
+        'DeviceProfile': {
+          'Name': '$clientName (Apple)',
+          'MaxStreamingBitrate': maxBitrate,
+          'DirectPlayProfiles': <Object>[],
+          'TranscodingProfiles': [
+            {
+              // HEVC verlangt bei Apple fMP4-Abschnitte.
+              'Container': 'mp4',
+              'Type': 'Video',
+              'VideoCodec': 'hevc,h264',
+              'AudioCodec': 'aac,ac3,eac3,alac,mp3',
+              'Protocol': 'hls',
+              'Context': 'Streaming',
+              'MaxAudioChannels': '6',
+              'MinSegments': 1,
+              'BreakOnNonKeyFrames': true,
+            },
+          ],
+          'SubtitleProfiles': [
+            for (final f in ['srt', 'subrip', 'ass', 'ssa', 'vtt', 'webvtt']) {'Format': f, 'Method': 'Hls'},
+            for (final f in ['pgssub', 'dvdsub', 'dvbsub', 'pgs']) {'Format': f, 'Method': 'Encode'},
+          ],
+        },
+      },
+    );
+    return PlaybackInfo((res.data as Map).cast<String, dynamic>());
+  }
+
   /// Originaldatei ohne Umwandlung ("Direct Play") – mpv kann praktisch alles abspielen.
   String streamUrl(String itemId, {required String mediaSourceId, String? playSessionId}) {
     final query = Uri(

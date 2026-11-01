@@ -34,6 +34,7 @@ import '../../widgets/buttons.dart';
 import '../../widgets/window_frame.dart';
 import '../details/details_screen.dart';
 import '../details/subtitle_search_dialog.dart';
+import 'apple_player.dart';
 import 'player_overlays.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/jf_image.dart';
@@ -264,6 +265,41 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     } else {
       _player.playOrPause();
     }
+  }
+
+  /// iPhone/iPad: Bild-in-Bild oder AirPlay – Apples Player übernimmt an derselben Stelle
+  /// (siehe [ApplePlayer]), der Jellyflex-Player schließt sich.
+  Future<void> _handoffToApple(AppleHandoff handoff) async {
+    final item = _item;
+    final source = _source;
+    if (item == null || source == null || _closing) return;
+    void snack(String text) => appMessengerKey.currentState?.showSnackBar(
+      SnackBar(content: Text(text), behavior: SnackBarBehavior.floating, width: 460),
+    );
+    // Apples Player kann viele Dateien (z. B. MKV) nicht – er bekommt den Stream vom Server.
+    if (_localFile != null) return snack(tr.appleHandoffStreamingOnly);
+    final position = _player.state.position;
+    final wasPlaying = _player.state.playing;
+    await _player.pause();
+    if (!mounted) return;
+    final ok = await ApplePlayer.open(
+      api: _api,
+      router: GoRouter.of(context),
+      item: item,
+      mediaSourceId: source.id,
+      position: position,
+      handoff: handoff,
+      audioIndex: _audioIndex,
+      subtitleIndex: _subtitleIndex,
+      maxBitrate: _maxBitrate,
+    );
+    if (!mounted) return;
+    if (!ok) {
+      snack(tr.appleHandoffFailed);
+      if (wasPlaying) await _player.play();
+      return;
+    }
+    await _close();
   }
 
   /// Kurzer Hinweis in der Bildmitte (Zoom, Spulen per Doppeltipp).
@@ -578,7 +614,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (MediaSession.onButton == _onMediaButton) {
       MediaSession.onButton = null;
       // Bei "Nächste Folge" übernimmt gleich der neue Player die Anzeige.
-      if (!_switchingToNext) MediaSession.clear();
+      if (!_switchingToNext) MediaSession.clear(keepAudio: ApplePlayer.active);
     }
     if (!_closing && windowFullscreen.value != _restoreFullscreen) setWindowFullscreen(_restoreFullscreen);
     _player.dispose();
@@ -1882,7 +1918,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       tooltip: tr.zoomTooltip,
                       onPressed: _cycleZoom,
                     ),
-                    // iPhone/iPad: der Player füllt ohnehin den Bildschirm, ein Mini-Fenster gibt es nicht.
+                    // iPhone/iPad: Bild-in-Bild und AirPlay über Apples Player (der füllt ohnehin den
+                    // Bildschirm, ein Mini-Fenster und Vollbild gibt es dort nicht).
+                    if (Platform.isIOS) ...[
+                      _PlayerIconButton(
+                        icon: Icons.airplay_rounded,
+                        tooltip: tr.airPlay,
+                        onPressed: () => _handoffToApple(AppleHandoff.airPlay),
+                      ),
+                      _PlayerIconButton(
+                        icon: Icons.picture_in_picture_alt_rounded,
+                        tooltip: tr.pictureInPicture,
+                        onPressed: () => _handoffToApple(AppleHandoff.pictureInPicture),
+                      ),
+                    ],
                     if (isDesktop) ...[
                       _PlayerIconButton(
                         icon: Icons.picture_in_picture_alt_rounded,

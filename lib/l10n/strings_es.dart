@@ -964,6 +964,14 @@ final class _Es extends S {
   @override
   String get miniPlayer => 'Minirreproductor (P)';
   @override
+  String get pictureInPicture => 'Imagen en imagen';
+  @override
+  String get airPlay => 'AirPlay';
+  @override
+  String get appleHandoffFailed => 'No se pudo transferir – el vídeo sigue aquí.';
+  @override
+  String get appleHandoffStreamingOnly => 'Solo en streaming – las descargas se reproducen en Jellyflex.';
+  @override
   String get exitFullscreen => 'Salir de pantalla completa (F)';
   @override
   String get fullscreen => 'Pantalla completa (F)';

@@ -960,6 +960,14 @@ final class _Tr extends S {
   @override
   String get miniPlayer => 'Mini oynatıcı (P)';
   @override
+  String get pictureInPicture => 'Resim içinde resim';
+  @override
+  String get airPlay => 'AirPlay';
+  @override
+  String get appleHandoffFailed => 'Aktarılamadı – video burada oynamaya devam ediyor.';
+  @override
+  String get appleHandoffStreamingOnly => 'Yalnızca akışta – indirmeler Jellyflex’te oynatılır.';
+  @override
   String get exitFullscreen => 'Tam ekrandan çık (F)';
   @override
   String get fullscreen => 'Tam ekran (F)';

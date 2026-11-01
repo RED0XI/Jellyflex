@@ -148,9 +148,12 @@ final class MediaSession {
         center.playbackState = .stopped
       #endif
       setEnabled(false, canNext: false)
-      // Sitzung freigeben – Musik anderer Apps darf weiterlaufen.
+      // Sitzung freigeben – Musik anderer Apps darf weiterlaufen. Nicht, wenn Apples Player
+      // gerade übernimmt (Bild-in-Bild, AirPlay): dem würde sonst der Ton abgeschnitten.
       #if os(iOS)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        if !(call.arguments as? Bool ?? false) {
+          try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
       #endif
       result(nil)
     default:

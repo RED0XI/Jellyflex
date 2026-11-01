@@ -866,6 +866,14 @@ class S {
   String get playbackOptions =>
       _t('Playback: speed, quality, sync', 'Wiedergabe: Geschwindigkeit, Qualität, Synchronisation');
   String get miniPlayer => _t('Mini player (P)', 'Mini-Player (P)');
+  String get pictureInPicture => _t('Picture in Picture', 'Bild-in-Bild');
+  String get airPlay => _t('AirPlay', 'AirPlay');
+  String get appleHandoffFailed => _t(
+    'Couldn’t hand the video over – it keeps playing here.',
+    'Übergabe hat nicht geklappt – das Video läuft hier weiter.',
+  );
+  String get appleHandoffStreamingOnly =>
+      _t('Only while streaming – downloads play in Jellyflex.', 'Nur beim Streamen – Downloads laufen in Jellyflex.');
   String get exitFullscreen => _t('Exit fullscreen (F)', 'Vollbild beenden (F)');
   String get fullscreen => _t('Fullscreen (F)', 'Vollbild (F)');
   String get mute => _t('Mute (M)', 'Stumm (M)');

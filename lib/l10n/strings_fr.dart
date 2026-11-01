@@ -964,6 +964,14 @@ final class _Fr extends S {
   @override
   String get miniPlayer => 'Mini lecteur (P)';
   @override
+  String get pictureInPicture => 'Image dans l’image';
+  @override
+  String get airPlay => 'AirPlay';
+  @override
+  String get appleHandoffFailed => 'Transfert impossible – la vidéo continue ici.';
+  @override
+  String get appleHandoffStreamingOnly => 'Uniquement en streaming – les téléchargements se lisent dans Jellyflex.';
+  @override
   String get exitFullscreen => 'Quitter le plein écran (F)';
   @override
   String get fullscreen => 'Plein écran (F)';
