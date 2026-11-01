@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/power.dart';
 import '../theme.dart';
 
 /// Langsam wandernde Farbflächen im Hintergrund.
@@ -11,10 +12,19 @@ class AmbientBackground extends StatefulWidget {
 }
 
 class _AmbientBackgroundState extends State<AmbientBackground> with SingleTickerProviderStateMixin {
-  late final _anim = AnimationController(vsync: this, duration: const Duration(seconds: 18))..repeat(reverse: true);
+  late final _anim = AnimationController(vsync: this, duration: const Duration(seconds: 18));
+  late final VoidCallback _stopWatching;
+
+  @override
+  void initState() {
+    super.initState();
+    // Steht still beim Energiesparen und solange eine andere App vorne ist.
+    _stopWatching = Power.whileAmbient(_anim, () => _anim.repeat(reverse: true));
+  }
 
   @override
   void dispose() {
+    _stopWatching();
     _anim.dispose();
     super.dispose();
   }

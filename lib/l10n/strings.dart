@@ -493,6 +493,13 @@ class S {
   );
   String get sounds => _t('Sounds', 'Klänge');
   String get soundsHint => _t('Ticks and a jingle in “Surprise me”.', 'Ticken und Melodie bei „Überrasch mich“.');
+  String get energySaver => _t('Energy saving', 'Energiesparen');
+  String get energySaverHint => _t(
+    'Saves battery: no trailers in the banner, no Ambilight or scene previews, calm backgrounds and lighter video scaling.',
+    'Schont den Akku: keine Trailer im Banner, kein Ambilight und keine Szenen-Vorschau, ruhige Hintergründe und sparsamere Bildskalierung.',
+  );
+  String get energySaverOnBattery => _t('On battery', 'Im Akkubetrieb');
+  String get energySaverActive => _t('Active right now.', 'Gerade aktiv.');
   String get theme => _t('Theme', 'Theme');
   String get themeHint => _t('Colours of the whole app – changes instantly.', 'Farben der ganzen App – wirkt sofort.');
 

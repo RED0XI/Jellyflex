@@ -12,6 +12,7 @@ import '../theme.dart';
 import 'themes.dart';
 import 'ui_sounds.dart';
 import 'platform/app_paths.dart';
+import 'power.dart';
 
 /// Wählbare Sprachen für Ton und Untertitel (ISO 639-2, wie Jellyfin/mpv sie liefern).
 const settingsLanguages = ['ger', 'eng', 'jpn', 'fre', 'spa', 'ita', 'tur', 'kor', 'rus', 'por', 'chi'];
@@ -82,7 +83,11 @@ class AppSettings {
     this.lastSeenVersion,
     this.setupDone = true,
     this.hoverPreview = true,
+    this.energySaver = EnergySaver.auto,
   });
+
+  /// Energiesparen: automatisch im Akkubetrieb, immer oder nie (siehe [Power]).
+  final EnergySaver energySaver;
 
   /// Zuletzt eingestellte Lautstärke im Player (0–100).
   final double playerVolume;
@@ -233,6 +238,7 @@ class AppSettings {
     String? Function()? lastSeenVersion,
     bool? setupDone,
     bool? hoverPreview,
+    EnergySaver? energySaver,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
@@ -271,6 +277,7 @@ class AppSettings {
     lastSeenVersion: lastSeenVersion != null ? lastSeenVersion() : this.lastSeenVersion,
     setupDone: setupDone ?? this.setupDone,
     hoverPreview: hoverPreview ?? this.hoverPreview,
+    energySaver: energySaver ?? this.energySaver,
   );
 
   Map<String, dynamic> toJson() => {
@@ -311,6 +318,7 @@ class AppSettings {
     'lastSeenVersion': lastSeenVersion,
     'setupDone': setupDone,
     'hoverPreview': hoverPreview,
+    'energySaver': energySaver.name,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -352,6 +360,7 @@ class AppSettings {
     // Ältere Versionen kannten den Assistenten nicht – wer schon Einstellungen hat, ist eingerichtet.
     setupDone: json['setupDone'] as bool? ?? true,
     hoverPreview: json['hoverPreview'] as bool? ?? true,
+    energySaver: EnergySaver.values.asNameMap()[json['energySaver']] ?? EnergySaver.auto,
   );
 }
 
@@ -398,6 +407,7 @@ class SettingsController extends Notifier<AppSettings> {
     appLayout = layoutById(s.layoutId);
     UiSounds.enabled = s.soundEffects;
     ImageDiskCache.instance.maxBytes = s.imageCacheMb * 1024 * 1024;
+    Power.mode = s.energySaver;
   }
 
   /// Aktuelle Einstellungen (auch dort lesbar, wo kein `ref` mehr verfügbar ist).

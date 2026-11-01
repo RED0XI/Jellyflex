@@ -9,6 +9,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../core/format.dart';
 import '../../core/images.dart';
 import '../../core/models.dart';
+import '../../core/power.dart';
 import '../../core/session.dart';
 import '../../core/settings.dart';
 import '../../core/route_observer.dart';
@@ -44,6 +45,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
   int _index = 0;
   bool _hovered = false;
 
+  /// Beim Energiesparen: füllt den Fortschritt im Sekundentakt statt mit [_cycle.forward].
+  Timer? _stepTimer;
+
   /// Zeit bis zum nächsten Titel – treibt das Weiterblättern und den Fortschritt im aktiven
   /// Punkt. Hält an, solange die Maus auf Text/Punkten steht, ein Trailer läuft oder eine
   /// andere Seite offen ist.
@@ -68,6 +72,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
   @override
   void initState() {
     super.initState();
+    Power.appActive.addListener(_onPowerChanged);
+    Power.energySaving.addListener(_onPowerChanged);
     _restartTimer();
   }
 
@@ -85,6 +91,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
   @override
   void dispose() {
     appRouteObserver.unsubscribe(this);
+    Power.appActive.removeListener(_onPowerChanged);
+    Power.energySaving.removeListener(_onPowerChanged);
+    _stepTimer?.cancel();
     _cycle.dispose();
     _trailerTimer?.cancel();
     _trailerLimit?.cancel();
@@ -126,13 +135,41 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
     _syncCycle();
   }
 
-  /// Weiterlaufen lassen oder anhalten – je nach Maus, Trailer und sichtbarer Seite.
+  /// Weiterlaufen lassen oder anhalten – je nach Maus, Trailer, sichtbarer Seite und ob
+  /// Jellyflex gerade vorne ist (im Hintergrund schaut niemand zu).
   void _syncCycle() {
-    if (_hovered || _trailerVisible || !_pageVisible) {
+    _stepTimer?.cancel();
+    if (_hovered || _trailerVisible || !_pageVisible || !Power.appActive.value) {
       _cycle.stop();
-    } else if (!_cycle.isAnimating && _cycle.value < 1) {
-      _cycle.forward();
+    } else if (_cycle.value < 1) {
+      if (Power.energySaving.value) {
+        // Eine laufende Animation zeichnet in jedem Bild neu (bis 120-mal pro Sekunde) –
+        // beim Energiesparen füllt sich der Punkt deshalb in Sekundenschritten.
+        _cycle.stop();
+        final steps = _interval.inSeconds;
+        _stepTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+          _cycle.value = math.min(1.0, ((_cycle.value * steps).round() + 1) / steps);
+        });
+      } else if (!_cycle.isAnimating) {
+        _cycle.forward();
+      }
     }
+  }
+
+  /// Stumme Trailer nur, solange jemand hinsieht und keine Energie gespart wird.
+  bool get _trailersAllowed => Power.appActive.value && !Power.energySaving.value;
+
+  /// Jellyflex in den Hintergrund/nach vorne oder Energiesparen an/aus.
+  void _onPowerChanged() {
+    if (!mounted) return;
+    // Mit Ton schaut jemand bewusst zu – der Trailer läuft dann weiter.
+    if (!_trailersAllowed && _muted) {
+      _stopTrailer();
+    } else if (_trailerItemId == null) {
+      _scheduleTrailer();
+    }
+    setState(() {}); // Ken-Burns-Zoom an/aus
+    _syncCycle();
   }
 
   void _advance(int index) {
@@ -149,7 +186,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
   /// Nach kurzer Zeit den Trailer des aktuellen Titels starten (falls vorhanden).
   void _scheduleTrailer() {
     _trailerTimer?.cancel();
-    if (!ref.read(settingsProvider).bannerTrailers || !_pageVisible) return;
+    if (!ref.read(settingsProvider).bannerTrailers || !_pageVisible || !_trailersAllowed) return;
     final items = ref.read(featuredProvider).value ?? const <BaseItem>[];
     if (items.isEmpty) return;
     final item = items[_index % items.length];
@@ -159,7 +196,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
   Future<void> _startTrailer(BaseItem item) async {
     final api = ref.read(apiProvider);
     final trailer = await api.getTrailer(item.id);
-    if (trailer == null || !mounted || !_pageVisible) return;
+    if (trailer == null || !mounted || !_pageVisible || !_trailersAllowed) return;
     final items = ref.read(featuredProvider).value ?? const <BaseItem>[];
     if (items.isEmpty || items[_index % items.length].id != item.id) return; // inzwischen weitergeblättert
 
@@ -271,6 +308,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
               switchOutCurve: Curves.easeIn,
               child: _KenBurnsBackdrop(
                 key: ValueKey(item.id),
+                animate: !Power.energySaving.value,
                 url: api.imageUrlOrNull(backdrop, maxWidth: screenImageWidth(context)),
                 blurHash: backdrop?.blurHash,
               ),
@@ -419,13 +457,18 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
 }
 
 class _KenBurnsBackdrop extends StatelessWidget {
-  const _KenBurnsBackdrop({super.key, required this.url, required this.blurHash});
+  const _KenBurnsBackdrop({super.key, required this.url, required this.blurHash, this.animate = true});
 
   final String? url;
   final String? blurHash;
 
+  /// Langsam zoomen; beim Energiesparen nicht (das zeichnet sonst 14 s lang jedes Bild neu).
+  final bool animate;
+
   @override
   Widget build(BuildContext context) {
+    final image = JfImage(url: url, blurHash: blurHash, alignment: Alignment.topCenter);
+    if (!animate) return RepaintBoundary(child: image);
     // ClipRect: Das gezoomte Bild darf nicht über das Banner hinausragen.
     return RepaintBoundary(
       child: ClipRect(
@@ -435,7 +478,7 @@ class _KenBurnsBackdrop extends StatelessWidget {
           curve: Curves.easeOut,
           builder: (context, scale, child) =>
               Transform.scale(scale: scale, alignment: Alignment.topRight, child: child),
-          child: JfImage(url: url, blurHash: blurHash, alignment: Alignment.topCenter),
+          child: image,
         ),
       ),
     );

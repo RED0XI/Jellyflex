@@ -23,6 +23,7 @@ import '../../core/media_info.dart' show codecLabel, trackLabel;
 import '../../core/media_session.dart';
 import '../../core/models.dart';
 import '../../core/play_queue.dart';
+import '../../core/power.dart';
 import '../../core/session.dart';
 import '../../core/series_tracks.dart';
 import '../../core/settings.dart';
@@ -215,6 +216,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     RemoteControl.onGeneral = _onRemoteGeneral;
     GamepadInput.playerHandler = _onPad;
     SleepTimer.instance.addListener(_onSleepTimerChanged);
+    Power.energySaving.addListener(_applyEnergySaving);
     _sleepTick = Timer.periodic(const Duration(seconds: 1), (_) => _checkSleepTimer());
     _checkSleepTimer();
   }
@@ -449,6 +451,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
+    Power.energySaving.removeListener(_applyEnergySaving);
     _hideTimer?.cancel();
     _outputSizeTimer?.cancel();
     playerPlaying.value = false;
@@ -634,6 +637,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       // Zuletzt eingestellte Lautstärke (stumm wird nicht übernommen); bis 150 % erlauben.
       final native = _player.platform;
       if (native is NativePlayer) await native.setProperty('volume-max', '${PlayerScreen.maxVolume.round()}');
+      await _applyEnergySaving();
       await _player.setVolume(_volumeBeforeMute);
       await _openStream(start);
 
@@ -765,6 +769,50 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _outputSize = target;
       _video.setSize(width: target.width.toInt(), height: target.height.toInt());
     });
+  }
+
+  /// Energiesparen: einfachere Skalierung wie mpvs Profil "fast" – spart in jedem Bild
+  /// GPU-Arbeit (vor allem beim Verkleinern von 4K), sichtbar höchstens bei starker Vergrößerung.
+  static const _fastScaling = {
+    'scale': 'bilinear',
+    'dscale': 'bilinear',
+    'dither': 'no',
+    'correct-downscaling': 'no',
+    'linear-downscaling': 'no',
+    'sigmoid-upscaling': 'no',
+    'hdr-compute-peak': 'no',
+  };
+
+  /// mpvs eigene Werte, solange die sparsame Skalierung gilt (sonst `null`).
+  Map<String, String>? _scalingBeforeSaving;
+
+  /// Sparsame Skalierung ein- bzw. wieder ausschalten (beim Öffnen und wenn das Energiesparen wechselt).
+  Future<void> _applyEnergySaving() async {
+    final native = _player.platform;
+    if (native is! NativePlayer) return;
+    if (Power.energySaving.value) {
+      if (_scalingBeforeSaving != null) return;
+      final before = _scalingBeforeSaving = {};
+      for (final e in _fastScaling.entries) {
+        try {
+          before[e.key] = await native.getProperty(e.key);
+          await native.setProperty(e.key, e.value);
+        } catch (err) {
+          debugPrint('mpv-Eigenschaft ${e.key} nicht gesetzt: $err');
+        }
+      }
+    } else {
+      final before = _scalingBeforeSaving;
+      if (before == null) return;
+      _scalingBeforeSaving = null;
+      for (final e in before.entries) {
+        try {
+          await native.setProperty(e.key, e.value);
+        } catch (err) {
+          debugPrint('mpv-Eigenschaft ${e.key} nicht zurückgesetzt: $err');
+        }
+      }
+    }
   }
 
   /// Untertitel: ruhige Systemschrift, schmaler Rand mit weichem Schatten statt der groben
@@ -1292,13 +1340,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               children: [
                 // Ambilight: unscharfe, vergrößerte Kopie des Bildes hinter dem Video – leuchtet in
                 // den Balken. Platz bleibt immer bestehen (sonst verlieren Elemente den Fokus).
+                // Beim Energiesparen aus: das Weichzeichnen kostet in jedem Bild viel GPU-Arbeit.
                 Positioned.fill(
-                  child: switch (settings.ambilight) {
-                    _ when _mini => const SizedBox.shrink(),
-                    AmbilightMode.always => _Ambilight(controller: _video),
-                    AmbilightMode.window when !_fullscreen => _Ambilight(controller: _video),
-                    _ => const SizedBox.shrink(),
-                  },
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: Power.energySaving,
+                    builder: (context, saving, _) => switch (settings.ambilight) {
+                      _ when _mini || saving => const SizedBox.shrink(),
+                      AmbilightMode.always => _Ambilight(controller: _video),
+                      AmbilightMode.window when !_fullscreen => _Ambilight(controller: _video),
+                      _ => const SizedBox.shrink(),
+                    },
+                  ),
                 ),
                 Positioned.fill(
                   child: LayoutBuilder(

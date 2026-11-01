@@ -431,6 +431,15 @@ final class _Tr extends S {
   @override
   String get soundsHint => '“Şaşırt beni” içinde tık sesleri ve müzik.';
   @override
+  String get energySaver => 'Enerji tasarrufu';
+  @override
+  String get energySaverHint =>
+      'Pili korur: afişte fragman yok, Ambilight ve sahne önizlemesi yok, sakin arka planlar ve daha hafif video ölçekleme.';
+  @override
+  String get energySaverOnBattery => 'Pil gücündeyken';
+  @override
+  String get energySaverActive => 'Şu anda etkin.';
+  @override
   String get theme => 'Tema';
   @override
   String get themeHint => 'Tüm uygulamanın renkleri – anında değişir.';

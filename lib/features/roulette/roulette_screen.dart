@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/format.dart';
 import '../../core/images.dart';
 import '../../core/models.dart';
+import '../../core/power.dart';
 import '../../core/session.dart';
 import '../../theme.dart';
 import '../../widgets/page_header.dart';
@@ -43,7 +44,8 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
   late final _confetti = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
 
   /// Ruhiges Pulsieren des Bühnenlichts hinter dem mittleren Poster.
-  late final _pulse = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat(reverse: true);
+  late final _pulse = AnimationController(vsync: this, duration: const Duration(seconds: 3));
+  late final VoidCallback _stopPulse;
 
   /// Wie viele Titel gerade zu den Filtern passen ("im Topf").
   int? _potSize;
@@ -70,6 +72,7 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
   @override
   void initState() {
     super.initState();
+    _stopPulse = Power.whileAmbient(_pulse, () => _pulse.repeat(reverse: true));
     _spin.addListener(() {
       final t = const Cubic(0.12, 0.9, 0.22, 1).transform(_spin.value);
       final next = _spinFrom + (_spinTo - _spinFrom) * t;
@@ -101,6 +104,7 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
   void dispose() {
     _spin.dispose();
     _confetti.dispose();
+    _stopPulse();
     _pulse.dispose();
     _scroll.dispose();
     super.dispose();
