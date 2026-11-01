@@ -439,6 +439,8 @@ final class _Es extends S {
   @override
   String get energySaverOnBattery => 'Con batería';
   @override
+  String get energySaverLowPower => 'En modo de bajo consumo';
+  @override
   String get energySaverActive => 'Activo ahora mismo.';
   @override
   String get theme => 'Tema';
@@ -646,6 +648,8 @@ final class _Es extends S {
   String get quickConnectFailed => 'No se pudo iniciar Quick Connect.';
   @override
   String get tagline => 'Tu cine. En tu escritorio.';
+  @override
+  String get taglineMobile => 'Tu cine. Donde estés.';
   @override
   String get whoIsWatching => '¿Quién está viendo?';
   @override

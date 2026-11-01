@@ -6,17 +6,11 @@ import '../theme.dart';
 /// der Seite. Überall gleich, damit Listen, Downloads, Kalender, Bibliothek & Co.
 /// dieselben Abstände haben.
 class PageHeader extends StatelessWidget {
-  const PageHeader({
-    super.key,
-    required this.title,
-    this.subtitle,
-    this.icon,
-    this.actions = const [],
-    this.padding = defaultPadding,
-  });
+  const PageHeader({super.key, required this.title, this.subtitle, this.icon, this.actions = const [], this.padding});
 
-  /// Abstand zum Fensterrand und zum Inhalt darunter.
-  static const defaultPadding = EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 28, kPageGutter, 24);
+  /// Abstand zum Fensterrand und zum Inhalt darunter (Standard: unter der Titelleiste).
+  static EdgeInsets defaultPadding(BuildContext context) =>
+      EdgeInsets.fromLTRB(kPageGutter, topInset(context) + 28, kPageGutter, 24);
 
   final String title;
   final String? subtitle;
@@ -24,12 +18,12 @@ class PageHeader extends StatelessWidget {
   /// Kleines Symbol in Akzentfarbe vor dem Titel (z. B. Würfel bei "Überrasch mich").
   final IconData? icon;
   final List<Widget> actions;
-  final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry? padding;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: padding,
+      padding: padding ?? defaultPadding(context),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [

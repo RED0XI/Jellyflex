@@ -273,15 +273,15 @@ class _RouletteScreenState extends ConsumerState<RouletteScreen> with TickerProv
           LayoutBuilder(
             builder: (context, viewport) => SingleChildScrollView(
               controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(0, kTitleBarHeight + 24, 0, 40),
+              padding: EdgeInsets.fromLTRB(0, topInset(context) + 24, 0, 40),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: viewport.maxHeight - kTitleBarHeight - 64),
+                constraints: BoxConstraints(minHeight: viewport.maxHeight - topInset(context) - 64),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
+                      padding: EdgeInsets.symmetric(horizontal: kPageGutter),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -596,7 +596,7 @@ class _WinnerCard extends StatelessWidget {
       if (item.communityRating != null) '★ ${item.communityRating!.toStringAsFixed(1)}',
     ];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(kPageGutter, 30, kPageGutter, 0),
+      padding: EdgeInsets.fromLTRB(kPageGutter, 30, kPageGutter, 0),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),

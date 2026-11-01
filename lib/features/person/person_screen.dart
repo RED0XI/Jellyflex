@@ -136,7 +136,7 @@ class _PersonScreenState extends ConsumerState<PersonScreen> {
             slivers: [
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 64, kPageGutter, 36),
+                  padding: EdgeInsets.fromLTRB(kPageGutter, topInset(context) + 64, kPageGutter, 36),
                   child: _Header(person: person, movieCount: movies.length, seriesCount: series.length),
                 ),
               ),
@@ -157,7 +157,7 @@ class _PersonScreenState extends ConsumerState<PersonScreen> {
               if (items.isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 20),
+                    padding: EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 20),
                     child: Row(
                       children: [
                         Text(tr.onYourServer, style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
@@ -182,7 +182,7 @@ class _PersonScreenState extends ConsumerState<PersonScreen> {
                   ),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
+                  padding: EdgeInsets.symmetric(horizontal: kPageGutter),
                   // Spalten aus dem verfügbaren Platz berechnen (wie in der Bibliothek).
                   sliver: SliverLayoutBuilder(
                     builder: (context, constraints) {

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/jellyfin_api.dart';
 import '../../core/models.dart';
+import '../../core/platform/device.dart';
 import '../../core/server_discovery.dart';
 import '../../core/session.dart';
 import '../../theme.dart';
@@ -215,7 +216,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   const BrandLogo(size: 42),
                   const SizedBox(height: 8),
-                  Text(tr.tagline, style: TextStyle(color: AppColors.textSecondary)),
+                  Text(isMobile ? tr.taglineMobile : tr.tagline, style: TextStyle(color: AppColors.textSecondary)),
                   const SizedBox(height: 36),
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
@@ -340,6 +341,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         TextField(
           controller: _serverCtrl,
           autofocus: true,
+          // Bildschirmtastatur (iPhone/iPad): Adress-Tastatur, nichts automatisch "verbessern".
+          keyboardType: TextInputType.url,
+          autocorrect: false,
+          enableSuggestions: false,
+          textInputAction: TextInputAction.go,
           decoration: InputDecoration(
             labelText: tr.serverAddress,
             hintText: 'https://jellyfin.example.com',
@@ -554,6 +560,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         TextField(
           controller: _userCtrl,
           focusNode: _userFocus,
+          autocorrect: false,
+          enableSuggestions: false,
+          autofillHints: const [AutofillHints.username],
           decoration: InputDecoration(labelText: tr.username, prefixIcon: Icon(Icons.person_rounded)),
           textInputAction: TextInputAction.next,
         ),
@@ -562,6 +571,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           controller: _passCtrl,
           focusNode: _passFocus,
           obscureText: true,
+          autofillHints: const [AutofillHints.password],
           decoration: InputDecoration(labelText: tr.password, prefixIcon: Icon(Icons.lock_rounded)),
           onSubmitted: (_) => _login(),
         ),

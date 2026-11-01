@@ -9,6 +9,9 @@ import 'dart:io';
 /// | Videos         | `%USERPROFILE%\Videos`          | `~/Movies`                                 |
 /// | Bilder         | `%USERPROFILE%\Pictures`        | `~/Pictures`                               |
 ///
+/// iOS: `$HOME` ist der Container der App – Einstellungen und Zwischenspeicher liegen wie
+/// unter macOS in `Library`, Videos und Bilder in `Documents` (in der Dateien-App sichtbar).
+///
 /// Unter Windows bleiben alle Pfade exakt wie in früheren Versionen – vorhandene
 /// Einstellungen, Anmeldungen und Downloads werden weiter gefunden.
 abstract final class AppPaths {
@@ -38,25 +41,25 @@ abstract final class AppPaths {
   /// Einstellungen, Anmeldung, Downloadliste, eigenes Logo.
   static Directory get appData {
     if (Platform.isWindows) return Directory(join(_env('APPDATA') ?? Directory.systemTemp.path, appFolder));
-    if (Platform.isMacOS) return Directory(join(home, 'Library', 'Application Support', appFolder));
+    if (Platform.isMacOS || Platform.isIOS) return Directory(join(home, 'Library', 'Application Support', appFolder));
     return Directory(join(_env('XDG_CONFIG_HOME') ?? join(home, '.config'), appFolder.toLowerCase()));
   }
 
   /// Zwischenspeicher, der nicht gesichert/synchronisiert werden muss (z. B. Bilder).
   static Directory get cache {
     if (Platform.isWindows) return Directory(join(_env('LOCALAPPDATA') ?? Directory.systemTemp.path, appFolder));
-    if (Platform.isMacOS) return Directory(join(home, 'Library', 'Caches', appFolder));
+    if (Platform.isMacOS || Platform.isIOS) return Directory(join(home, 'Library', 'Caches', appFolder));
     return Directory(join(_env('XDG_CACHE_HOME') ?? join(home, '.cache'), appFolder.toLowerCase()));
   }
 
   /// Ordner für Videos (Standard-Downloadort liegt darin).
-  static String get videos => join(home, Platform.isMacOS ? 'Movies' : 'Videos');
+  static String get videos => join(home, Platform.isIOS ? 'Documents' : (Platform.isMacOS ? 'Movies' : 'Videos'));
 
   /// Downloads-Ordner (Leistungstest-Berichte) – anders als „Dokumente“ selten in OneDrive umgeleitet.
-  static String get downloads => join(home, 'Downloads');
+  static String get downloads => join(home, Platform.isIOS ? 'Documents' : 'Downloads');
 
   /// Ordner für Bilder (Bildschirmfotos, Jahresrückblick).
-  static String get pictures => join(home, 'Pictures');
+  static String get pictures => join(home, Platform.isIOS ? 'Documents' : 'Pictures');
 
   /// Pfad für Vergleiche: absolut, ohne abschließendes Trennzeichen, klein geschrieben
   /// (Windows und macOS unterscheiden standardmäßig nicht nach Groß-/Kleinschreibung).

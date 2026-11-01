@@ -82,7 +82,7 @@ class _MediaRowState extends State<MediaRow> {
         children: [
           if (widget.title != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 0),
+              padding: EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 0),
               child: Row(
                 children: [
                   Text(appLayout.heading(widget.title!), style: appLayout.headingStyle()),
@@ -104,7 +104,7 @@ class _MediaRowState extends State<MediaRow> {
                     controller: _controller,
                     scrollDirection: Axis.horizontal,
                     clipBehavior: Clip.none,
-                    padding: const EdgeInsets.symmetric(horizontal: kPageGutter, vertical: _vPad),
+                    padding: EdgeInsets.symmetric(horizontal: kPageGutter, vertical: _vPad),
                     itemCount: widget.itemCount,
                     separatorBuilder: (_, _) => SizedBox(width: widget.spacing ?? appLayout.cardGap),
                     itemBuilder: widget.itemBuilder,

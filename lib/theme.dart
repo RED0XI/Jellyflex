@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core/layouts.dart';
+import 'core/platform/device.dart';
 import 'core/themes.dart';
 
 /// Aktives Farbschema (wird aus den Einstellungen gesetzt).
@@ -31,11 +32,16 @@ abstract final class AppColors {
 const appFontFamily = 'Segoe UI Variable Text';
 const appFontFallback = ['Segoe UI', 'Arial'];
 
-/// Horizontaler Seitenabstand, den alle Screens teilen.
-const double kPageGutter = 56;
+/// Horizontaler Seitenabstand, den alle Screens teilen (iPhone/iPad: schmaler).
+final double kPageGutter = isMobile ? 20 : 56;
 
 /// Höhe der eigenen Fenster-Titelleiste.
 const double kTitleBarHeight = 36;
+
+/// Abstand vom oberen Rand bis unter die Leiste mit dem Zurück-Knopf: auf dem Desktop die
+/// Titelleiste, auf iPhone/iPad zusätzlich Statusleiste und Notch/Dynamic Island.
+double topInset(BuildContext context) =>
+    isMobile ? MediaQuery.paddingOf(context).top + kTitleBarHeight : kTitleBarHeight;
 
 /// [key] nur, damit sich das Ergebnis bei einem Theme-/Layout-Wechsel ändert.
 ThemeData buildTheme([String? key]) {

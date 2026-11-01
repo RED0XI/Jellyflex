@@ -11,6 +11,7 @@ import '../../core/gamepad_input.dart';
 import '../../core/profile_pin.dart';
 import '../../core/session.dart';
 import '../../core/settings.dart';
+import '../../core/platform/device.dart';
 import '../../l10n/strings.dart';
 import '../../theme.dart';
 import '../../widgets/pin_dialog.dart';
@@ -165,28 +166,29 @@ class _LockPage extends ConsumerWidget {
       child: Stack(
         children: [
           // Fenster bleibt verschiebbar, minimierbar und schließbar.
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: kTitleBarHeight,
-            child: Row(
-              children: [
-                const Expanded(child: DragToMoveArea(child: SizedBox.expand())),
-                IconButton(
-                  tooltip: tr.minimize,
-                  icon: const Icon(Icons.remove_rounded, size: 18),
-                  onPressed: () => windowManager.minimize(),
-                ),
-                IconButton(
-                  tooltip: tr.close,
-                  icon: const Icon(Icons.close_rounded, size: 18),
-                  onPressed: () => windowManager.close(),
-                ),
-                const SizedBox(width: 6),
-              ],
+          if (isDesktop)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: kTitleBarHeight,
+              child: Row(
+                children: [
+                  const Expanded(child: DragToMoveArea(child: SizedBox.expand())),
+                  IconButton(
+                    tooltip: tr.minimize,
+                    icon: const Icon(Icons.remove_rounded, size: 18),
+                    onPressed: () => windowManager.minimize(),
+                  ),
+                  IconButton(
+                    tooltip: tr.close,
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    onPressed: () => windowManager.close(),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+              ),
             ),
-          ),
           _lockContent(name, unlock, ref),
         ],
       ),

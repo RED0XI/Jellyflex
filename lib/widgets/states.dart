@@ -56,7 +56,7 @@ class RowsSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
+      padding: EdgeInsets.symmetric(horizontal: kPageGutter),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

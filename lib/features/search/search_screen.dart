@@ -140,7 +140,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 28, kPageGutter, 16),
+                    padding: EdgeInsets.fromLTRB(kPageGutter, topInset(context) + 28, kPageGutter, 16),
                     child: TextField(
                       controller: _controller,
                       autofocus: true,
@@ -183,7 +183,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 if (_term.isNotEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 20),
+                      padding: EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 20),
                       child: Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -302,7 +302,7 @@ class _RecentSearches extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 0),
+      padding: EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

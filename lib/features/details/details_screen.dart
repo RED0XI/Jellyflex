@@ -865,7 +865,7 @@ class _SeasonsSectionState extends ConsumerState<_SeasonsSection> {
       children: [
         // Viele Staffeln brechen in die nächste Zeile um, statt rechts aus dem Fenster zu laufen.
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
+          padding: EdgeInsets.symmetric(horizontal: kPageGutter),
           child: Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -1009,7 +1009,7 @@ class _SeasonTools extends ConsumerWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 0),
+      padding: EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 0),
       child: Wrap(
         spacing: 8,
         runSpacing: 6,

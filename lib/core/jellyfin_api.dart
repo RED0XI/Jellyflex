@@ -148,6 +148,7 @@ class JellyfinApi {
 
   static String get deviceName {
     final host = Platform.localHostname.replaceAll(RegExp(r'[^A-Za-z0-9 _-]'), '');
+    if (Platform.isIOS) return 'iPhone/iPad';
     return host.isEmpty ? (Platform.isMacOS ? 'Mac' : 'Windows') : host;
   }
 

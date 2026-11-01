@@ -197,7 +197,7 @@ class TopNav extends ConsumerWidget {
       right: 0,
       child: _FrostedBar(
         scroll: scroll,
-        height: kTitleBarHeight + 60,
+        height: topInset(context) + 60,
         child: Row(
           children: [
             BrandLogo(size: minimal ? 20 : 26),
@@ -257,7 +257,7 @@ class TabsNav extends ConsumerWidget {
       right: 0,
       child: _FrostedBar(
         scroll: scroll,
-        height: kTitleBarHeight + 76,
+        height: topInset(context) + 76,
         child: Row(
           children: [
             const BrandLogo(size: 24),
@@ -361,7 +361,7 @@ class SideNav extends ConsumerWidget {
         color: AppColors.surface,
         border: Border(right: BorderSide(color: AppColors.border)),
       ),
-      padding: const EdgeInsets.fromLTRB(14, kTitleBarHeight + 10, 14, 16),
+      padding: EdgeInsets.fromLTRB(14, topInset(context) + 10, 14, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -517,7 +517,7 @@ class _FrostedBar extends StatelessWidget {
         final t = (offset / 240).clamp(0.0, 1.0);
         final solid = AppColors.background.withValues(alpha: 0.72);
         final bar = Container(
-          padding: const EdgeInsets.only(top: kTitleBarHeight - 4, left: kPageGutter, right: kPageGutter + 4),
+          padding: EdgeInsets.only(top: topInset(context) - 4, left: kPageGutter, right: kPageGutter + 4),
           height: height,
           decoration: BoxDecoration(
             gradient: LinearGradient(

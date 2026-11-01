@@ -10,6 +10,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../core/app_lock.dart';
 import '../core/gamepad_input.dart';
+import '../core/platform/device.dart';
 import '../core/route_observer.dart';
 import '../core/window_memory.dart';
 import '../theme.dart';
@@ -25,7 +26,12 @@ final windowChromeVisible = ValueNotifier<bool>(true);
 final windowFullscreen = ValueNotifier<bool>(false);
 
 Future<void> setWindowFullscreen(bool value) async {
-  await windowManager.setFullScreen(value);
+  if (isDesktop) {
+    await windowManager.setFullScreen(value);
+  } else {
+    // iPhone/iPad: Statusleiste und Home-Leiste aus- bzw. wieder einblenden.
+    await SystemChrome.setEnabledSystemUIMode(value ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge);
+  }
   windowFullscreen.value = value;
 }
 
@@ -37,7 +43,8 @@ Rect? _boundsBeforeMini;
 bool _maximizedBeforeMini = false;
 
 Future<void> setWindowMiniPlayer(bool value) async {
-  if (value == windowMiniPlayer.value) return;
+  // Ohne eigenes Fenster (iPhone/iPad) gibt es keinen Mini-Player.
+  if (value == windowMiniPlayer.value || !isDesktop) return;
   if (value) {
     if (windowFullscreen.value) await setWindowFullscreen(false);
     _maximizedBeforeMini = await windowManager.isMaximized();
@@ -122,9 +129,11 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
     widget.router.routerDelegate.addListener(_onRouteChanged);
     GamepadInput.start(_onPadAction);
     HardwareKeyboard.instance.addHandler(_onHardwareKey);
-    windowManager.isMaximized().then((v) {
-      if (mounted) setState(() => _maximized = v);
-    });
+    if (isDesktop) {
+      windowManager.isMaximized().then((v) {
+        if (mounted) setState(() => _maximized = v);
+      });
+    }
     if (isMacOS) _chromeVisibility.addListener(_syncMacButtons);
   }
 
@@ -326,7 +335,43 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
     );
   }
 
+  /// iPhone/iPad: keine Fensterleiste – nur der Zurück-Knopf, unter Statusleiste und Notch.
+  Widget _buildMobileFrame(bool showBack) {
+    final safe = MediaQuery.paddingOf(context);
+    return Stack(
+      children: [
+        Positioned.fill(child: widget.child),
+        Positioned(
+          top: safe.top,
+          left: safe.left + 4,
+          child: ListenableBuilder(
+            listenable: windowChromeVisible,
+            builder: (context, _) {
+              final visible = showBack && windowChromeVisible.value;
+              return AnimatedOpacity(
+                opacity: visible ? 1 : 0,
+                duration: const Duration(milliseconds: 250),
+                child: IgnorePointer(
+                  ignoring: !visible,
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: _TitleBarButton(
+                      icon: Icons.arrow_back_rounded,
+                      tooltip: tr.back,
+                      onPressed: () => widget.router.pop(),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildFrame(bool showBack, {required bool inPlayer}) {
+    if (!isDesktop) return _buildMobileFrame(showBack);
     return Stack(
       children: [
         Positioned.fill(child: widget.child),

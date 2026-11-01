@@ -98,7 +98,7 @@ class _MagazineHeroState extends ConsumerState<MagazineHero> {
     return SizedBox(
       height: widget.height,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 92, kPageGutter, 28),
+        padding: EdgeInsets.fromLTRB(kPageGutter, topInset(context) + 92, kPageGutter, 28),
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 600),
           child: Row(

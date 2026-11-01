@@ -186,7 +186,7 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
                 ),
                 // Fortschrittsbalken oben.
                 Positioned(
-                  top: kTitleBarHeight + 6,
+                  top: topInset(context) + 6,
                   left: kPageGutter,
                   right: kPageGutter,
                   child: AnimatedBuilder(
@@ -514,7 +514,7 @@ class _Slide extends ConsumerWidget {
           ),
           _Glow(color: base),
           Padding(
-            padding: const EdgeInsets.fromLTRB(kPageGutter * 1.5, kTitleBarHeight + 40, kPageGutter * 1.5, 110),
+            padding: EdgeInsets.fromLTRB(kPageGutter * 1.5, topInset(context) + 40, kPageGutter * 1.5, 110),
             child: _Rise(
               child: LayoutBuilder(
                 builder: (context, box) {

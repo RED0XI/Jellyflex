@@ -5,10 +5,12 @@ import '../theme.dart';
 /// Dunkler Verlauf unter der Titelleiste, der beim Scrollen einblendet –
 /// damit Inhalte nicht unter Zurück-Pfeil und Fensterknöpfen "durchscheinen".
 class TopScrim extends StatelessWidget {
-  const TopScrim({super.key, required this.scroll, this.height = kTitleBarHeight + 28});
+  const TopScrim({super.key, required this.scroll, this.height});
 
   final ScrollController scroll;
-  final double height;
+
+  /// Standard: Titelleiste (auf iPhone/iPad mit Statusleiste) und etwas Luft.
+  final double? height;
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +18,7 @@ class TopScrim extends StatelessWidget {
       top: 0,
       left: 0,
       right: 0,
-      height: height,
+      height: height ?? topInset(context) + 28,
       child: IgnorePointer(
         child: AnimatedBuilder(
           animation: scroll,

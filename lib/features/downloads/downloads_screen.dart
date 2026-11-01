@@ -89,7 +89,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                 if (done.isNotEmpty) ...[
                   _SectionTitle(tr.readyOffline),
                   SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
+                    padding: EdgeInsets.symmetric(horizontal: kPageGutter),
                     sliver: SliverGrid.builder(
                       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: 190,
@@ -120,7 +120,7 @@ class _WaitingForWifi extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 16),
+      margin: EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 16),
       padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.14),
@@ -162,7 +162,7 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SliverToBoxAdapter(
     child: Padding(
-      padding: const EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 14),
+      padding: EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 14),
       child: Text(text, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
     ),
   );
@@ -249,7 +249,7 @@ class _ActiveRow extends ConsumerWidget {
       DownloadStatus.done => tr.done,
     };
     return Container(
-      margin: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 12),
+      margin: EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14)),
       child: Row(

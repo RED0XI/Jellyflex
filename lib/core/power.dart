@@ -1,10 +1,14 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-/// Energiesparen: automatisch im Akkubetrieb (oder im Stromsparmodus), immer oder nie.
+/// Energiesparen: automatisch (Mac: im Akkubetrieb oder Stromsparmodus; iPhone/iPad: nur im
+/// Stromsparmodus – sie laufen fast immer auf Akku), immer oder nie.
 enum EnergySaver { auto, on, off }
 
-/// Stromversorgung und was daraus für die Oberfläche folgt (Gegenstück: macos/Runner/Power.swift).
+/// Stromversorgung und was daraus für die Oberfläche folgt (Gegenstücke: macos/Runner/Power.swift,
+/// ios/Runner/Power.swift).
 ///
 /// Jede laufende Animation lässt Flutter jedes Bild neu zeichnen – auf ProMotion-Displays
 /// bis zu 120-mal pro Sekunde, auch wenn sich kaum etwas bewegt. Deshalb zwei Schalter:
@@ -44,7 +48,7 @@ abstract final class Power {
     try {
       _setStatus(await _channel.invokeMethod<Object?>('status'));
     } on MissingPluginException {
-      // Ohne macOS-Runner (Windows, Tests): gilt als Netzbetrieb.
+      // Ohne Runner mit dem Kanal (Windows, Tests): gilt als Netzbetrieb.
     } catch (e) {
       debugPrint('Stromversorgung unbekannt: $e');
     }
@@ -72,7 +76,7 @@ abstract final class Power {
     energySaving.value = switch (_mode) {
       EnergySaver.on => true,
       EnergySaver.off => false,
-      EnergySaver.auto => onBattery,
+      EnergySaver.auto => Platform.isIOS ? _lowPower : onBattery,
     };
     ambientMotion.value = !energySaving.value && appActive.value;
   }

@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
@@ -13,6 +14,7 @@ import 'core/app_log.dart';
 import 'core/download_notify.dart';
 import 'core/app_shell.dart';
 import 'core/licenses.dart';
+import 'core/platform/device.dart';
 import 'core/power.dart';
 import 'core/retry.dart';
 import 'core/window_memory.dart';
@@ -46,6 +48,14 @@ Future<void> main(List<String> args) async {
   UiSounds.preload();
   // Stammzertifikate für den Video-Player schon beim Start bereitlegen.
   SystemCerts.caFile();
+  if (isMobile) {
+    // iPhone/iPad: kein Fenster. Inhalt bis unter Statusleiste und Home-Leiste, helle Symbole
+    // auf dem dunklen Hintergrund.
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+    runApp(const ProviderScope(retry: providerRetry, child: JellyflexApp()));
+    return;
+  }
   await windowManager.ensureInitialized();
   // Fenster wie beim letzten Mal (Größe, Lage, maximiert).
   final saved = await WindowMemory.load();

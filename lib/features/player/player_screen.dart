@@ -822,7 +822,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (native is! NativePlayer) return;
     final s = ref.read(settingsProvider);
     final props = {
-      'sub-font': Platform.isMacOS ? 'Helvetica Neue' : 'Segoe UI',
+      'sub-font': Platform.isMacOS || Platform.isIOS ? 'Helvetica Neue' : 'Segoe UI',
       'sub-bold': 'yes',
       'sub-font-size': '34',
       'sub-color': '#FFFFFFFF',
@@ -1414,7 +1414,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 if (_statsVisible && !_mini)
                   Positioned(
                     left: 24,
-                    top: kTitleBarHeight + 78,
+                    top: topInset(context) + 78,
                     child: _StatsOverlay(
                       player: _player,
                       playMethod: _localFile != null
@@ -1616,7 +1616,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           ),
         ),
         Positioned(
-          top: _fullscreen ? 20 : kTitleBarHeight + 8,
+          top: _fullscreen ? 20 : topInset(context) + 8,
           left: 24,
           right: 24,
           child: _hoverZone(

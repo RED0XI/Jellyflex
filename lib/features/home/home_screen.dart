@@ -66,7 +66,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       HeroStyle.banner => HeroBanner(height: heroHeight),
       HeroStyle.split => MagazineHero(height: heroHeight),
       HeroStyle.none => GreetingHeader(
-        top: layout.nav == NavStyle.sidebar ? kTitleBarHeight + 28 : kTitleBarHeight + 96,
+        top: layout.nav == NavStyle.sidebar ? topInset(context) + 28 : topInset(context) + 96,
       ),
     };
 

@@ -438,6 +438,8 @@ final class _Tr extends S {
   @override
   String get energySaverOnBattery => 'Pil gücündeyken';
   @override
+  String get energySaverLowPower => 'Düşük Güç Modunda';
+  @override
   String get energySaverActive => 'Şu anda etkin.';
   @override
   String get theme => 'Tema';
@@ -645,6 +647,8 @@ final class _Tr extends S {
   String get quickConnectFailed => 'Quick Connect başlatılamadı.';
   @override
   String get tagline => 'Sinema salonun. Bilgisayarında.';
+  @override
+  String get taglineMobile => 'Sinema salonun. Her yerde.';
   @override
   String get whoIsWatching => 'Kim izliyor?';
   @override

@@ -130,13 +130,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   trailing: _Choice<EnergySaver>(
                     value: s.energySaver,
                     label: switch (s.energySaver) {
-                      // Den Akku meldet bisher nur der macOS-Runner.
-                      EnergySaver.auto => Platform.isMacOS ? tr.energySaverOnBattery : tr.off,
+                      // Den Akku melden bisher nur die Runner für macOS und iOS.
+                      EnergySaver.auto =>
+                        Platform.isMacOS ? tr.energySaverOnBattery : (Platform.isIOS ? tr.energySaverLowPower : tr.off),
                       EnergySaver.on => tr.always,
                       EnergySaver.off => tr.off,
                     },
                     options: [
                       if (Platform.isMacOS) (EnergySaver.auto, tr.energySaverOnBattery),
+                      if (Platform.isIOS) (EnergySaver.auto, tr.energySaverLowPower),
                       (EnergySaver.on, tr.always),
                       (EnergySaver.off, tr.off),
                     ],
@@ -669,7 +671,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             builder: (context, physics) => ListView(
               controller: _scroll,
               physics: physics,
-              padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 28, kPageGutter, 72),
+              padding: EdgeInsets.fromLTRB(kPageGutter, topInset(context) + 28, kPageGutter, 72),
               children: [
                 Center(
                   child: ConstrainedBox(

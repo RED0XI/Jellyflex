@@ -337,7 +337,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 28, kPageGutter, 0),
+                    padding: EdgeInsets.fromLTRB(kPageGutter, topInset(context) + 28, kPageGutter, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -466,7 +466,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
+                    padding: EdgeInsets.symmetric(horizontal: kPageGutter),
                     // Spalten aus dem tatsächlich verfügbaren Platz berechnen.
                     sliver: SliverLayoutBuilder(
                       builder: (context, constraints) {

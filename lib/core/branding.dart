@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'settings.dart';
 import 'platform/app_paths.dart';
+import 'platform/device.dart';
 
 /// Eigener App-Name und eigenes Logo – überall dort, wo sonst "Jellyflex" steht
 /// (Titelleiste, Fenstertitel, Taskleisten-Symbol, Anmeldung, Start).
@@ -126,6 +127,7 @@ Future<Uint8List> _icoFrom(ui.Image image) async {
 /// (macOS: nur der Titel – das Dock-Symbol bleibt das signierte App-Symbol.)
 Future<void> applyWindowBranding(AppSettings s) async {
   try {
+    if (!isDesktop) return;
     await windowManager.setTitle(appDisplayName(s));
     if (!Platform.isWindows) return;
     final logo = customLogo(s);

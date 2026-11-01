@@ -105,13 +105,19 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
               )
             else
               TextButton(onPressed: _finish, child: Text(tr.setupLater)),
-            const Spacer(),
-            SizedBox(
-              width: 200,
-              child: PrimaryButton(
-                label: last ? tr.setupFinish : tr.next,
-                icon: last ? Icons.check_rounded : Icons.arrow_forward_rounded,
-                onPressed: _next,
+            const SizedBox(width: 12),
+            // Rechtsbündig, höchstens 200 breit – auf schmalen Bildschirmen (iPhone) entsprechend schmaler.
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: 200,
+                  child: PrimaryButton(
+                    label: last ? tr.setupFinish : tr.next,
+                    icon: last ? Icons.check_rounded : Icons.arrow_forward_rounded,
+                    onPressed: _next,
+                  ),
+                ),
               ),
             ),
           ],

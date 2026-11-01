@@ -30,7 +30,9 @@ String buildErrorReport({
     ..writeln('Created: $created')
     ..writeln()
     ..writeln('App version: $appVersion')
-    ..writeln('${Platform.isMacOS ? 'macOS' : 'Windows'}: ${Platform.operatingSystemVersion}')
+    ..writeln(
+      '${Platform.isIOS ? 'iOS' : (Platform.isMacOS ? 'macOS' : 'Windows')}: ${Platform.operatingSystemVersion}',
+    )
     ..writeln('Dart: ${Platform.version.split(' ').first}')
     ..writeln('CPU cores: ${Platform.numberOfProcessors}')
     ..writeln(
