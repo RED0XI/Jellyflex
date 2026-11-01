@@ -21,6 +21,7 @@ import UIKit
     let messenger = registrar.messenger()
     AppShell.shared.register(with: messenger)
     Keychain.register(with: messenger)
+    MediaSession.shared.register(with: messenger)
     Power.shared.register(with: messenger)
   }
 }

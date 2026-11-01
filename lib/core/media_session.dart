@@ -1,13 +1,15 @@
 import 'package:flutter/services.dart';
 
-/// Medienanzeige (Windows: Lautstärke-Overlay, macOS: „Jetzt läuft“) und Medientasten.
+/// Medienanzeige (Windows: Lautstärke-Overlay, macOS/iOS: „Jetzt läuft“, Sperrbildschirm) und
+/// Medientasten.
 ///
 /// Gegenstücke: windows/runner/media_session.cpp, macos/Runner/MediaSession.swift.
 abstract final class MediaSession {
   static const _channel = MethodChannel('jellyflex/media_session');
   static bool _initialized = false;
 
-  /// Wird bei Medientasten aufgerufen: "play", "pause", "stop", "next", "previous".
+  /// Wird bei Medientasten aufgerufen: "play", "pause", "stop", "next", "previous",
+  /// "skipForward", "skipBackward" oder `seek:<Sekunden>` (Ziehen an der Leiste).
   static void Function(String button)? onButton;
 
   static void _ensureInitialized() {
@@ -34,7 +36,18 @@ abstract final class MediaSession {
     'canNext': canNext,
   });
 
+  /// Vor dem Öffnen eines Videos (iOS: Audio-Sitzung aktivieren, damit der Player Ton ausgeben
+  /// und im Hintergrund weiterlaufen darf).
+  static Future<void> prepare() => _invoke('prepare');
+
   static Future<void> setPlaying(bool playing) => _invoke('setPlaying', playing);
+
+  /// Position, Länge und Tempo – die Anzeige zählt von hier aus selbst weiter, es reicht also
+  /// ein Aufruf bei Start, Pause, Sprung und Tempowechsel.
+  static Future<void> setProgress({required Duration position, required Duration duration, double rate = 1}) => _invoke(
+    'progress',
+    {'position': position.inMilliseconds / 1000, 'duration': duration.inMilliseconds / 1000, 'rate': rate},
+  );
 
   static Future<void> clear() => _invoke('clear');
 

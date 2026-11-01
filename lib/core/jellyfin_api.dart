@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import 'images.dart';
 import 'models.dart';
+import 'platform/device.dart';
 import '../l10n/strings.dart';
 import 'redact.dart';
 import 'version.dart';
@@ -148,7 +149,8 @@ class JellyfinApi {
 
   static String get deviceName {
     final host = Platform.localHostname.replaceAll(RegExp(r'[^A-Za-z0-9 _-]'), '');
-    if (Platform.isIOS) return 'iPhone/iPad';
+    // iOS gibt den eigenen Gerätenamen nicht mehr heraus – dann wenigstens die Geräteart.
+    if (Platform.isIOS) return isPhoneDevice ? 'iPhone' : 'iPad';
     return host.isEmpty ? (Platform.isMacOS ? 'Mac' : 'Windows') : host;
   }
 

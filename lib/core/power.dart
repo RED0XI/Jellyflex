@@ -30,6 +30,10 @@ abstract final class Power {
   /// Jellyflex ist die App im Vordergrund.
   static final ValueNotifier<bool> appActive = ValueNotifier(true)..addListener(_update);
 
+  /// Jellyflex ist zu sehen – auch wenn kurz das Kontrollzentrum o. Ä. darüber liegt (iOS:
+  /// "inactive"). `false` erst, wenn die App im Hintergrund bzw. das Fenster verdeckt ist.
+  static final ValueNotifier<bool> appVisible = ValueNotifier(true);
+
   /// Schmückende Dauer-Animationen dürfen laufen.
   static final ValueNotifier<bool> ambientMotion = ValueNotifier(true);
 
@@ -40,7 +44,12 @@ abstract final class Power {
   static Future<void> init() async {
     final state = WidgetsBinding.instance.lifecycleState;
     appActive.value = state == null || state == AppLifecycleState.resumed;
-    _lifecycle ??= AppLifecycleListener(onStateChange: (state) => appActive.value = state == AppLifecycleState.resumed);
+    _lifecycle ??= AppLifecycleListener(
+      onStateChange: (state) {
+        appActive.value = state == AppLifecycleState.resumed;
+        appVisible.value = state == AppLifecycleState.resumed || state == AppLifecycleState.inactive;
+      },
+    );
     _update();
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'changed') _setStatus(call.arguments);

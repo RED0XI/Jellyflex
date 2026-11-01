@@ -223,7 +223,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     Power.energySaving.addListener(_applyEnergySaving);
     _sleepTick = Timer.periodic(const Duration(seconds: 1), (_) => _checkSleepTimer());
     _checkSleepTimer();
-    if (isMobile) _enterMobilePlayback();
+    if (isMobile) {
+      _enterMobilePlayback();
+      Power.appVisible.addListener(_onAppVisibleChanged);
+    }
   }
 
   // --- iPhone/iPad -------------------------------------------------------------
@@ -477,6 +480,41 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         _close();
       case 'next':
         _playNext();
+      case 'skipForward':
+        _seekBy(_seekStep);
+      case 'skipBackward':
+        _seekBy(-_seekStep);
+      case final seek when seek.startsWith('seek:'):
+        final seconds = double.tryParse(seek.substring(5));
+        if (seconds != null) _player.seek(Duration(milliseconds: (seconds * 1000).round()));
+    }
+  }
+
+  /// Fortschritt für Sperrbildschirm/Kontrollzentrum (zählt selbst weiter, s. [MediaSession.setProgress]).
+  void _updateMediaProgress() {
+    final s = _player.state;
+    if (s.duration == Duration.zero || _closing) return;
+    MediaSession.setProgress(position: s.position, duration: s.duration, rate: s.rate);
+  }
+
+  /// Video aus, solange die App im Hintergrund ist (iPhone/iPad): Der Ton spielt weiter,
+  /// aber niemand sieht das Bild – Dekodieren und Zeichnen würden nur Akku kosten.
+  String? _videoTrackBeforeBackground;
+
+  Future<void> _onAppVisibleChanged() async {
+    final native = _player.platform;
+    if (native is! NativePlayer || _closing) return;
+    try {
+      if (!Power.appVisible.value) {
+        if (_videoTrackBeforeBackground != null || !_player.state.playing) return;
+        _videoTrackBeforeBackground = await native.getProperty('vid');
+        await native.setProperty('vid', 'no');
+      } else if (_videoTrackBeforeBackground case final vid?) {
+        _videoTrackBeforeBackground = null;
+        await native.setProperty('vid', vid);
+      }
+    } catch (e) {
+      debugPrint('Video im Hintergrund nicht umgeschaltet: $e');
     }
   }
 
@@ -500,7 +538,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
-    if (isMobile) _leaveMobilePlayback();
+    if (isMobile) {
+      _leaveMobilePlayback();
+      Power.appVisible.removeListener(_onAppVisibleChanged);
+    }
     Power.energySaving.removeListener(_applyEnergySaving);
     _hideTimer?.cancel();
     _outputSizeTimer?.cancel();
@@ -655,6 +696,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _subscriptions
         ..add(_player.stream.tracks.listen((_) => _applyDefaultTracks()))
         ..add(_player.stream.playing.listen(_onPlayingChanged))
+        // Sprünge (auch von außen) und Tempowechsel: Anzeige auf dem Sperrbildschirm nachziehen.
+        ..add(_player.stream.duration.listen((_) => _updateMediaProgress()))
+        ..add(_player.stream.rate.listen((_) => _updateMediaProgress()))
+        ..add(_player.stream.buffering.listen((buffering) => buffering ? null : _updateMediaProgress()))
         // Erst mit der Bildgröße lässt sich "Ausfüllen" berechnen.
         // Erst mit der Bildgröße lassen sich "Ausfüllen" und die Ausgabegröße berechnen.
         ..add(_player.stream.width.listen((_) => mounted ? setState(() {}) : null))
@@ -688,6 +733,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       final native = _player.platform;
       if (native is NativePlayer) await native.setProperty('volume-max', '${PlayerScreen.maxVolume.round()}');
       await _applyEnergySaving();
+      await MediaSession.prepare();
       await _player.setVolume(_volumeBeforeMute);
       await _openStream(start);
 
@@ -942,6 +988,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _onPlayingChanged(bool playing) {
     playerPlaying.value = playing;
+    _updateMediaProgress();
     // Per Medientaste o. Ä. weitergespielt → "Gute Nacht" ausblenden.
     if (playing && _sleeping && mounted) setState(() => _sleeping = false);
     _reportProgress();
