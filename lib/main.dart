@@ -64,6 +64,7 @@ Future<void> main(List<String> args) async {
     return;
   }
   await windowManager.ensureInitialized();
+  // Fenster wie beim letzten Mal (Größe, Lage, maximiert).
   final saved = await WindowMemory.load();
 
   final options = WindowOptions(
@@ -85,4 +86,6 @@ Future<void> main(List<String> args) async {
     await windowManager.show();
     await windowManager.focus();
   });
+
+  runApp(const ProviderScope(retry: providerRetry, child: JellyflexApp()));
 }
