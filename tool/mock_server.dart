@@ -883,6 +883,13 @@ Object? _handle(HttpRequest req) {
   if (seg.length == 3 && seg[0] == 'Items' && seg[2] == 'Similar') {
     return {'Items': movies.where((m) => m['Id'] != seg[1]).take(10).toList()};
   }
+  if (seg.length == 3 && seg[0] == 'Items' && seg[2] == 'Ancestors') {
+    final isShow = byId[seg[1]]?['Type'] != 'Movie';
+    return [
+      {'Id': isShow ? 'lib-shows' : 'lib-movies', 'Name': isShow ? 'Serien' : 'Filme', 'Type': 'CollectionFolder'},
+      {'Id': 'root', 'Name': 'Media Folders', 'Type': 'UserRootFolder'},
+    ];
+  }
   if (seg.length == 3 && seg[0] == 'Items' && seg[2] == 'PlaybackInfo') {
     final item = byId[seg[1]];
     return {'PlaySessionId': 'mock-session', 'MediaSources': item?['MediaSources'] ?? []};

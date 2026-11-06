@@ -215,9 +215,67 @@ final class _Fr extends S {
   @override
   String get size => 'Taille';
   @override
-  String get background => 'Fond';
+  String get subtitleFont => 'Police';
   @override
-  String get subtitleBackgroundHint => 'Cadre semi-transparent derrière le texte.';
+  String get subtitleFontStandard => 'Standard';
+  @override
+  String get subtitleFontClear => 'Lisible';
+  @override
+  String get subtitleFontSerif => 'Serif';
+  @override
+  String get subtitleFontMono => 'Machine à écrire';
+  @override
+  String get subtitleFontRounded => 'Arrondie';
+  @override
+  String get subtitleColor => 'Couleur';
+  @override
+  String get subtitleColorWhite => 'Blanc';
+  @override
+  String get subtitleColorYellow => 'Jaune';
+  @override
+  String get subtitleColorCyan => 'Cyan';
+  @override
+  String get subtitleColorGreen => 'Vert';
+  @override
+  String get subtitleColorPink => 'Rose';
+  @override
+  String get subtitleEdge => 'Contour';
+  @override
+  String get subtitleEdgeOutline => 'Contour';
+  @override
+  String get subtitleEdgeThick => 'Contour épais';
+  @override
+  String get subtitleEdgeShadow => 'Ombre';
+  @override
+  String get subtitleEdgeBox => 'Cadre';
+  @override
+  String get subtitleEdgeNone => 'Aucun';
+  @override
+  String get subtitleBoxOpacity => 'Opacité du cadre';
+  @override
+  String get subtitlePosition => 'Hauteur dans l’image';
+  @override
+  String get subtitlePositionBottom => 'En bas';
+  @override
+  String get subtitleBold => 'Gras';
+  @override
+  String get subtitleForceStyle => 'Aussi pour les sous-titres stylisés (ASS)';
+  @override
+  String get subtitleForceStyleHint =>
+      'Remplace leur apparence – panneaux et effets peuvent se décaler. Les sous-titres image (PGS) peuvent seulement être agrandis et déplacés.';
+  @override
+  String get subtitlesByLibrary => 'Sous-titres par bibliothèque';
+  @override
+  String get subtitlesByLibraryHint =>
+      'Donnez à une bibliothèque sa propre langue et sa propre apparence, p. ex. de grands sous-titres jaunes pour les animés.';
+  @override
+  String get subtitleSameAsGeneral => 'Comme en général';
+  @override
+  String get subtitleOwnStyle => 'Apparence propre';
+  @override
+  String get subtitleScopeAll => 'Partout';
+  @override
+  String get subtitleUseGeneral => 'Utiliser l’apparence générale';
   @override
   String get subtitlePreview => 'Voici à quoi ressemblent vos sous-titres.';
   @override

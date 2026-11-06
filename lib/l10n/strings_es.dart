@@ -215,9 +215,67 @@ final class _Es extends S {
   @override
   String get size => 'Tamaño';
   @override
-  String get background => 'Fondo';
+  String get subtitleFont => 'Fuente';
   @override
-  String get subtitleBackgroundHint => 'Recuadro semitransparente detrás del texto.';
+  String get subtitleFontStandard => 'Estándar';
+  @override
+  String get subtitleFontClear => 'Legible';
+  @override
+  String get subtitleFontSerif => 'Serif';
+  @override
+  String get subtitleFontMono => 'Máquina de escribir';
+  @override
+  String get subtitleFontRounded => 'Redondeada';
+  @override
+  String get subtitleColor => 'Color';
+  @override
+  String get subtitleColorWhite => 'Blanco';
+  @override
+  String get subtitleColorYellow => 'Amarillo';
+  @override
+  String get subtitleColorCyan => 'Cian';
+  @override
+  String get subtitleColorGreen => 'Verde';
+  @override
+  String get subtitleColorPink => 'Rosa';
+  @override
+  String get subtitleEdge => 'Borde';
+  @override
+  String get subtitleEdgeOutline => 'Contorno';
+  @override
+  String get subtitleEdgeThick => 'Contorno grueso';
+  @override
+  String get subtitleEdgeShadow => 'Sombra';
+  @override
+  String get subtitleEdgeBox => 'Recuadro';
+  @override
+  String get subtitleEdgeNone => 'Ninguno';
+  @override
+  String get subtitleBoxOpacity => 'Opacidad del recuadro';
+  @override
+  String get subtitlePosition => 'Altura en la imagen';
+  @override
+  String get subtitlePositionBottom => 'Abajo';
+  @override
+  String get subtitleBold => 'Negrita';
+  @override
+  String get subtitleForceStyle => 'También para subtítulos con estilo (ASS)';
+  @override
+  String get subtitleForceStyleHint =>
+      'Sustituye su aspecto: los carteles y efectos pueden moverse. Los subtítulos de imagen (PGS) solo se pueden ampliar y mover.';
+  @override
+  String get subtitlesByLibrary => 'Subtítulos por biblioteca';
+  @override
+  String get subtitlesByLibraryHint =>
+      'Da a una biblioteca su propio idioma y aspecto, p. ej. subtítulos grandes y amarillos para anime.';
+  @override
+  String get subtitleSameAsGeneral => 'Como en general';
+  @override
+  String get subtitleOwnStyle => 'Aspecto propio';
+  @override
+  String get subtitleScopeAll => 'En todas partes';
+  @override
+  String get subtitleUseGeneral => 'Usar el aspecto general';
   @override
   String get subtitlePreview => 'Así se ven tus subtítulos.';
   @override

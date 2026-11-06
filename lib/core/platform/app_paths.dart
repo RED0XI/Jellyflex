@@ -35,8 +35,12 @@ abstract final class AppPaths {
     return value == null || value.isEmpty ? null : value;
   }
 
-  /// Benutzerordner (`%USERPROFILE%` bzw. `$HOME`).
-  static String get home => (Platform.isWindows ? _env('USERPROFILE') : _env('HOME')) ?? Directory.systemTemp.path;
+  /// Benutzerordner (`%USERPROFILE%` bzw. `$HOME`). iOS: der Container der App – Dart kennt dort
+  /// kein `$HOME`, aber der Temp-Ordner liegt direkt darin. Nie `tmp` selbst: den leert iOS jederzeit.
+  static String get home {
+    if (Platform.isIOS) return _env('HOME') ?? Directory.systemTemp.parent.path;
+    return (Platform.isWindows ? _env('USERPROFILE') : _env('HOME')) ?? Directory.systemTemp.path;
+  }
 
   /// Einstellungen, Anmeldung, Downloadliste, eigenes Logo.
   static Directory get appData {

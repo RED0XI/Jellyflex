@@ -15,6 +15,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../core/downloads.dart';
+import '../core/item_library.dart';
 import '../core/jellyfin_api.dart';
 import '../core/series_tracks.dart';
 import '../core/models.dart';
@@ -107,6 +108,14 @@ class _FakeApi extends JellyfinApi {
   String streamUrl(String itemId, {required String mediaSourceId, String? playSessionId}) => _testVideo;
 
   @override
+  Future<String?> getLibraryId(String itemId) async => 'lib-test';
+
+  @override
+  Future<List<BaseItem>> getUserViews() async => [
+    BaseItem({'Id': 'lib-test', 'Name': 'Anime', 'Type': 'CollectionFolder', 'CollectionType': 'tvshows'}),
+  ];
+
+  @override
   Future<List<MediaSegment>> getMediaSegments(String itemId) async => [
     MediaSegment({'Type': 'Intro', 'StartTicks': 30000000, 'EndTicks': 250000000}),
   ];
@@ -162,6 +171,7 @@ class _HarnessSession extends SessionController {
 Widget buildHarnessApp({AppSettings? settings}) {
   final temp = Directory.systemTemp.createTempSync('jellyflex_harness_');
   SeriesTracks.instance = SeriesTracks.forFile(File('${temp.path}${Platform.pathSeparator}series_tracks.json'));
+  ItemLibraries.instance = ItemLibraries.forFile(File('${temp.path}${Platform.pathSeparator}item_libraries.json'));
   final router = GoRouter(
     routes: [
       GoRoute(

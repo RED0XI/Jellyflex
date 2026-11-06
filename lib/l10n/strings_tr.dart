@@ -215,9 +215,67 @@ final class _Tr extends S {
   @override
   String get size => 'Boyut';
   @override
-  String get background => 'Arka plan';
+  String get subtitleFont => 'Yazı tipi';
   @override
-  String get subtitleBackgroundHint => 'Metnin arkasında yarı saydam bir kutu.';
+  String get subtitleFontStandard => 'Standart';
+  @override
+  String get subtitleFontClear => 'Net';
+  @override
+  String get subtitleFontSerif => 'Serifli';
+  @override
+  String get subtitleFontMono => 'Daktilo';
+  @override
+  String get subtitleFontRounded => 'Yuvarlak';
+  @override
+  String get subtitleColor => 'Renk';
+  @override
+  String get subtitleColorWhite => 'Beyaz';
+  @override
+  String get subtitleColorYellow => 'Sarı';
+  @override
+  String get subtitleColorCyan => 'Camgöbeği';
+  @override
+  String get subtitleColorGreen => 'Yeşil';
+  @override
+  String get subtitleColorPink => 'Pembe';
+  @override
+  String get subtitleEdge => 'Kenar';
+  @override
+  String get subtitleEdgeOutline => 'Kontur';
+  @override
+  String get subtitleEdgeThick => 'Kalın kontur';
+  @override
+  String get subtitleEdgeShadow => 'Gölge';
+  @override
+  String get subtitleEdgeBox => 'Kutu';
+  @override
+  String get subtitleEdgeNone => 'Yok';
+  @override
+  String get subtitleBoxOpacity => 'Kutu opaklığı';
+  @override
+  String get subtitlePosition => 'Görüntüdeki yükseklik';
+  @override
+  String get subtitlePositionBottom => 'Altta';
+  @override
+  String get subtitleBold => 'Kalın';
+  @override
+  String get subtitleForceStyle => 'Biçimli altyazılarda da (ASS)';
+  @override
+  String get subtitleForceStyleHint =>
+      'Kendi görünümlerinin yerine geçer – tabelalar ve efektler kayabilir. Görüntü altyazıları (PGS) yalnızca büyütülüp taşınabilir.';
+  @override
+  String get subtitlesByLibrary => 'Kütüphaneye göre altyazı';
+  @override
+  String get subtitlesByLibraryHint =>
+      'Bir kütüphaneye kendi dilini ve görünümünü verin, ör. anime için büyük sarı altyazılar.';
+  @override
+  String get subtitleSameAsGeneral => 'Genel ayar gibi';
+  @override
+  String get subtitleOwnStyle => 'Kendi görünümü';
+  @override
+  String get subtitleScopeAll => 'Her yerde';
+  @override
+  String get subtitleUseGeneral => 'Genel görünümü kullan';
   @override
   String get subtitlePreview => 'Altyazıların böyle görünüyor.';
   @override

@@ -11,6 +11,7 @@ import 'app_shell.dart';
 import 'download_folder.dart';
 import 'platform/app_paths.dart';
 import 'images.dart';
+import 'item_library.dart';
 import 'jellyfin_api.dart';
 import 'models.dart';
 import 'session.dart';
@@ -534,6 +535,8 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     if (session == null || !_safeId.hasMatch(item.id)) return;
     final o = options ?? defaultOptions;
     _roots.add(root.path);
+    // Offline lässt sich die Bibliothek nicht mehr erfragen (Untertitel-Regeln je Bibliothek).
+    ItemLibraries.instance.resolve(ref.read(apiProvider), itemId: item.id, seriesId: item.seriesId).ignore();
     final folder = AppPaths.join(root.path, _folderName(item.id, session.serverUrl, session.userId));
     _set([
       ...state,

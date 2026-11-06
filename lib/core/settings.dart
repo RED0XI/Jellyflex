@@ -13,6 +13,7 @@ import 'themes.dart';
 import 'ui_sounds.dart';
 import 'platform/app_paths.dart';
 import 'power.dart';
+import 'subtitle_style.dart';
 
 /// Wählbare Sprachen für Ton und Untertitel (ISO 639-2, wie Jellyfin/mpv sie liefern).
 const settingsLanguages = ['ger', 'eng', 'jpn', 'fre', 'spa', 'ita', 'tur', 'kor', 'rus', 'por', 'chi'];
@@ -51,8 +52,8 @@ class AppSettings {
     this.autoSkipIntro = false,
     this.nextEpisodeCountdown = true,
     this.episodeImagesInRows = true,
-    this.subtitleScale = 1.0,
-    this.subtitleBackground = false,
+    this.subtitleStyle = const SubtitleStyle(),
+    this.subtitleLibraries = const {},
     this.maxBitrate,
     this.bannerTrailers = true,
     this.appName,
@@ -194,11 +195,32 @@ class AppSettings {
   /// Bei "Weiterschauen" das Standbild der Folge statt des Serienbilds zeigen.
   final bool episodeImagesInRows;
 
-  /// Untertitelgröße (1.0 = normal).
-  final double subtitleScale;
+  /// Allgemeines Aussehen der Untertitel.
+  final SubtitleStyle subtitleStyle;
 
-  /// Untertitel auf halbtransparentem Kasten (besser lesbar).
-  final bool subtitleBackground;
+  /// Eigene Untertitel-Regeln einzelner Bibliotheken (nach Bibliotheks-ID).
+  final Map<String, LibrarySubtitles> subtitleLibraries;
+
+  /// Aussehen für einen Titel aus [libraryId]: das der Bibliothek, sonst das allgemeine.
+  SubtitleStyle subtitleStyleFor(String? libraryId) => subtitleLibraries[libraryId]?.style ?? subtitleStyle;
+
+  /// Untertitelsprache für einen Titel aus [libraryId]: die der Bibliothek, sonst die allgemeine.
+  String? subtitleLanguageFor(String? libraryId) => subtitleLibraries[libraryId]?.language ?? subtitleLanguage;
+
+  /// Eigene Sprache der Bibliothek (`null` = wie allgemein).
+  String? libraryLanguage(String? libraryId) => subtitleLibraries[libraryId]?.language;
+
+  /// Hat die Bibliothek ein eigenes Aussehen?
+  bool hasLibraryStyle(String? libraryId) => subtitleLibraries[libraryId]?.style != null;
+
+  /// Regeln einer Bibliothek setzen; ohne eigene Werte fällt der Eintrag ganz weg.
+  AppSettings withLibrarySubtitles(String libraryId, LibrarySubtitles rules) => copyWith(
+    subtitleLibraries: {
+      for (final e in subtitleLibraries.entries)
+        if (e.key != libraryId) e.key: e.value,
+      if (!rules.isEmpty) libraryId: rules,
+    },
+  );
 
   AppSettings copyWith({
     String? Function()? audioLanguage,
@@ -206,8 +228,8 @@ class AppSettings {
     bool? autoSkipIntro,
     bool? nextEpisodeCountdown,
     bool? episodeImagesInRows,
-    double? subtitleScale,
-    bool? subtitleBackground,
+    SubtitleStyle? subtitleStyle,
+    Map<String, LibrarySubtitles>? subtitleLibraries,
     int? Function()? maxBitrate,
     bool? bannerTrailers,
     String? Function()? appName,
@@ -245,8 +267,8 @@ class AppSettings {
     autoSkipIntro: autoSkipIntro ?? this.autoSkipIntro,
     nextEpisodeCountdown: nextEpisodeCountdown ?? this.nextEpisodeCountdown,
     episodeImagesInRows: episodeImagesInRows ?? this.episodeImagesInRows,
-    subtitleScale: subtitleScale ?? this.subtitleScale,
-    subtitleBackground: subtitleBackground ?? this.subtitleBackground,
+    subtitleStyle: subtitleStyle ?? this.subtitleStyle,
+    subtitleLibraries: subtitleLibraries ?? this.subtitleLibraries,
     maxBitrate: maxBitrate != null ? maxBitrate() : this.maxBitrate,
     bannerTrailers: bannerTrailers ?? this.bannerTrailers,
     appName: appName != null ? appName() : this.appName,
@@ -286,8 +308,8 @@ class AppSettings {
     'autoSkipIntro': autoSkipIntro,
     'nextEpisodeCountdown': nextEpisodeCountdown,
     'episodeImagesInRows': episodeImagesInRows,
-    'subtitleScale': subtitleScale,
-    'subtitleBackground': subtitleBackground,
+    'subtitleStyle': subtitleStyle.toJson(),
+    'subtitleLibraries': {for (final e in subtitleLibraries.entries) e.key: e.value.toJson()},
     'maxBitrate': maxBitrate,
     'bannerTrailers': bannerTrailers,
     'appName': appName,
@@ -327,8 +349,12 @@ class AppSettings {
     autoSkipIntro: json['autoSkipIntro'] as bool? ?? false,
     nextEpisodeCountdown: json['nextEpisodeCountdown'] as bool? ?? true,
     episodeImagesInRows: json['episodeImagesInRows'] as bool? ?? true,
-    subtitleScale: (json['subtitleScale'] as num?)?.toDouble() ?? 1.0,
-    subtitleBackground: json['subtitleBackground'] as bool? ?? false,
+    subtitleStyle: _subtitleStyleFromJson(json),
+    subtitleLibraries: {
+      if (json['subtitleLibraries'] is Map)
+        for (final e in (json['subtitleLibraries'] as Map).entries)
+          if (e.value is Map) '${e.key}': LibrarySubtitles.fromJson((e.value as Map).cast<String, dynamic>()),
+    },
     maxBitrate: (json['maxBitrate'] as num?)?.toInt(),
     bannerTrailers: json['bannerTrailers'] as bool? ?? true,
     appName: json['appName'] as String?,
@@ -361,6 +387,17 @@ class AppSettings {
     setupDone: json['setupDone'] as bool? ?? true,
     hoverPreview: json['hoverPreview'] as bool? ?? true,
     energySaver: EnergySaver.values.asNameMap()[json['energySaver']] ?? EnergySaver.auto,
+  );
+}
+
+/// Ältere Versionen kannten nur Größe und Kasten – die bleiben beim Update erhalten.
+SubtitleStyle _subtitleStyleFromJson(Map<String, dynamic> json) {
+  if (json['subtitleStyle'] is Map) {
+    return SubtitleStyle.fromJson((json['subtitleStyle'] as Map).cast<String, dynamic>());
+  }
+  return SubtitleStyle(
+    scale: ((json['subtitleScale'] as num?)?.toDouble() ?? 1.0).clamp(SubtitleStyle.minScale, SubtitleStyle.maxScale),
+    edge: json['subtitleBackground'] == true ? SubtitleEdge.box : SubtitleEdge.outline,
   );
 }
 

@@ -355,6 +355,16 @@ class JellyfinApi {
 
   // --- Listen (Wiedergabelisten auf dem Server) ------------------------------
 
+  /// Bibliothek, zu der ein Titel gehört: der oberste Ordner unter seinen Vorfahren.
+  Future<String?> getLibraryId(String itemId) async {
+    final res = await dio.get('/Items/$itemId/Ancestors', queryParameters: {'userId': userId});
+    if (res.data is! List) return null;
+    for (final ancestor in (res.data as List).whereType<Map>()) {
+      if (ancestor['Type'] == 'CollectionFolder') return ancestor['Id'] as String?;
+    }
+    return null;
+  }
+
   Future<List<BaseItem>> getPlaylists() => _getItems('/Items', {
     'userId': userId,
     'includeItemTypes': 'Playlist',

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -17,6 +18,7 @@ import '../../core/downloads.dart';
 import '../../core/format.dart';
 import '../../core/gamepad_input.dart';
 import '../../core/images.dart';
+import '../../core/item_library.dart';
 import '../../core/jellyfin_api.dart';
 import '../../core/live_connection.dart';
 import '../../core/media_info.dart' show codecLabel, trackLabel;
@@ -28,12 +30,15 @@ import '../../core/session.dart';
 import '../../core/series_tracks.dart';
 import '../../core/settings.dart';
 import '../../core/sleep_timer.dart';
+import '../../core/subtitle_style.dart';
 import '../../core/track_choice.dart';
 import '../../theme.dart';
 import '../../widgets/buttons.dart';
+import '../../widgets/subtitle_style_editor.dart';
 import '../../widgets/window_frame.dart';
 import '../details/details_screen.dart';
 import '../details/subtitle_search_dialog.dart';
+import '../home/home_providers.dart';
 import 'apple_player.dart';
 import 'player_overlays.dart';
 import '../../widgets/focusable.dart';
@@ -45,6 +50,7 @@ import '../../core/redact.dart';
 import '../../core/platform/app_paths.dart';
 import '../../core/platform/device.dart';
 
+part 'player_subtitle_panel.dart';
 part 'player_tracks_panel.dart';
 part 'player_extras.dart';
 part 'player_widgets.dart';
@@ -158,8 +164,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _hoveringControls = false;
   bool _trackPanelOpen = false;
   bool _playbackPanelOpen = false;
+  bool _subtitleStyleOpen = false;
+
+  /// Bibliothek des Titels (für deren Untertitel-Regeln); `null` = unbekannt.
+  String? _libraryId;
+
+  /// Zuletzt an mpv gegebener Untertitel-Stil – beim Schieben der Regler nur Änderungen senden.
+  Map<String, String> _subtitleProps = const {};
   bool _chaptersOpen = false;
-  bool get _anyPanelOpen => _trackPanelOpen || _playbackPanelOpen || _chaptersOpen;
+  bool get _anyPanelOpen => _trackPanelOpen || _playbackPanelOpen || _chaptersOpen || _subtitleStyleOpen;
 
   /// Technische Infos (Taste I).
   bool _statsVisible = false;
@@ -668,6 +681,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         _remembered = SeriesTracks.instance.get(account, item.seriesId!);
         _restoreZoom(SeriesTracks.instance.zoom(account, item.seriesId!));
       }
+      // Bibliothek nachsehen: Hat eine eigene Regeln, entscheiden die über die Spur – kurz darauf
+      // warten. Sonst den Start nicht aufhalten (das Panel im Player braucht sie nur für die Auswahl).
+      final library = ItemLibraries.instance.resolve(_api, itemId: item.id, seriesId: item.seriesId);
+      if (settings.subtitleLibraries.isNotEmpty) {
+        _libraryId = await library.timeout(const Duration(seconds: 2), onTimeout: () => null);
+        if (!mounted) return;
+      } else {
+        library.then((id) {
+          if (mounted) setState(() => _libraryId = id);
+        });
+      }
       var maxBitrate = settings.maxBitrate;
       // Ist die Datei ohnehin kleiner als die Grenze, lohnt Umrechnen nicht.
       if (maxBitrate != null && (source.bitrate ?? 0) > 0 && source.bitrate! <= maxBitrate) maxBitrate = null;
@@ -700,7 +724,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             chosenAudio ?? preferredAudioIndex(source, remembered: _remembered?.audio, setting: settings.audioLanguage);
         _subtitleIndex =
             chosenSubtitle ??
-            preferredSubtitleIndex(source, remembered: _remembered?.subtitle, setting: settings.subtitleLanguage);
+            preferredSubtitleIndex(
+              source,
+              remembered: _remembered?.subtitle,
+              setting: settings.subtitleLanguageFor(_libraryId),
+            );
         _chapters = item.chapters;
       });
       // Auf der Detailseite gewählt → wie eine Wahl im Player für die Serie merken.
@@ -947,28 +975,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
   }
 
-  /// Untertitel: ruhige Systemschrift, schmaler Rand mit weichem Schatten statt der groben
-  /// mpv-Vorgabe; Größe und Hintergrund aus den Einstellungen.
-  Future<void> _applySubtitleStyle() async {
+  /// Untertitel-Stil an mpv geben: der der Bibliothek, sonst der allgemeine. [onlyChanges]: nur,
+  /// was sich geändert hat (beim Schieben der Regler kommt das sehr oft).
+  Future<void> _applySubtitleStyle({bool onlyChanges = false}) async {
     final native = _player.platform;
     if (native is! NativePlayer) return;
-    final s = ref.read(settingsProvider);
-    final props = {
-      'sub-font': Platform.isMacOS || Platform.isIOS ? 'Helvetica Neue' : 'Segoe UI',
-      'sub-bold': 'yes',
-      'sub-font-size': '34',
-      'sub-color': '#FFFFFFFF',
-      'sub-border-color': '#E6000000',
-      'sub-border-size': '1.6',
-      'sub-shadow-color': '#80000000',
-      'sub-shadow-offset': '1.2',
-      'sub-blur': '0.3',
-      'sub-margin-y': '36',
-      'sub-scale': s.subtitleScale.toStringAsFixed(2),
-      'sub-border-style': s.subtitleBackground ? 'background-box' : 'outline-and-shadow',
-      'sub-back-color': '#B3000000',
-    };
+    final props = ref.read(settingsProvider).subtitleStyleFor(_libraryId).toMpv();
+    final before = onlyChanges ? _subtitleProps : const <String, String>{};
+    _subtitleProps = props;
     for (final e in props.entries) {
+      if (before[e.key] == e.value) continue;
       try {
         await native.setProperty(e.key, e.value);
       } catch (err) {
@@ -1442,8 +1458,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Widget build(BuildContext context) {
     // Änderungen an der Untertitel-Darstellung sofort übernehmen.
     ref.listen(settingsProvider, (prev, next) {
-      if (prev?.subtitleScale != next.subtitleScale || prev?.subtitleBackground != next.subtitleBackground) {
-        _applySubtitleStyle();
+      if (prev?.subtitleStyleFor(_libraryId) != next.subtitleStyleFor(_libraryId)) {
+        _applySubtitleStyle(onlyChanges: true);
       }
     });
     final settings = ref.watch(settingsProvider);
@@ -1975,6 +1991,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       onAudio: _selectAudio,
                       onSubtitle: _selectSubtitle,
                       onClose: () => _setTrackPanel(false),
+                      onStyle: () => _setSubtitleStylePanel(true),
+                      maxHeight: _panelMaxHeight(context),
+                    ),
+                  )
+                : _subtitleStyleOpen
+                ? _hoverZone(
+                    _SubtitleStylePanel(
+                      key: const ValueKey('subtitle-style'),
+                      libraryId: _libraryId,
+                      maxHeight: _panelMaxHeight(context),
                     ),
                   )
                 : _chaptersOpen
@@ -2179,11 +2205,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _rememberSubtitle(_subtitleIndex);
   }
 
+  /// Panels stehen über der Steuerleiste – auf dem iPhone im Querformat ist dort wenig Platz.
+  double _panelMaxHeight(BuildContext context) => math.min(420, MediaQuery.sizeOf(context).height - 136);
+
+  void _setSubtitleStylePanel(bool open) {
+    setState(() {
+      _subtitleStyleOpen = open;
+      if (open) _trackPanelOpen = _playbackPanelOpen = _chaptersOpen = false;
+    });
+    _showControls(autoHide: !open && _player.state.playing);
+  }
+
   void _setTrackPanel(bool open) {
     if (open && _refreshTracksOnOpen) _refreshSource();
     setState(() {
       _trackPanelOpen = open;
-      if (open) _playbackPanelOpen = _chaptersOpen = false;
+      if (open) _playbackPanelOpen = _chaptersOpen = _subtitleStyleOpen = false;
     });
     _afterPanelChange();
   }
@@ -2191,7 +2228,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _setPlaybackPanel(bool open) {
     setState(() {
       _playbackPanelOpen = open;
-      if (open) _trackPanelOpen = _chaptersOpen = false;
+      if (open) _trackPanelOpen = _chaptersOpen = _subtitleStyleOpen = false;
     });
     _afterPanelChange();
   }
@@ -2199,7 +2236,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _setChaptersPanel(bool open) {
     setState(() {
       _chaptersOpen = open;
-      if (open) _trackPanelOpen = _playbackPanelOpen = false;
+      if (open) _trackPanelOpen = _playbackPanelOpen = _subtitleStyleOpen = false;
     });
     // Fokus bleibt im Kapitel-Panel (Pfeiltasten wählen das Kapitel).
     if (open) {
@@ -2250,6 +2287,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     setState(() {
       _trackPanelOpen = false;
       _playbackPanelOpen = false;
+      _subtitleStyleOpen = false;
       _chaptersOpen = false;
     });
     _afterPanelChange();

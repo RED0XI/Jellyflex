@@ -246,9 +246,42 @@ class S {
   String get autoplayNextHint => _t('With a countdown at the end of an episode.', 'Mit Countdown am Ende einer Folge.');
   String get subtitleAppearance => _t('Subtitle appearance', 'Untertitel-Darstellung');
   String get size => _t('Size', 'Größe');
-  String get background => _t('Background', 'Hintergrund');
-  String get subtitleBackgroundHint =>
-      _t('Semi-transparent box behind the text.', 'Halbtransparenter Kasten hinter dem Text.');
+  String get subtitleFont => _t('Font', 'Schrift');
+  String get subtitleFontStandard => _t('Standard', 'Standard');
+  String get subtitleFontClear => _t('Clear', 'Klar');
+  String get subtitleFontSerif => _t('Serif', 'Serifen');
+  String get subtitleFontMono => _t('Monospace', 'Schreibmaschine');
+  String get subtitleFontRounded => _t('Rounded', 'Rund');
+  String get subtitleColor => _t('Colour', 'Farbe');
+  String get subtitleColorWhite => _t('White', 'Weiß');
+  String get subtitleColorYellow => _t('Yellow', 'Gelb');
+  String get subtitleColorCyan => _t('Cyan', 'Cyan');
+  String get subtitleColorGreen => _t('Green', 'Grün');
+  String get subtitleColorPink => _t('Pink', 'Rosa');
+  String get subtitleEdge => _t('Edge', 'Rand');
+  String get subtitleEdgeOutline => _t('Outline', 'Kontur');
+  String get subtitleEdgeThick => _t('Thick outline', 'Kräftige Kontur');
+  String get subtitleEdgeShadow => _t('Shadow', 'Schatten');
+  String get subtitleEdgeBox => _t('Box', 'Kasten');
+  String get subtitleEdgeNone => _t('None', 'Keiner');
+  String get subtitleBoxOpacity => _t('Box opacity', 'Deckkraft des Kastens');
+  String get subtitlePosition => _t('Height in the picture', 'Höhe im Bild');
+  String get subtitlePositionBottom => _t('Bottom', 'Unten');
+  String get subtitleBold => _t('Bold', 'Fett');
+  String get subtitleForceStyle => _t('Also for styled subtitles (ASS)', 'Auch für gestaltete Untertitel (ASS)');
+  String get subtitleForceStyleHint => _t(
+    'Replaces their own look – signs and effects can shift. Image subtitles (PGS) can only be resized and moved.',
+    'Ersetzt deren eigenes Aussehen – Schilder und Effekte können verrutschen. Bild-Untertitel (PGS) lassen sich nur vergrößern und verschieben.',
+  );
+  String get subtitlesByLibrary => _t('Subtitles per library', 'Untertitel je Bibliothek');
+  String get subtitlesByLibraryHint => _t(
+    'Give a library its own language and look, e.g. large yellow subtitles for anime.',
+    'Gib einer Bibliothek eine eigene Sprache und ein eigenes Aussehen, z. B. große gelbe Untertitel für Anime.',
+  );
+  String get subtitleSameAsGeneral => _t('As in general', 'Wie allgemein');
+  String get subtitleOwnStyle => _t('Own look', 'Eigenes Aussehen');
+  String get subtitleScopeAll => _t('Everywhere', 'Überall');
+  String get subtitleUseGeneral => _t('Use the general look', 'Allgemeines Aussehen nutzen');
   String get subtitlePreview => _t('This is how your subtitles look.', 'So sehen deine Untertitel aus.');
   String get home => _t('Home', 'Startseite');
   String get search => _t('Search', 'Suchen');

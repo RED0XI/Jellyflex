@@ -11,6 +11,7 @@ import '../../core/format.dart';
 import '../../core/gamepad_input.dart';
 import '../../core/images.dart';
 import '../../core/models.dart';
+import '../../core/platform/device.dart';
 import '../../core/power.dart';
 import '../../core/session.dart';
 import '../../core/settings.dart';
@@ -73,7 +74,8 @@ class _ScreensaverState extends ConsumerState<Screensaver> {
   void _restartTimer() {
     _idle?.cancel();
     final minutes = ref.read(settingsProvider).screensaverMinutes;
-    if (minutes <= 0) return;
+    // iPhone: das Telefon dimmt und sperrt selbst – dort gäbe es nur Akkuverbrauch.
+    if (minutes <= 0 || isPhoneDevice) return;
     _idle = Timer(Duration(minutes: minutes), _startIfAllowed);
   }
 

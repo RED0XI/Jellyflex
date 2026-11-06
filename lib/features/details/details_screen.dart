@@ -7,6 +7,7 @@ import '../downloads/download_flow.dart';
 import '../downloads/downloads_screen.dart';
 import '../../core/format.dart';
 import '../../core/images.dart';
+import '../../core/item_library.dart';
 import '../../core/media_info.dart';
 import '../../core/models.dart';
 import '../../core/series_tracks.dart';
@@ -526,9 +527,14 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
     final remembered = item.isEpisode && item.seriesId != null && account != null
         ? SeriesTracks.instance.get(account, item.seriesId!)
         : null;
+    final library = ref.watch(itemLibraryProvider((itemId: item.id, seriesId: item.seriesId))).value;
     return (
       audio: preferredAudioIndex(source, remembered: remembered?.audio, setting: settings.audioLanguage),
-      subtitle: preferredSubtitleIndex(source, remembered: remembered?.subtitle, setting: settings.subtitleLanguage),
+      subtitle: preferredSubtitleIndex(
+        source,
+        remembered: remembered?.subtitle,
+        setting: settings.subtitleLanguageFor(library),
+      ),
     );
   }
 
