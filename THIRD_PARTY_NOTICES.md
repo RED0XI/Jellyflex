@@ -19,6 +19,17 @@ The libraries are separate files next to the program and can be replaced with yo
 the same version. The source code of mpv and FFmpeg is available from the links above and from
 [mpv-player/mpv](https://github.com/mpv-player/mpv) and [ffmpeg.org](https://ffmpeg.org).
 
+## Mozilla CA certificates (iPhone/iPad)
+
+On iPhone and iPad the video player (mpv/FFmpeg with mbedTLS) cannot use the system's trusted
+root certificates. Jellyflex therefore ships the root certificates of Mozilla's CA program,
+[assets/certs/cacert.pem](assets/certs/cacert.pem), as extracted by the curl project
+([curl.se/docs/caextract.html](https://curl.se/docs/caextract.html)) from Mozilla's
+`certdata.txt`. Licensed under the **Mozilla Public License 2.0** – full text in
+[LICENSES/MPL-2.0.txt](LICENSES/MPL-2.0.txt); source: the
+[NSS builtins in the Firefox source tree](https://github.com/mozilla-firefox/firefox/blob/release/security/nss/lib/ckfw/builtins/certdata.txt).
+Update by downloading a newer `cacert.pem` from the link above.
+
 ## Flutter and Dart packages
 
 Flutter, the Dart packages (e.g. media_kit, dio, riverpod, go_router, window_manager – MIT, BSD

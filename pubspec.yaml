@@ -82,6 +82,9 @@ flutter:
     - assets/sounds/
     # Lizenztext von libmpv/FFmpeg für die Lizenzseite der App.
     - LICENSES/LGPL-3.0.txt
+    - LICENSES/MPL-2.0.txt
+    # iPhone/iPad: Stammzertifikate für den Video-Player (siehe lib/core/system_certs.dart).
+    - assets/certs/cacert.pem
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -43,13 +43,20 @@ abstract final class SystemCerts {
 
   static const _shell = MethodChannel('jellyflex/shell');
 
+  /// iPhone/iPad: Stammzertifikate von Mozilla (wie bei curl/Firefox, https://curl.se/docs/caextract.html).
+  /// iOS gibt seine eigene Liste nicht heraus, und mpv/FFmpeg prüfen dort mit mbedTLS statt mit
+  /// dem System – ohne diese Liste scheiterte jeder https-Server ("Datei konnte nicht geladen werden").
+  static const bundledRoots = 'assets/certs/cacert.pem';
+
   static Future<String?> _export() async {
-    if (!Platform.isWindows && !Platform.isMacOS && !Platform.isAndroid) return null;
+    if (!Platform.isWindows && !Platform.isMacOS && !Platform.isAndroid && !Platform.isIOS) return null;
     try {
       final pem = Platform.isWindows
           ? _windowsRootsAsPem()
           : Platform.isAndroid
           ? await androidRootsAsPem()
+          : Platform.isIOS
+          ? pemBlocks(await rootBundle.loadString(bundledRoots))
           : await _macRootsAsPem();
       if (pem.isEmpty) return null;
       final dir = appDataDir;
@@ -86,17 +93,25 @@ abstract final class SystemCerts {
   /// Android: die Stammzertifikate des Systems (`/system/etc/security/cacerts`, eine Datei je
   /// Zertifikat, nach dem PEM-Block steht noch Klartext) – nur die PEM-Blöcke übernehmen.
   static Future<String> androidRootsAsPem([String folder = '/system/etc/security/cacerts']) async {
-    final pem = RegExp(r'-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----');
     final buffer = StringBuffer();
     final files = Directory(folder).listSync().whereType<File>().toList()..sort((a, b) => a.path.compareTo(b.path));
     for (final file in files) {
       try {
-        for (final m in pem.allMatches(await file.readAsString())) {
-          buffer.writeln(m.group(0));
-        }
+        buffer.write(pemBlocks(await file.readAsString()));
       } catch (_) {
         // Unlesbare Einzeldatei überspringen.
       }
+    }
+    return buffer.toString();
+  }
+
+  /// Nur die PEM-Blöcke aus [text] (ohne Kommentare und Klartext drumherum), je Zeile abgeschlossen.
+  @visibleForTesting
+  static String pemBlocks(String text) {
+    final pem = RegExp(r'-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----');
+    final buffer = StringBuffer();
+    for (final m in pem.allMatches(text)) {
+      buffer.writeln(m.group(0));
     }
     return buffer.toString();
   }

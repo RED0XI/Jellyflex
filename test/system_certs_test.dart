@@ -31,4 +31,12 @@ void main() {
     File('${dir.path}/b.0').writeAsStringSync('$b\n');
     expect(await SystemCerts.androidRootsAsPem(dir.path), '$a\n$b\n');
   });
+
+  test('iPhone: mitgelieferte Mozilla-Stammzertifikate – nur PEM-Blöcke, keine Kommentare', () {
+    final raw = File(SystemCerts.bundledRoots).readAsStringSync();
+    final pem = SystemCerts.pemBlocks(raw);
+    expect('-----BEGIN CERTIFICATE-----'.allMatches(pem).length, greaterThan(100));
+    expect(pem, isNot(contains('##')));
+    expect(pem.trim(), endsWith('-----END CERTIFICATE-----'));
+  });
 }

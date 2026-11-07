@@ -2,7 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// Lizenzen, die Flutter nicht von selbst kennt, auf der Lizenzseite der App zeigen:
-/// libmpv und FFmpeg (LGPL-3.0, ohne GPL-Teile gebaut) – siehe THIRD_PARTY_NOTICES.md.
+/// libmpv und FFmpeg (LGPL-3.0, ohne GPL-Teile gebaut) und die Mozilla-Stammzertifikate (MPL-2.0,
+/// nur iPhone/iPad) – siehe THIRD_PARTY_NOTICES.md.
 void registerThirdPartyLicenses() {
   LicenseRegistry.addLicense(() async* {
     yield const LicenseEntryWithLineBreaks(
@@ -14,5 +15,13 @@ void registerThirdPartyLicenses() {
       'github.com/mpv-player/mpv and ffmpeg.org.',
     );
     yield LicenseEntryWithLineBreaks(['libmpv', 'FFmpeg'], await rootBundle.loadString('LICENSES/LGPL-3.0.txt'));
+    yield const LicenseEntryWithLineBreaks(
+      ['Mozilla CA certificates'],
+      'iPhone/iPad: the video player checks server certificates against the root certificates from '
+      'Mozilla\'s CA program (certdata.txt, extracted by the curl project: curl.se/docs/caextract.html). '
+      'Licensed under the Mozilla Public License 2.0; source: '
+      'github.com/mozilla-firefox/firefox/blob/release/security/nss/lib/ckfw/builtins/certdata.txt',
+    );
+    yield LicenseEntryWithLineBreaks(['Mozilla CA certificates'], await rootBundle.loadString('LICENSES/MPL-2.0.txt'));
   });
 }
