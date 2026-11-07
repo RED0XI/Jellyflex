@@ -70,6 +70,7 @@ class AppSettings {
     this.themeId = 'midnight',
     this.soundEffects = true,
     this.intro = true,
+    this.introSound = true,
     this.playerVolume = 100,
     this.downloadFolder,
     this.downloadFolderAsked = false,
@@ -139,8 +140,11 @@ class AppSettings {
   /// Klänge bei "Überrasch mich".
   final bool soundEffects;
 
-  /// Kurzes Intro (animiertes Logo, Klang nur mit [soundEffects]) beim Start der App.
+  /// Kurzes Intro (animiertes Logo) beim Start der App.
   final bool intro;
+
+  /// Klang zum Intro – eigener Schalter, unabhängig von [soundEffects].
+  final bool introSound;
 
   /// Farbschema (siehe lib/core/themes.dart).
   final String themeId;
@@ -250,6 +254,7 @@ class AppSettings {
     String? themeId,
     bool? soundEffects,
     bool? intro,
+    bool? introSound,
     double? playerVolume,
     String? Function()? downloadFolder,
     bool? downloadFolderAsked,
@@ -290,6 +295,7 @@ class AppSettings {
     themeId: themeId ?? this.themeId,
     soundEffects: soundEffects ?? this.soundEffects,
     intro: intro ?? this.intro,
+    introSound: introSound ?? this.introSound,
     playerVolume: playerVolume ?? this.playerVolume,
     downloadFolder: downloadFolder != null ? downloadFolder() : this.downloadFolder,
     downloadFolderAsked: downloadFolderAsked ?? this.downloadFolderAsked,
@@ -332,6 +338,7 @@ class AppSettings {
     'themeId': themeId,
     'soundEffects': soundEffects,
     'intro': intro,
+    'introSound': introSound,
     'playerVolume': playerVolume,
     'downloadFolder': downloadFolder,
     'downloadFolderAsked': downloadFolderAsked,
@@ -378,6 +385,7 @@ class AppSettings {
     themeId: json['themeId'] as String? ?? 'midnight',
     soundEffects: json['soundEffects'] as bool? ?? true,
     intro: json['intro'] as bool? ?? true,
+    introSound: json['introSound'] as bool? ?? true,
     playerVolume: ((json['playerVolume'] as num?)?.toDouble() ?? 100).clamp(0, 100).toDouble(),
     downloadFolder: json['downloadFolder'] as String?,
     downloadFolderAsked: json['downloadFolderAsked'] as bool? ?? false,

@@ -502,8 +502,11 @@ final class _Fr extends S {
   @override
   String get introSetting => 'Intro au démarrage';
   @override
-  String get introSettingHint =>
-      'Un court logo animé au démarrage de Jellyflex (avec son si les sons sont activés). Une touche le passe.';
+  String get introSettingHint => 'Un court logo animé au démarrage. Une touche le passe.';
+  @override
+  String get introSoundSetting => 'Son de l’intro';
+  @override
+  String get introSoundSettingHint => 'Joue avec l’intro – indépendamment des autres sons.';
   @override
   String get energySaverActive => 'Actif en ce moment.';
   @override

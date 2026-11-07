@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,11 +12,11 @@ import 'brand_mark.dart';
 
 /// Kurzes Intro beim Start der App (3 s): Das Zeichen zeichnet sich, füllt sich und federt, ein
 /// Lichtstreif huscht darüber, die zwei "Sende"-Bögen erscheinen, der Name schreibt sich daneben,
-/// dann öffnet sich die App. Klang dazu (assets/sounds/intro.wav), wenn "Klänge" an ist.
+/// dann öffnet sich die App. Klang dazu (assets/sounds/intro.wav) mit eigenem Schalter.
 ///
 /// Liegt über der App, die darunter schon lädt. Jede Taste oder Berührung überspringt es.
 /// Nur beim Kaltstart, nicht in Tests, nicht mit "Bewegungen reduzieren" und abschaltbar
-/// (Einstellungen → Aussehen → Intro beim Start).
+/// (Einstellungen → Allgemein → Intro beim Start / Intro-Klang).
 class AppIntro extends ConsumerStatefulWidget {
   const AppIntro({super.key, required this.child});
 
@@ -79,7 +81,7 @@ class _AppIntroState extends ConsumerState<AppIntro> with SingleTickerProviderSt
   void _start() {
     if (!mounted || !_visible || _started) return;
     _started = true;
-    UiSounds.play(UiSound.intro);
+    if (ref.read(settingsProvider).introSound) UiSounds.play(UiSound.intro, always: true);
     _anim.forward();
   }
 
@@ -126,8 +128,12 @@ class _AppIntroState extends ConsumerState<AppIntro> with SingleTickerProviderSt
             onTap: _skip,
             child: AnimatedBuilder(
               animation: _anim,
-              builder: (context, _) =>
-                  _IntroFrame(t: _anim.value, skipped: _skipped, name: appDisplayName(ref.read(settingsProvider))),
+              builder: (context, _) => _IntroFrame(
+                t: _anim.value,
+                skipped: _skipped,
+                name: appDisplayName(ref.read(settingsProvider)),
+                logo: customLogo(ref.read(settingsProvider)),
+              ),
             ),
           ),
         ),
@@ -138,11 +144,16 @@ class _AppIntroState extends ConsumerState<AppIntro> with SingleTickerProviderSt
 
 /// Ein Bild des Intros zum Zeitpunkt [t] (0…1 über 3 s).
 class _IntroFrame extends StatelessWidget {
-  const _IntroFrame({required this.t, required this.skipped, required this.name});
+  const _IntroFrame({required this.t, required this.skipped, required this.name, this.logo});
 
   final double t;
   final bool skipped;
+
+  /// Name der App – der eigene, falls in den Einstellungen einer vergeben ist.
   final String name;
+
+  /// Eigenes Logo aus den Einstellungen – erscheint statt des Zeichens.
+  final File? logo;
 
   /// Fortschritt in einem Abschnitt [from]…[to] von [t], mit [curve].
   double _seg(double from, double to, [Curve curve = Curves.easeInOut]) =>
@@ -220,18 +231,32 @@ class _IntroFrame extends StatelessWidget {
                         child: SizedBox(
                           width: mark,
                           height: mark,
-                          child: CustomPaint(
-                            painter: BrandMarkPainter(
-                              colors: brandMarkColors(),
-                              draw: draw,
-                              fill: fill,
-                              shine: shine,
-                              highlight: fill,
-                              arc1: arc1,
-                              arc2: arc2,
-                              glow: glow,
-                            ),
-                          ),
+                          child: logo != null
+                              // Eigenes Logo: blendet auf und federt (statt sich zu zeichnen).
+                              ? Opacity(
+                                  opacity: fill,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(mark * 0.2),
+                                    child: Image.file(
+                                      logo!,
+                                      fit: BoxFit.contain,
+                                      cacheWidth: (mark * MediaQuery.devicePixelRatioOf(context)).ceil(),
+                                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                                    ),
+                                  ),
+                                )
+                              : CustomPaint(
+                                  painter: BrandMarkPainter(
+                                    colors: brandMarkColors(),
+                                    draw: draw,
+                                    fill: fill,
+                                    shine: shine,
+                                    highlight: fill,
+                                    arc1: arc1,
+                                    arc2: arc2,
+                                    glow: glow,
+                                  ),
+                                ),
                         ),
                       ),
                     ),

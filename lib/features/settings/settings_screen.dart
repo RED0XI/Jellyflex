@@ -141,6 +141,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onChanged: (v) => ctrl.update((s) => s.copyWith(intro: v)),
               ),
             ),
+            if (s.intro)
+              _Row(
+                title: tr.introSoundSetting,
+                subtitle: tr.introSoundSettingHint,
+                trailing: _Toggle(
+                  value: s.introSound,
+                  onChanged: (v) => ctrl.update((s) => s.copyWith(introSound: v)),
+                ),
+              ),
             _Keywords(
               text: '${tr.energySaver} ${tr.energySaverHint}',
               child: ValueListenableBuilder<bool>(

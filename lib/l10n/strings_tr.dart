@@ -502,8 +502,11 @@ final class _Tr extends S {
   @override
   String get introSetting => 'Açılışta intro';
   @override
-  String get introSettingHint =>
-      'Jellyflex açılırken kısa animasyonlu logo (sesler açıksa sesli). Herhangi bir tuş atlar.';
+  String get introSettingHint => 'Açılışta kısa animasyonlu logo. Herhangi bir tuş atlar.';
+  @override
+  String get introSoundSetting => 'Intro sesi';
+  @override
+  String get introSoundSettingHint => 'İntro ile çalar – diğer seslerden bağımsız.';
   @override
   String get energySaverActive => 'Şu anda etkin.';
   @override

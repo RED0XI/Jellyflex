@@ -90,9 +90,10 @@ abstract final class UiSounds {
     }
   }
 
-  /// Spielt [sound]; `true`, wenn das System den Klang angenommen hat.
-  static bool play(UiSound sound) {
-    if (!enabled) return false;
+  /// Spielt [sound]; `true`, wenn das System den Klang angenommen hat. [always]: auch wenn
+  /// "Klänge" aus ist (das Intro hat einen eigenen Schalter).
+  static bool play(UiSound sound, {bool always = false}) {
+    if (!enabled && !always) return false;
     if (_viaShell) {
       if (!_macLoaded.contains(sound)) return false;
       _shell.invokeMethod<void>('playSound', sound.file).catchError((_) {});

@@ -503,8 +503,11 @@ final class _Es extends S {
   @override
   String get introSetting => 'Intro al iniciar';
   @override
-  String get introSettingHint =>
-      'Un breve logotipo animado al iniciar Jellyflex (con sonido si los sonidos están activados). Cualquier tecla lo salta.';
+  String get introSettingHint => 'Un breve logotipo animado al iniciar. Cualquier tecla lo salta.';
+  @override
+  String get introSoundSetting => 'Sonido de la intro';
+  @override
+  String get introSoundSettingHint => 'Suena con la intro, independiente de los demás sonidos.';
   @override
   String get energySaverActive => 'Activo ahora mismo.';
   @override

@@ -537,8 +537,13 @@ class S {
   String get energySaverOnTv => _t('On the TV', 'Auf dem Fernseher');
   String get introSetting => _t('Intro at start', 'Intro beim Start');
   String get introSettingHint => _t(
-    'A short animated logo when Jellyflex starts (with sound if sounds are on). Any key skips it.',
-    'Kurzes animiertes Logo beim Start (mit Klang, wenn Klänge an sind). Jede Taste überspringt es.',
+    'A short animated logo when Jellyflex starts. Any key skips it.',
+    'Kurzes animiertes Logo beim Start. Jede Taste überspringt es.',
+  );
+  String get introSoundSetting => _t('Intro sound', 'Intro-Klang');
+  String get introSoundSettingHint => _t(
+    'Plays with the intro – independent of the other sounds.',
+    'Spielt zum Intro – unabhängig von den anderen Klängen.',
   );
   String get energySaverActive => _t('Active right now.', 'Gerade aktiv.');
   String get theme => _t('Theme', 'Theme');
