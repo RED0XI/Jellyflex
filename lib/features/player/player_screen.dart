@@ -47,6 +47,7 @@ import '../live_handler.dart' show appMessengerKey;
 import '../../l10n/strings.dart';
 import '../../core/system_certs.dart';
 import '../../core/redact.dart';
+import '../../core/screen_brightness.dart';
 import '../../core/platform/app_paths.dart';
 import '../../core/platform/device.dart';
 
@@ -195,6 +196,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   final _zoomOsd = ValueNotifier<String?>(null);
   Timer? _zoomOsdTimer;
 
+  /// Touch: senkrecht wischen – links Helligkeit, rechts Lautstärke (Anzeige am Rand).
+  _Swipe? _swipe;
+  double _swipeValue = 0;
+  final _levelOsd = ValueNotifier<(_Swipe, double)?>(null);
+  Timer? _levelOsdTimer;
+
   /// Kurze Lautstärke-Anzeige in der Bildmitte (Mausrad, Pfeiltasten); `null` = ausgeblendet.
   Timer? _hideTimer;
   Timer? _progressTimer;
@@ -313,6 +320,46 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       return;
     }
     await _close();
+  }
+
+  /// Wischen beginnt: Seite bestimmt, was sich ändert. Ganz oben und unten nicht – dort liegen
+  /// die Gesten des Systems (Kontrollzentrum, Home).
+  Future<void> _onSwipeStart(DragStartDetails d) async {
+    final size = MediaQuery.sizeOf(context);
+    final y = d.localPosition.dy;
+    if (y < size.height * 0.1 || y > size.height * 0.9) return;
+    final kind = d.localPosition.dx < size.width / 2 ? _Swipe.brightness : _Swipe.volume;
+    _swipe = kind;
+    _swipeValue = kind == _Swipe.volume ? (_volume / 100).clamp(0.0, 1.0) : 0.5;
+    if (kind == _Swipe.brightness) _swipeValue = await ScreenBrightness.get() ?? 0.5;
+    _showLevel();
+  }
+
+  /// Ein voller Wisch über drei Viertel der Höhe geht von 0 auf 100 %.
+  void _onSwipeUpdate(DragUpdateDetails d) {
+    final kind = _swipe;
+    if (kind == null) return;
+    final height = MediaQuery.sizeOf(context).height;
+    _swipeValue = (_swipeValue - d.delta.dy / (height * 0.75)).clamp(0.0, 1.0);
+    if (kind == _Swipe.brightness) {
+      ScreenBrightness.set(_swipeValue);
+    } else {
+      _setVolume(_swipeValue * 100);
+    }
+    _showLevel();
+  }
+
+  void _onSwipeEnd() {
+    _swipe = null;
+    _levelOsdTimer?.cancel();
+    _levelOsdTimer = Timer(const Duration(milliseconds: 700), () => _levelOsd.value = null);
+  }
+
+  void _showLevel() {
+    final kind = _swipe;
+    if (kind == null) return;
+    _levelOsdTimer?.cancel();
+    _levelOsd.value = (kind, _swipeValue);
   }
 
   /// Kurzer Hinweis in der Bildmitte (Zoom, Spulen per Doppeltipp).
@@ -588,6 +635,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void dispose() {
     if (isMobile) {
+      // Helligkeit wie vor dem Video (auf dem iPhone gilt sie sonst systemweit weiter).
+      ScreenBrightness.restore();
+      _levelOsdTimer?.cancel();
       _leaveMobilePlayback();
       Power.appVisible.removeListener(_onAppVisibleChanged);
     }
@@ -1524,6 +1574,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   ),
                 ),
                 Center(child: _ZoomOsd(label: _zoomOsd)),
+                if (isMobile) Positioned.fill(child: _LevelOsd(level: _levelOsd)),
                 Positioned.fill(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
@@ -1540,6 +1591,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       }
                     },
                     onDoubleTapDown: isMobile ? (details) => _doubleTapX = details.localPosition.dx : null,
+                    onVerticalDragStart: isMobile ? _onSwipeStart : null,
+                    onVerticalDragUpdate: isMobile ? _onSwipeUpdate : null,
+                    onVerticalDragEnd: isMobile ? (_) => _onSwipeEnd() : null,
+                    onVerticalDragCancel: isMobile ? _onSwipeEnd : null,
                     // Im Mini-Player holt ein Doppelklick das große Fenster zurück.
                     onDoubleTap: () {
                       _userActive();
@@ -1754,12 +1809,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           left: 0,
           right: 0,
           height: 180,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xB0000000), Color(0x00000000)],
+          // Nur Deko: Tippen und Wischen gehen durch zum Bild (Helligkeit/Lautstärke am Handy).
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xB0000000), Color(0x00000000)],
+                ),
               ),
             ),
           ),
@@ -1769,12 +1827,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           left: 0,
           right: 0,
           height: 260,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [Color(0xD0000000), Color(0x00000000)],
+          // Nur Deko: Tippen und Wischen gehen durch zum Bild (Helligkeit/Lautstärke am Handy).
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [Color(0xD0000000), Color(0x00000000)],
+                ),
               ),
             ),
           ),

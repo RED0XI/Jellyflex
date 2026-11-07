@@ -431,3 +431,82 @@ class _ChapterTicksPainter extends CustomPainter {
   @override
   bool shouldRepaint(_ChapterTicksPainter old) => old.fractions.length != fractions.length;
 }
+
+/// Was ein senkrechter Wisch im Player ändert (Touch).
+enum _Swipe { brightness, volume }
+
+/// Anzeige beim Wischen: schmaler Balken am Rand der Seite, auf der gewischt wird
+/// (links Helligkeit, rechts Lautstärke).
+class _LevelOsd extends StatelessWidget {
+  const _LevelOsd({required this.level});
+
+  final ValueListenable<(_Swipe, double)?> level;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: ValueListenableBuilder<(_Swipe, double)?>(
+        valueListenable: level,
+        builder: (context, value, _) {
+          final (kind, amount) = value ?? (_Swipe.volume, 0.0);
+          final icon = switch (kind) {
+            _Swipe.brightness => amount < 0.35 ? Icons.brightness_low_rounded : Icons.brightness_high_rounded,
+            _Swipe.volume =>
+              amount == 0
+                  ? Icons.volume_off_rounded
+                  : amount < 0.5
+                  ? Icons.volume_down_rounded
+                  : Icons.volume_up_rounded,
+          };
+          return AnimatedOpacity(
+            opacity: value == null ? 0 : 1,
+            duration: const Duration(milliseconds: 180),
+            child: Align(
+              alignment: kind == _Swipe.brightness ? const Alignment(-0.82, 0) : const Alignment(0.82, 0),
+              child: Container(
+                width: 52,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(26),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 22),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: 6,
+                      height: 130,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: Stack(
+                          children: [
+                            Container(color: Colors.white.withValues(alpha: 0.22)),
+                            Align(
+                              alignment: Alignment.bottomCenter,
+                              child: FractionallySizedBox(
+                                heightFactor: amount,
+                                widthFactor: 1,
+                                child: const ColoredBox(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '${(amount * 100).round()}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}

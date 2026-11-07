@@ -9,6 +9,7 @@ import UIKit
 /// - `connectionCost`: "metered" bei Mobilfunk, Handy-Hotspot oder "Datensparmodus",
 ///   sonst "unrestricted" bzw. "none" – Downloads warten so auf WLAN.
 /// - `loadSound`/`playSound`: kurze Oberflächen-Klänge aus dem Speicher.
+/// - `getBrightness`/`setBrightness`: Bildschirmhelligkeit 0…1 (Wischen im Player).
 ///
 /// Alles Weitere (Dock-Menü, Stammzertifikate …) gibt es hier noch nicht; Dart fängt die
 /// fehlenden Methoden ab.
@@ -46,6 +47,16 @@ final class AppShell: NSObject {
         // Ein neuer Klang beginnt von vorn (wie unter macOS und Windows).
         player.currentTime = 0
         player.play()
+        result(true)
+      case "getBrightness":
+        // Bildschirmhelligkeit 0…1 (Wischen links im Player).
+        result(Double(UIScreen.main.brightness))
+      case "setBrightness":
+        guard let value = call.arguments as? Double else {
+          result(false)
+          return
+        }
+        UIScreen.main.brightness = CGFloat(min(max(value, 0), 1))
         result(true)
       default:
         result(FlutterMethodNotImplemented)

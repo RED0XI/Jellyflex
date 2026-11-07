@@ -65,6 +65,18 @@ class MainActivity : FlutterActivity() {
                     val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
                     result.success(if (cm.isActiveNetworkMetered) "metered" else "unmetered")
                 }
+                // Helligkeit nur für dieses Fenster (0…1; -1 = wie im System) – Wischen im Player.
+                "getBrightness" -> {
+                    val value = window.attributes.screenBrightness
+                    result.success(if (value < 0) -1.0 else value.toDouble())
+                }
+                "setBrightness" -> {
+                    val value = (call.arguments as? Double) ?: -1.0
+                    val attrs = window.attributes
+                    attrs.screenBrightness = if (value < 0) -1f else value.toFloat().coerceIn(0.01f, 1f)
+                    window.attributes = attrs
+                    result.success(true)
+                }
                 else -> result.notImplemented()
             }
         }
