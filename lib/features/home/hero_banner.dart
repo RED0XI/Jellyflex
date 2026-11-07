@@ -284,6 +284,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
       );
     }
 
+    final phone = isPhone(context);
     final current = _index % items.length;
     final item = items[current];
     final backdrop = Images.backdrop(item);
@@ -385,8 +386,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
           ),
           Positioned(
             left: kPageGutter,
-            bottom: 84,
-            width: math.min(600, width * 0.46),
+            bottom: phone ? 56 : 84,
+            // iPhone: volle Breite – 46 % wären dort keine 190 pt (Titel abgeschnitten, Knöpfe zu breit).
+            width: phone ? width - 2 * kPageGutter : math.min(600, width * 0.46),
             child: pauseOnHover(
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 600),
@@ -404,7 +406,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
           ),
           Positioned(
             left: kPageGutter,
-            bottom: 40,
+            bottom: phone ? 24 : 40,
             child: pauseOnHover(
               Row(
                 children: [
@@ -446,7 +448,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
           // Ton an/aus, solange ein Trailer läuft.
           Positioned(
             right: kPageGutter,
-            bottom: 84,
+            // iPhone: neben den Punkten statt neben den Knöpfen (der Text nutzt dort die ganze Breite).
+            bottom: phone ? 12 : 84,
             child: AnimatedOpacity(
               opacity: _trailerVisible ? 1 : 0,
               duration: const Duration(milliseconds: 400),
@@ -457,7 +460,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
                   child: CircleIconButton(
                     icon: _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
                     tooltip: _muted ? tr.soundOn : tr.soundOff,
-                    size: 46,
+                    size: phone ? 38 : 46,
                     onPressed: _toggleMute,
                   ),
                 ),
@@ -509,6 +512,7 @@ class _HeroInfo extends ConsumerWidget {
     final api = ref.watch(apiProvider);
     final logo = api.imageUrlOrNull(Images.logo(item), maxWidth: 800);
     const shadow = [Shadow(color: Colors.black87, blurRadius: 16)];
+    final phone = isPhone(context);
 
     final meta = <String>[
       ?yearLabel(item),
@@ -520,8 +524,8 @@ class _HeroInfo extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        TitleLogo(logoUrl: logo, title: item.name, maxHeight: 130, fontSize: 52),
-        const SizedBox(height: 18),
+        TitleLogo(logoUrl: logo, title: item.name, maxHeight: phone ? 76 : 130, fontSize: phone ? 34 : 52),
+        SizedBox(height: phone ? 12 : 18),
         DefaultTextStyle.merge(
           style: TextStyle(color: AppColors.textPrimary, fontSize: 15, shadows: shadow),
           child: Wrap(
@@ -542,15 +546,15 @@ class _HeroInfo extends ConsumerWidget {
           ),
         ],
         if (item.overview != null) ...[
-          const SizedBox(height: 16),
+          SizedBox(height: phone ? 10 : 16),
           Text(
             item.overview!,
-            maxLines: 3,
+            maxLines: phone ? 2 : 3,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 15.5, height: 1.5, color: Color(0xFFDADCE5), shadows: shadow),
+            style: TextStyle(fontSize: phone ? 14 : 15.5, height: 1.5, color: const Color(0xFFDADCE5), shadows: shadow),
           ),
         ],
-        const SizedBox(height: 26),
+        SizedBox(height: phone ? 18 : 26),
         Row(
           children: [
             if (item.isMovie)

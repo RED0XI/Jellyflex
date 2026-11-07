@@ -85,8 +85,15 @@ class _MediaRowState extends State<MediaRow> {
               padding: EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 0),
               child: Row(
                 children: [
-                  Text(appLayout.heading(widget.title!), style: appLayout.headingStyle()),
-                  const Spacer(),
+                  // Lange Titel ("Weil du … angesehen hast") auf schmalen Bildschirmen mit "…" kürzen.
+                  Expanded(
+                    child: Text(
+                      appLayout.heading(widget.title!),
+                      style: appLayout.headingStyle(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                   ?widget.trailing,
                 ],
               ),

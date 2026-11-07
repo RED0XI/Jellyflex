@@ -61,9 +61,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final layout = appLayout;
     // Mindesthöhe: Titel und Knöpfe dürfen nie unter die Navigation rutschen.
     final minHero = layout.nav == NavStyle.tabs ? 580.0 : 520.0;
-    final heroHeight = (screenHeight * layout.heroHeight).clamp(minHero, 920.0);
     // Kopf je nach Layout: großes Banner, Titelgeschichte oder nur eine Begrüßung.
     final phone = isPhone(context);
+    // iPhone: gut die Hälfte des Bildschirms – darunter sollen schon die ersten Reihen zu sehen sein.
+    final heroHeight = phone
+        ? (screenHeight * 0.6).clamp(440.0, 560.0)
+        : (screenHeight * layout.heroHeight).clamp(minHero, 920.0);
     final Widget header = switch (layout.hero) {
       HeroStyle.banner => HeroBanner(height: heroHeight),
       // Die geteilte Titelgeschichte braucht Breite – auf dem iPhone das große Banner.

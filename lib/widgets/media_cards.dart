@@ -6,6 +6,7 @@ import '../core/format.dart';
 import '../core/images.dart';
 import '../core/layouts.dart';
 import '../core/models.dart';
+import '../core/platform/device.dart';
 import '../core/play_queue.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
@@ -16,9 +17,11 @@ import 'focusable.dart';
 import 'hover_preview.dart';
 import 'jf_image.dart';
 
-/// Kartengrößen – abhängig vom Layout (siehe [AppLayout.cardScale]).
-double get kPosterWidth => 168 * appLayout.cardScale;
-double get kLandscapeWidth => 320 * appLayout.cardScale;
+/// Kartengrößen – abhängig vom Layout (siehe [AppLayout.cardScale]). Auf dem iPhone fest und kleiner:
+/// gut drei Poster bzw. anderthalb Querformat-Karten nebeneinander, wie bei Streaming-Apps üblich.
+double get _cardScale => isPhoneDevice ? 0.67 : appLayout.cardScale;
+double get kPosterWidth => 168 * _cardScale;
+double get kLandscapeWidth => 320 * _cardScale;
 
 /// Platz für Titel unter den Karten (0, wenn das Layout sie im Bild zeigt).
 double get kCardTextHeight => appLayout.cardTitles ? 52 : 0;
