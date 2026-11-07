@@ -574,3 +574,116 @@ int _bucket(double px) {
   }
   return 1600;
 }
+
+/// Folge als kompakte Zeile (iPhone): kleines Standbild links, Titel, Länge und Inhalt rechts –
+/// so passen fünf, sechs Folgen auf den Bildschirm statt einer. Tippen spielt ab, lange drücken
+/// öffnet das Menü.
+class EpisodeListTile extends ConsumerWidget {
+  const EpisodeListTile({super.key, required this.item, this.highlighted = false});
+
+  final BaseItem item;
+
+  /// Die Folge, von deren Seite man kommt ("Diese Folge").
+  final bool highlighted;
+
+  static const _imageWidth = 136.0;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final api = ref.watch(apiProvider);
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final image = Images.landscape(item);
+    final w = _bucket(_imageWidth * dpr);
+    final number = item.indexNumber;
+    final meta = [if (item.runtime != null) formatRuntime(item.runtime!), if (highlighted) tr.thisEpisode].join(' · ');
+    return Focusable(
+      onTap: () => playItem(context, item),
+      onSecondaryTap: (pos) => showItemContextMenu(context, item, pos),
+      semanticLabel: '${number != null ? '$number. ' : ''}${item.name}',
+      builder: (context, hovered) => GestureDetector(
+        onLongPressStart: (d) => showItemContextMenu(context, item, d.globalPosition),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: highlighted || hovered ? Colors.white.withValues(alpha: 0.07) : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: highlighted ? AppColors.accent.withValues(alpha: 0.6) : Colors.transparent,
+              width: 1.2,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: _imageWidth,
+                  height: _imageWidth * 9 / 16,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      JfImage(
+                        url: api.imageUrlOrNull(image, fillWidth: w, fillHeight: (w * 9 / 16).round()),
+                        blurHash: image?.blurHash,
+                        fallback: _TitleFallback(item.name),
+                      ),
+                      Center(
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.black.withValues(alpha: 0.45),
+                          ),
+                          child: const Icon(Icons.play_arrow_rounded, size: 20, color: Colors.white),
+                        ),
+                      ),
+                      _Badge(item),
+                      if (progressOf(item) case final p?) _ProgressBar(p),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${number != null ? '$number. ' : ''}${item.name}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, height: 1.25),
+                    ),
+                    if (meta.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        meta,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: highlighted ? AppColors.accent : AppColors.textSecondary,
+                          fontWeight: highlighted ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                    if (item.overview case final overview? when overview.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        overview,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, height: 1.35, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

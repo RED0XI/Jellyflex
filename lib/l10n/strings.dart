@@ -604,6 +604,7 @@ class S {
   );
   String get downloadSeason => _t('Download season', 'Staffel herunterladen');
   String get thisEpisode => _t('This episode', 'Diese Folge');
+  String get allSeasons => _t('All seasons', 'Alle Staffeln');
   String get cast => _t('Cast', 'Besetzung');
   String get youMightLike => _t('You might also like', 'Das könnte dir auch gefallen');
   String get inThisCollection => _t('In this collection', 'In dieser Sammlung');

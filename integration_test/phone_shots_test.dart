@@ -88,6 +88,21 @@ void main() {
       await shot('${layout}_details');
     }
 
+    // Folge einer Serie: Weg zur Serie, Staffelwahl, kompakte Folgenliste.
+    settings.update((s) => s.copyWith(layoutId: 'cinema'));
+    router.go('/');
+    await pumpFor(tester, const Duration(seconds: 1));
+    router.push('/item/series0_s2_e3');
+    await pumpFor(tester, const Duration(seconds: 3));
+    await shot('episode');
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -700));
+    await pumpFor(tester, const Duration(seconds: 2));
+    await shot('episode_list');
+    // Suche ohne Begriff: Genre-Kacheln.
+    router.go('/search');
+    await pumpFor(tester, const Duration(seconds: 3));
+    await shot('search_genres');
+
     await tester.pumpWidget(const SizedBox());
     temp.deleteSync(recursive: true);
   });

@@ -589,6 +589,8 @@ final class _Es extends S {
   @override
   String get thisEpisode => 'Este episodio';
   @override
+  String get allSeasons => 'Todas las temporadas';
+  @override
   String get cast => 'Reparto';
   @override
   String get youMightLike => 'También te puede gustar';

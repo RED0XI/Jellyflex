@@ -589,6 +589,8 @@ final class _Fr extends S {
   @override
   String get thisEpisode => 'Cet épisode';
   @override
+  String get allSeasons => 'Toutes les saisons';
+  @override
   String get cast => 'Distribution';
   @override
   String get youMightLike => 'Vous aimerez peut-être';

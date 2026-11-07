@@ -101,7 +101,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           collectionType: state.uri.queryParameters['type'],
         ),
       ),
-      _route('/item/:id', (state) => DetailsScreen(itemId: state.pathParameters['id']!)),
+      _route(
+        '/item/:id',
+        (state) =>
+            DetailsScreen(itemId: state.pathParameters['id']!, initialSeasonId: state.uri.queryParameters['season']),
+      ),
       _route('/person/:id', (state) => PersonScreen(personId: state.pathParameters['id']!)),
       _route(
         '/play/:id',
