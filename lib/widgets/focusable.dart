@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/platform/device.dart';
+import 'focus_navigation.dart';
 
 /// Kontextmenü für das fokussierte Element öffnen (Menütaste, Umschalt+F10, Controller-X).
 class ShowContextMenuIntent extends Intent {
@@ -68,7 +69,7 @@ class _FocusableState extends State<Focusable> {
     setState(() => _focused = focused);
     widget.onFocusChange?.call(focused);
     if (!focused) return;
-    if (isTv) return _revealMinimally();
+    if (isTv) return revealInScrollables(context, minimal: true);
     Scrollable.ensureVisible(
       context,
       alignment: widget.scrollAlignment,
@@ -102,35 +103,6 @@ class _FocusableState extends State<Focusable> {
         ),
       ],
     );
-  }
-
-  /// Fernseher: nur so weit scrollen, dass das Element ganz zu sehen ist – der Fokus wandert über
-  /// die sichtbaren Karten, die Reihe rückt erst am Rand nach (wie bei Google TV und Apple TV).
-  /// Ständiges Mittig-Ziehen ließ das ganze Bild bei jedem Schritt mitlaufen.
-  void _revealMinimally() {
-    final object = context.findRenderObject();
-    if (object == null) return;
-    const duration = Duration(milliseconds: 260);
-    var scrollable = Scrollable.maybeOf(context);
-    while (scrollable != null) {
-      // Diese Fläche richtet sich selbst aus (Startseite am Fernseher: Reihe immer oben).
-      if (scrollable.widget.controller is TvAnchoredScrollController) break;
-      final position = scrollable.position;
-      // Hinter dem Ende → ans Ende holen; vor dem Anfang → an den Anfang. Sonst nichts.
-      position.ensureVisible(
-        object,
-        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
-        duration: duration,
-        curve: Curves.easeOutCubic,
-      );
-      position.ensureVisible(
-        object,
-        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
-        duration: duration,
-        curve: Curves.easeOutCubic,
-      );
-      scrollable = Scrollable.maybeOf(scrollable.context);
-    }
   }
 
   @override
@@ -179,7 +151,50 @@ class _FocusableState extends State<Focusable> {
   }
 }
 
-/// Fernseher: Scroll-Fläche, die selbst bestimmt, wo das fokussierte Element steht (z. B. die
-/// Reihen der Startseite: die gewählte Reihe immer direkt unter den Infos). [Focusable] scrollt sie
-/// beim Fokussieren nicht.
-class TvAnchoredScrollController extends ScrollController {}
+/// Fernseher: weiße Umrandung, sobald ein Element darin den Fokus hat – für Standard-Elemente
+/// (Schalter, Auswahlmenüs), deren eigene Fokus-Anzeige aus 3 m nicht zu sehen ist. Sonst: [child].
+class TvFocusRing extends StatefulWidget {
+  const TvFocusRing({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<TvFocusRing> createState() => _TvFocusRingState();
+}
+
+class _TvFocusRingState extends State<TvFocusRing> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isTv) return widget.child;
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onFocusChange: (f) => setState(() => _focused = f),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          widget.child,
+          Positioned(
+            left: -4,
+            top: -4,
+            right: -4,
+            bottom: -4,
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: _focused ? 1 : 0,
+                duration: const Duration(milliseconds: 120),
+                child: const DecoratedBox(
+                  decoration: ShapeDecoration(
+                    shape: StadiumBorder(side: BorderSide(color: Colors.white, width: 2.5)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

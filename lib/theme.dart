@@ -68,7 +68,19 @@ ThemeData buildTheme([String? key]) {
       .apply(fontFamily: font, fontFamilyFallback: appFontFallback)
       .apply(bodyColor: AppColors.textPrimary, displayColor: AppColors.textPrimary);
 
+  // Fernseher: Standard-Knöpfe (Text-, Symbol-, gefüllte Knöpfe) zeigen den Fokus mit weißem Rand,
+  // Menüeinträge mit deutlicher Hinterlegung – aus 3 m ist "etwas heller" nicht zu sehen.
+  final tvFocusSide = WidgetStateProperty.resolveWith<BorderSide?>(
+    (states) => states.contains(WidgetState.focused) ? const BorderSide(color: Colors.white, width: 2.5) : null,
+  );
+  final tvButtons = isTv ? ButtonStyle(side: tvFocusSide) : null;
+
   return base.copyWith(
+    focusColor: isTv ? Colors.white.withValues(alpha: 0.2) : null,
+    textButtonTheme: TextButtonThemeData(style: tvButtons),
+    filledButtonTheme: FilledButtonThemeData(style: tvButtons),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: tvButtons),
+    iconButtonTheme: IconButtonThemeData(style: tvButtons),
     textTheme: textTheme,
     splashFactory: NoSplash.splashFactory,
     highlightColor: Colors.transparent,

@@ -987,7 +987,9 @@ class _Toggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Switch(value: value, onChanged: onChanged);
+    return TvFocusRing(
+      child: Switch(value: value, onChanged: onChanged),
+    );
   }
 }
 
@@ -1176,37 +1178,42 @@ class _Choice<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<int>(
-      tooltip: '',
-      offset: const Offset(0, 46),
-      constraints: const BoxConstraints(minWidth: 220, maxHeight: 420),
-      onSelected: (i) => onChanged(options[i].$1),
-      itemBuilder: (_) => [
-        for (var i = 0; i < options.length; i++)
-          PopupMenuItem(
-            value: i,
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 28,
-                  child: options[i].$1 == value ? Icon(Icons.check_rounded, size: 18, color: AppColors.accent) : null,
-                ),
-                Text(options[i].$2),
-              ],
+    return TvFocusRing(
+      child: PopupMenuButton<int>(
+        tooltip: '',
+        offset: const Offset(0, 46),
+        constraints: const BoxConstraints(minWidth: 220, maxHeight: 420),
+        onSelected: (i) => onChanged(options[i].$1),
+        itemBuilder: (_) => [
+          for (var i = 0; i < options.length; i++)
+            PopupMenuItem(
+              value: i,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 28,
+                    child: options[i].$1 == value ? Icon(Icons.check_rounded, size: 18, color: AppColors.accent) : null,
+                  ),
+                  Text(options[i].$2),
+                ],
+              ),
             ),
+        ],
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
           ),
-      ],
-      child: Container(
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(width: 6),
-            const Icon(Icons.expand_more_rounded, size: 20),
-          ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(width: 6),
+              const Icon(Icons.expand_more_rounded, size: 20),
+            ],
+          ),
         ),
       ),
     );

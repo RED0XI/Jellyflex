@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 
+import '../core/platform/device.dart';
+
 /// Bewegt den Fokus in eine Richtung – wie bei TV-Apps:
 /// Es gewinnt das nächstgelegene Element in Pfeilrichtung, wobei Elemente in
 /// derselben Zeile (links/rechts) bzw. Spalte (hoch/runter) stark bevorzugt
@@ -38,6 +40,7 @@ bool _moveWithinScope(TraversalDirection direction) {
       return rowA != rowB ? rowA.compareTo(rowB) : a.rect.left.compareTo(b.rect.left);
     });
     candidates.first.requestFocus();
+    revealFocused(candidates.first);
     return true;
   }
 
@@ -51,6 +54,7 @@ bool _moveWithinScope(TraversalDirection direction) {
       _best(candidates, current, from, direction, sameRow: horizontal) ??
       (horizontal ? _best(candidates, current, from, direction, onScreenOnly: true) : null);
   best?.requestFocus();
+  if (best != null) revealFocused(best);
   return best != null;
 }
 
@@ -122,4 +126,50 @@ bool _visible(FocusNode node) {
     scrollable = Scrollable.maybeOf(scrollable.context);
   }
   return true;
+}
+
+/// Scrollt das fokussierte Element ins Bild – auch Standard-Elemente (Schalter, Auswahlmenüs), die
+/// das nicht selbst tun ([Focusable] tut es schon; doppelt schadet nicht, das Ziel ist dasselbe).
+/// Fernseher: nur so weit wie nötig; sonst mittig.
+void revealFocused(FocusNode node) {
+  final context = node.context;
+  if (context == null) return;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!context.mounted) return;
+    revealInScrollables(context, minimal: isTv);
+  });
+}
+
+/// Fernseher-Startseite & Co.: Scroll-Flächen mit diesem Controller richten sich selbst aus.
+class TvAnchoredScrollController extends ScrollController {}
+
+/// [context] in allen umgebenden Scroll-Flächen sichtbar machen. [minimal]: nur so weit wie nötig
+/// (Fernseher: der Fokus wandert über das Sichtbare, die Fläche rückt erst am Rand nach).
+void revealInScrollables(BuildContext context, {required bool minimal, double alignment = 0.5}) {
+  final object = context.findRenderObject();
+  if (object == null || !object.attached) return;
+  const duration = Duration(milliseconds: 260);
+  if (!minimal) {
+    Scrollable.ensureVisible(context, alignment: alignment, duration: duration, curve: Curves.easeOutCubic);
+    return;
+  }
+  var scrollable = Scrollable.maybeOf(context);
+  while (scrollable != null) {
+    if (scrollable.widget.controller is TvAnchoredScrollController) break;
+    final position = scrollable.position;
+    // Hinter dem Ende → ans Ende holen; vor dem Anfang → an den Anfang. Sonst nichts.
+    position.ensureVisible(
+      object,
+      alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      duration: duration,
+      curve: Curves.easeOutCubic,
+    );
+    position.ensureVisible(
+      object,
+      alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+      duration: duration,
+      curve: Curves.easeOutCubic,
+    );
+    scrollable = Scrollable.maybeOf(scrollable.context);
+  }
 }
