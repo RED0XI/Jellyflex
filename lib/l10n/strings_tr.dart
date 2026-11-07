@@ -588,8 +588,6 @@ final class _Tr extends S {
   @override
   String get thisEpisode => 'Bu bölüm';
   @override
-  String get allSeasons => 'Tüm sezonlar';
-  @override
   String get cast => 'Oyuncular';
   @override
   String get youMightLike => 'Bunlar da hoşuna gidebilir';

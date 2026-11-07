@@ -346,8 +346,6 @@ class _Header extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (item.isEpisode) ...[
-              // Sichtbarer Weg zur ganzen Serie (alle Staffeln) – auch mit Fernbedienung erreichbar.
-              if (item.seriesId != null) ...[_SeriesLink(item: item), const SizedBox(height: 14)],
               MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: GestureDetector(
@@ -958,46 +956,6 @@ void _openSeries(BuildContext context, BaseItem episode) {
     context.pop();
   } else {
     context.push('/item/${episode.seriesId}?season=${episode.seasonId ?? ''}');
-  }
-}
-
-/// "‹ Serienname · Alle Staffeln" über dem Titel einer Folge.
-class _SeriesLink extends StatelessWidget {
-  const _SeriesLink({required this.item});
-
-  final BaseItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return Focusable(
-      onTap: () => _openSeries(context, item),
-      semanticLabel: '${item.seriesName ?? ''}, ${tr.allSeasons}',
-      builder: (context, hovered) => AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.fromLTRB(8, 7, 14, 7),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: hovered ? 0.18 : 0.09),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: hovered ? Colors.white.withValues(alpha: 0.8) : Colors.transparent),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.chevron_left_rounded, size: 20),
-            const SizedBox(width: 2),
-            Flexible(
-              child: Text(
-                item.seriesName ?? '',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
-              ),
-            ),
-            Text('  ·  ${tr.allSeasons}', style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary)),
-          ],
-        ),
-      ),
-    );
   }
 }
 
