@@ -136,6 +136,7 @@ class _HoverCardState extends State<_HoverCard> {
   Widget build(BuildContext context) {
     final item = widget.item;
     return Focusable(
+      tvRing: false,
       onTap: widget.onTap,
       onSecondaryTap: widget.onContextMenu,
       autofocus: widget.autofocus,

@@ -613,67 +613,92 @@ class _NavLink extends StatelessWidget {
   }
 }
 
-/// Fernseher: schmale Symbolleiste links (wie Google TV, Netflix, Disney+). Mit Fokus klappt sie
-/// über die Seite auf und zeigt die Namen; sonst nur Symbole – der Inhalt hat die volle Fläche.
+/// Fernseher: Menüleiste links (wie Disney+, Netflix, Google TV). Eingeklappt nur Symbole, mit
+/// Fokus klappt sie über die abgedunkelte Seite auf: oben das Profil, darunter große Einträge,
+/// die aktuelle Seite in der Themenfarbe.
 class TvNavRail extends ConsumerWidget {
-  const TvNavRail({super.key, required this.router, required this.path, required this.expanded});
+  const TvNavRail({super.key, required this.router, required this.path, required this.expanded, this.activeNode});
 
   /// Breite eingeklappt – so viel Platz bekommt die Seite daneben nicht.
   static const collapsedWidth = 88.0;
-  static const expandedWidth = 300.0;
+  static const expandedWidth = 320.0;
 
   final GoRouter router;
   final String path;
   final bool expanded;
 
+  /// Fokus-Knoten des Eintrags der aktuellen Seite – "links" in die Leiste landet dort.
+  final FocusNode? activeNode;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionProvider).value;
     final entries = [
       NavEntry(icon: Icons.search_rounded, label: tr.search, path: '/search', onTap: () => router.go('/search')),
       ...navEntries(() => router, ref, replace: true),
-      NavEntry(icon: Icons.bookmarks_outlined, label: tr.myLists, path: '/lists', onTap: () => router.go('/lists')),
+      NavEntry(icon: Icons.bookmarks_rounded, label: tr.myLists, path: '/lists', onTap: () => router.go('/lists')),
       NavEntry(
-        icon: Icons.calendar_month_outlined,
+        icon: Icons.calendar_month_rounded,
         label: tr.upcoming,
         path: '/calendar',
         onTap: () => router.go('/calendar'),
       ),
-      NavEntry(
-        icon: Icons.settings_outlined,
-        label: tr.settings,
-        path: '/settings',
-        onTap: () => router.go('/settings'),
-      ),
     ];
+    final settings = NavEntry(
+      icon: Icons.settings_rounded,
+      label: tr.settings,
+      path: '/settings',
+      onTap: () => router.go('/settings'),
+    );
     bool isActive(NavEntry e) => e.path == '/' ? path == '/' : path.startsWith(e.path);
+    final active = [...entries, settings].where(isActive).firstOrNull;
+    Widget link(NavEntry e) => _TvRailLink(
+      entry: e,
+      active: isActive(e),
+      expanded: expanded,
+      focusNode: identical(e, active) ? activeNode : null,
+    );
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
+      duration: const Duration(milliseconds: 240),
       curve: Curves.easeOutCubic,
       width: expanded ? expandedWidth : collapsedWidth,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: expanded
-              ? [
-                  AppColors.background,
-                  AppColors.background.withValues(alpha: 0.96),
-                  AppColors.background.withValues(alpha: 0),
-                ]
-              : [AppColors.background.withValues(alpha: 0.85), AppColors.background.withValues(alpha: 0)],
-          stops: expanded ? const [0, 0.75, 1] : const [0, 1],
-        ),
+        color: expanded ? AppColors.surface : Colors.transparent,
+        gradient: expanded
+            ? null
+            : LinearGradient(
+                colors: [AppColors.background.withValues(alpha: 0.9), AppColors.background.withValues(alpha: 0)],
+              ),
+        boxShadow: [if (expanded) const BoxShadow(color: Color(0x99000000), blurRadius: 40, offset: Offset(8, 0))],
       ),
-      padding: const EdgeInsets.fromLTRB(18, 40, 0, 28),
+      padding: const EdgeInsets.fromLTRB(16, 36, 16, 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(height: 40, child: expanded ? const BrandLogo(size: 24) : const SizedBox.shrink()),
-          const Spacer(),
-          for (final e in entries) _TvRailLink(entry: e, active: isActive(e), expanded: expanded),
-          const Spacer(),
-          Padding(
-            padding: const EdgeInsets.only(left: 6),
-            child: ProfileMenuButton(router: router, size: 40, extraActions: true),
+          // Profil oben: Bild, mit Fokus auch der Name.
+          Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: ProfileMenuButton(router: router, size: 44, extraActions: true),
+              ),
+              if (expanded && session != null) ...[
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    session.userName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ],
           ),
+          const Spacer(),
+          for (final e in entries) link(e),
+          const Spacer(),
+          link(settings),
         ],
       ),
     );
@@ -681,27 +706,34 @@ class TvNavRail extends ConsumerWidget {
 }
 
 class _TvRailLink extends StatelessWidget {
-  const _TvRailLink({required this.entry, required this.active, required this.expanded});
+  const _TvRailLink({required this.entry, required this.active, required this.expanded, this.focusNode});
 
   final NavEntry entry;
   final bool active;
   final bool expanded;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Focusable(
+        tvRing: false,
         onTap: entry.onTap,
+        focusNode: focusNode,
         semanticLabel: entry.label,
         builder: (context, focused) => AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          height: 48,
-          width: expanded ? TvNavRail.expandedWidth - 44 : 52,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          height: 52,
+          width: expanded ? TvNavRail.expandedWidth - 32 : 56,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: focused ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
+            color: focused
+                ? Colors.white
+                : active
+                ? AppColors.accent.withValues(alpha: 0.16)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(26),
           ),
           child: Row(
             children: [
@@ -715,14 +747,14 @@ class _TvRailLink extends StatelessWidget {
                     : AppColors.textSecondary,
               ),
               if (expanded) ...[
-                const SizedBox(width: 16),
+                const SizedBox(width: 18),
                 Expanded(
                   child: Text(
                     entry.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 17,
+                      fontSize: 19,
                       fontWeight: active || focused ? FontWeight.w700 : FontWeight.w500,
                       color: focused ? Colors.black : (active ? AppColors.textPrimary : AppColors.textSecondary),
                     ),

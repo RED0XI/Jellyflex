@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -27,6 +28,7 @@ import 'home_nav.dart';
 import '../../core/layouts.dart';
 import 'home_providers.dart';
 import '../../widgets/focusable.dart';
+import '../../widgets/layout_shell.dart';
 import '../../l10n/strings.dart';
 
 part 'tv_home.dart';

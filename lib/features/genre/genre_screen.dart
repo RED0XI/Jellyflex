@@ -319,6 +319,7 @@ class _GenreTile extends ConsumerWidget {
         .withHue((HSLColor.fromColor(AppColors.accent).hue + colorSeed * 37) % 360)
         .toColor();
     return Focusable(
+      tvRing: false,
       semanticLabel: genre,
       onTap: () => context.push('/genre/${Uri.encodeComponent(genre)}'),
       builder: (context, hovered) => AnimatedScale(

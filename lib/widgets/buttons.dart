@@ -35,6 +35,7 @@ class _PrimaryButtonState extends State<PrimaryButton> {
   Widget build(BuildContext context) {
     final enabled = widget.onPressed != null && !widget.loading;
     return Focusable(
+      tvRing: false,
       onTap: enabled ? widget.onPressed : null,
       autofocus: widget.autofocus,
       scrollAlignment: widget.scrollAlignment,

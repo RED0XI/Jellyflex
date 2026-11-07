@@ -21,6 +21,7 @@ class _TvPill extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(right: 12),
       child: Focusable(
+        tvRing: false,
         onTap: onPressed,
         semanticLabel: label ?? tooltip,
         focusNode: focusNode,

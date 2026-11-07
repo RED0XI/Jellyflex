@@ -42,11 +42,33 @@ bool _moveWithinScope(TraversalDirection direction) {
   }
 
   final from = current.rect;
+  // Links/rechts zuerst innerhalb derselben Zeile (senkrecht überlappend) – sonst sprang der Fokus
+  // z. B. am Anfang einer Reihe in eine andere, seitwärts gescrollte Reihe, deren Karten links
+  // außerhalb des Bildes liegen, statt in die Seitenleiste. Gibt es dort nichts, zählt jedes
+  // sichtbare Element in der Richtung (z. B. von der Bereichsliste zu den Einstellungen).
+  final horizontal = direction == TraversalDirection.left || direction == TraversalDirection.right;
+  final best =
+      _best(candidates, current, from, direction, sameRow: horizontal) ??
+      (horizontal ? _best(candidates, current, from, direction, onScreenOnly: true) : null);
+  best?.requestFocus();
+  return best != null;
+}
+
+FocusNode? _best(
+  List<FocusNode> candidates,
+  FocusNode current,
+  Rect from,
+  TraversalDirection direction, {
+  bool sameRow = false,
+  bool onScreenOnly = false,
+}) {
   FocusNode? best;
   var bestScore = double.infinity;
   for (final node in candidates) {
     if (node == current) continue;
     final r = node.rect;
+    if (sameRow && _overlapGap(from.top, from.bottom, r.top, r.bottom) > 0) continue;
+    if (onScreenOnly && !_visible(node)) continue;
     final double along;
     final double across;
     switch (direction) {
@@ -74,8 +96,7 @@ bool _moveWithinScope(TraversalDirection direction) {
       best = node;
     }
   }
-  best?.requestFocus();
-  return best != null;
+  return best;
 }
 
 /// Abstand zweier Intervalle (0, wenn sie sich überlappen) – für "gleiche Zeile".
@@ -83,4 +104,22 @@ double _overlapGap(double aStart, double aEnd, double bStart, double bEnd) {
   if (bEnd < aStart) return aStart - bEnd;
   if (bStart > aEnd) return bStart - aEnd;
   return 0;
+}
+
+/// Ist das Element wirklich zu sehen – also nicht aus einer Scroll-Fläche herausgescrollt (auch
+/// wenn seine Fläche geometrisch noch im Bildschirm liegt, z. B. über einem abgeschnittenen Rand)?
+bool _visible(FocusNode node) {
+  final context = node.context;
+  if (context == null) return false;
+  var rect = node.rect;
+  var scrollable = Scrollable.maybeOf(context);
+  while (scrollable != null) {
+    final box = scrollable.context.findRenderObject();
+    if (box is RenderBox && box.hasSize && box.attached) {
+      rect = rect.intersect(box.localToGlobal(Offset.zero) & box.size);
+      if (rect.width <= 1 || rect.height <= 1) return false;
+    }
+    scrollable = Scrollable.maybeOf(scrollable.context);
+  }
+  return true;
 }

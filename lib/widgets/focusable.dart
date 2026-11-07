@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/platform/device.dart';
+
 /// Kontextmenü für das fokussierte Element öffnen (Menütaste, Umschalt+F10, Controller-X).
 class ShowContextMenuIntent extends Intent {
   const ShowContextMenuIntent();
@@ -23,7 +25,12 @@ class Focusable extends StatefulWidget {
     this.semanticLabel,
     this.focusNode,
     this.onFocusChange,
+    this.tvRing = true,
   });
+
+  /// Fernseher: weiße Umrandung bei Fokus – für Elemente ohne eigene deutliche Fokus-Darstellung
+  /// (aus 3 m Entfernung reicht "etwas heller" nicht). Karten & Co. mit eigener: `false`.
+  final bool tvRing;
 
   /// Meldet, wenn das Element den Fokus bekommt bzw. verliert (z. B. für die Infos oben auf der
   /// Startseite am Fernseher).
@@ -60,13 +67,69 @@ class _FocusableState extends State<Focusable> {
   void _onFocusChange(bool focused) {
     setState(() => _focused = focused);
     widget.onFocusChange?.call(focused);
-    if (focused) {
-      Scrollable.ensureVisible(
-        context,
-        alignment: widget.scrollAlignment,
-        duration: const Duration(milliseconds: 320),
+    if (!focused) return;
+    if (isTv) return _revealMinimally();
+    Scrollable.ensureVisible(
+      context,
+      alignment: widget.scrollAlignment,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  Widget _withTvRing(Widget child, bool focused) {
+    if (!isTv || !widget.tvRing) return child;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        Positioned(
+          left: -4,
+          top: -4,
+          right: -4,
+          bottom: -4,
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: focused ? 1 : 0,
+              duration: const Duration(milliseconds: 120),
+              child: const DecoratedBox(
+                decoration: ShapeDecoration(
+                  shape: StadiumBorder(side: BorderSide(color: Colors.white, width: 2.5)),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Fernseher: nur so weit scrollen, dass das Element ganz zu sehen ist – der Fokus wandert über
+  /// die sichtbaren Karten, die Reihe rückt erst am Rand nach (wie bei Google TV und Apple TV).
+  /// Ständiges Mittig-Ziehen ließ das ganze Bild bei jedem Schritt mitlaufen.
+  void _revealMinimally() {
+    final object = context.findRenderObject();
+    if (object == null) return;
+    const duration = Duration(milliseconds: 260);
+    var scrollable = Scrollable.maybeOf(context);
+    while (scrollable != null) {
+      // Diese Fläche richtet sich selbst aus (Startseite am Fernseher: Reihe immer oben).
+      if (scrollable.widget.controller is TvAnchoredScrollController) break;
+      final position = scrollable.position;
+      // Hinter dem Ende → ans Ende holen; vor dem Anfang → an den Anfang. Sonst nichts.
+      position.ensureVisible(
+        object,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        duration: duration,
         curve: Curves.easeOutCubic,
       );
+      position.ensureVisible(
+        object,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+        duration: duration,
+        curve: Curves.easeOutCubic,
+      );
+      scrollable = Scrollable.maybeOf(scrollable.context);
     }
   }
 
@@ -110,8 +173,13 @@ class _FocusableState extends State<Focusable> {
       child: GestureDetector(
         onTap: enabled ? widget.onTap : null,
         onSecondaryTapUp: widget.onSecondaryTap == null ? null : (d) => widget.onSecondaryTap!(d.globalPosition),
-        child: widget.builder(context, enabled && (_hovered || _focused)),
+        child: _withTvRing(widget.builder(context, enabled && (_hovered || _focused)), enabled && _focused),
       ),
     );
   }
 }
+
+/// Fernseher: Scroll-Fläche, die selbst bestimmt, wo das fokussierte Element steht (z. B. die
+/// Reihen der Startseite: die gewählte Reihe immer direkt unter den Infos). [Focusable] scrollt sie
+/// beim Fokussieren nicht.
+class TvAnchoredScrollController extends ScrollController {}

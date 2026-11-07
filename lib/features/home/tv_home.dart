@@ -13,7 +13,7 @@ class _TvHome extends ConsumerStatefulWidget {
 }
 
 class _TvHomeState extends ConsumerState<_TvHome> {
-  final _scroll = ScrollController();
+  final _scroll = TvAnchoredScrollController();
 
   /// Titel oben – folgt [tvFocusedItem] mit kurzer Verzögerung, damit beim schnellen Durchwandern
   /// nicht jedes Bild geladen wird.
@@ -52,92 +52,136 @@ class _TvHomeState extends ConsumerState<_TvHome> {
     final item = _shown;
     final backdrop = item == null ? null : Images.backdrop(item);
     final infoHeight = size.height * 0.46;
-    return Scaffold(
-      body: Stack(
-        children: [
-          // Bild des fokussierten Titels oben rechts, weich in den Hintergrund auslaufend.
-          Positioned(
-            top: 0,
-            right: 0,
-            width: size.width * 0.74,
-            height: size.height * 0.7,
-            // Eigene Ebene: Scrollen der Reihen zeichnet das Bild nicht neu. Bild höchstens 1280 px
-            // breit (liegt ohnehin unter Verläufen) – große Bilder dekodieren auf TV-Chips spürbar.
-            child: RepaintBoundary(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 280),
-                child: KeyedSubtree(
-                  key: ValueKey(backdrop),
-                  child: backdrop == null
-                      ? const SizedBox.expand()
-                      : JfImage(
-                          url: api.imageUrlOrNull(backdrop, maxWidth: 1280),
-                          // Kein Blurhash: der würde bei jedem Fokuswechsel neu berechnet.
-                          placeholderColor: Colors.transparent,
-                          alignment: Alignment.topCenter,
-                        ),
+    return PopScope(
+      // Zurück auf der Startseite: erst in die Menüleiste, von dort verlässt ein zweites Zurück die App.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        tvMenuFocused() ? SystemNavigator.pop() : tvFocusMenu();
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            // Bild des fokussierten Titels oben rechts, weich in den Hintergrund auslaufend.
+            Positioned(
+              top: 0,
+              right: 0,
+              width: size.width * 0.74,
+              height: size.height * 0.7,
+              // Eigene Ebene: Scrollen der Reihen zeichnet das Bild nicht neu. Bild höchstens 1280 px
+              // breit (liegt ohnehin unter Verläufen) – große Bilder dekodieren auf TV-Chips spürbar.
+              child: RepaintBoundary(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 280),
+                  child: KeyedSubtree(
+                    key: ValueKey(backdrop),
+                    child: backdrop == null
+                        ? const SizedBox.expand()
+                        : JfImage(
+                            url: api.imageUrlOrNull(backdrop, maxWidth: 1280),
+                            // Kein Blurhash: der würde bei jedem Fokuswechsel neu berechnet.
+                            placeholderColor: Colors.transparent,
+                            alignment: Alignment.topCenter,
+                          ),
+                  ),
                 ),
               ),
             ),
-          ),
-          Positioned(
-            top: 0,
-            right: 0,
-            width: size.width * 0.74,
-            height: size.height * 0.7,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.background, AppColors.background.withValues(alpha: 0)],
-                    stops: const [0, 0.45],
-                  ),
-                ),
+            Positioned(
+              top: 0,
+              right: 0,
+              width: size.width * 0.74,
+              height: size.height * 0.7,
+              child: IgnorePointer(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
                       colors: [AppColors.background, AppColors.background.withValues(alpha: 0)],
-                      stops: const [0, 0.5],
+                      stops: const [0, 0.45],
+                    ),
+                  ),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [AppColors.background, AppColors.background.withValues(alpha: 0)],
+                        stops: const [0, 0.5],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-          Column(
-            children: [
-              SizedBox(
-                height: infoHeight,
-                width: double.infinity,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(48, 44, size.width * 0.42, 12),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    layoutBuilder: (current, previous) =>
-                        Stack(alignment: Alignment.bottomLeft, children: [...previous, ?current]),
-                    child: item == null ? const SizedBox.shrink() : _TvInfo(key: ValueKey(item.id), item: item),
+            Column(
+              children: [
+                SizedBox(
+                  height: infoHeight,
+                  width: double.infinity,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(48, 44, size.width * 0.42, 12),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      layoutBuilder: (current, previous) =>
+                          Stack(alignment: Alignment.bottomLeft, children: [...previous, ?current]),
+                      child: item == null ? const SizedBox.shrink() : _TvInfo(key: ValueKey(item.id), item: item),
+                    ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: _scroll,
-                  // Platz unten, damit auch die letzte Reihe in die Mitte rücken kann.
-                  padding: EdgeInsets.only(bottom: size.height * 0.3),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (final row in widget.rows) Padding(padding: const EdgeInsets.only(bottom: 18), child: row),
-                    ],
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _scroll,
+                    // Platz unten, damit auch die letzte Reihe in die Mitte rücken kann.
+                    padding: EdgeInsets.only(bottom: size.height * 0.3),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final row in widget.rows)
+                          _TvRowAnchor(
+                            scroll: _scroll,
+                            child: Padding(padding: const EdgeInsets.only(bottom: 18), child: row),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+/// Hält die Reihe mit dem Fokus direkt unter den Infos – so steht die gerade gewählte Reihe immer
+/// an derselben Stelle, statt dass die Seite bei jedem Schritt anders mitläuft.
+class _TvRowAnchor extends StatelessWidget {
+  const _TvRowAnchor({required this.scroll, required this.child});
+
+  final ScrollController scroll;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onFocusChange: (focused) {
+        if (!focused) return;
+        // Nach dem Scrollen der Karte selbst (Focusable) – sonst überschreibt es dieses hier.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final object = context.findRenderObject();
+          if (object == null || !scroll.hasClients) return;
+          scroll.position.ensureVisible(
+            object,
+            alignment: 0,
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+          );
+        });
+      },
+      child: child,
     );
   }
 }

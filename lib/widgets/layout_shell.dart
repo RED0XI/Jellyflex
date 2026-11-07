@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -12,6 +13,12 @@ import '../features/home/home_nav.dart';
 import 'focus_navigation.dart';
 import 'mobile_tab_bar.dart';
 import 'window_frame.dart';
+
+/// Fernseher: hat die Menüleiste den Fokus? (Zurück auf der Startseite: erst Leiste, dann App zu.)
+bool Function() tvMenuFocused = () => false;
+
+/// Fernseher: Fokus in die Menüleiste (auf den Eintrag der aktuellen Seite).
+VoidCallback tvFocusMenu = () {};
 
 /// Rahmen um alle Seiten, der vom Layout abhängt:
 /// - "Bibliothek": feste Seitenleiste links neben allen Übersichtsseiten
@@ -60,6 +67,8 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     windowChromeVisible.addListener(_onChange);
     // Fernseher: Leiste klappt mit Fokus auf.
     _sideScope.addListener(_onSideFocus);
+    tvMenuFocused = () => _sideScope.hasFocus;
+    tvFocusMenu = _enterRail;
     focusEdgeHandler = _onFocusEdge;
   }
 
@@ -70,10 +79,29 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     if (focusEdgeHandler == _onFocusEdge) focusEdgeHandler = null;
     _sideScope.removeListener(_onSideFocus);
     _sideScope.dispose();
+    _railActive.dispose();
     super.dispose();
   }
 
   bool _railExpanded = false;
+
+  /// Fernseher: Eintrag der aktuellen Seite in der Leiste.
+  final _railActive = FocusNode(debugLabel: 'Leiste: aktuelle Seite');
+
+  /// Fernseher: wo der Fokus auf der Seite war, bevor es in die Leiste ging ("rechts" kehrt zurück).
+  FocusNode? _lastPageFocus;
+
+  /// In die Leiste – auf den Eintrag der aktuellen Seite (sonst den ersten).
+  bool _enterRail() {
+    final current = FocusManager.instance.primaryFocus;
+    if (current != null && !_sideScope.hasFocus) _lastPageFocus = current;
+    if (_railActive.context != null) {
+      _railActive.requestFocus();
+      return true;
+    }
+    _sideScope.requestFocus();
+    return moveFocusInDirection(TraversalDirection.down);
+  }
 
   void _onSideFocus() {
     if (_sideScope.hasFocus != _railExpanded && mounted) setState(() => _railExpanded = _sideScope.hasFocus);
@@ -86,10 +114,17 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     if (appLocked.value || !_sidebarShown || popupTracker.open.value > 0) return false;
     final inSidebar = _sideScope.hasFocus;
     if (direction == TraversalDirection.left && !inSidebar) {
+      if (isTv) return _enterRail();
       _sideScope.requestFocus();
       return moveFocusInDirection(TraversalDirection.down);
     }
     if (direction == TraversalDirection.right && inSidebar) {
+      // Fernseher: zurück zu dem Element, von dem es in die Leiste ging.
+      final last = _lastPageFocus;
+      if (isTv && last != null && last.context != null && last.canRequestFocus) {
+        last.requestFocus();
+        return true;
+      }
       final page = widget.router.routerDelegate.navigatorKey.currentState?.focusNode;
       if (page == null) return false;
       page.requestFocus();
@@ -100,6 +135,20 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
 
   /// Der Router meldet sich teils mitten im Aufbau – erst nach dem Frame neu zeichnen.
   void _onChange() {
+    // Fernseher: Nach einem Seitenwechsel muss ein Element der neuen Seite den Fokus haben – sonst
+    // (z. B. über die Leiste gewechselt) stand er nirgends, und erst die nächste Taste fand etwas.
+    if (isTv) {
+      Future.delayed(const Duration(milliseconds: 400), () {
+        final page = widget.router.routerDelegate.navigatorKey.currentState?.focusNode;
+        if (!mounted || page == null) return;
+        final focus = FocusManager.instance.primaryFocus;
+        final onPageElement = focus != null && focus is! FocusScopeNode && focus.ancestors.contains(page);
+        if (onPageElement) return;
+        _lastPageFocus = null;
+        page.requestFocus();
+        moveFocusInDirection(TraversalDirection.down);
+      });
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() {});
     });
@@ -183,6 +232,17 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
             if (tabBar) MobileTabBar(router: router, active: _lastTab),
           ],
         ),
+        // Fernseher: aufgeklappte Leiste dunkelt die Seite ab.
+        if (tvRail)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: _railExpanded ? 1 : 0,
+                duration: const Duration(milliseconds: 240),
+                child: const ColoredBox(color: Color(0x99000000)),
+              ),
+            ),
+          ),
         // Fernseher: die Leiste liegt über der Seite (aufgeklappt deckt sie sie teilweise ab).
         if (tvRail)
           Positioned(
@@ -196,7 +256,11 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
                 type: MaterialType.transparency,
                 child: FocusScope(
                   node: _sideScope,
-                  child: TvNavRail(router: router, path: path, expanded: _railExpanded),
+                  // In der Leiste führt "links" nirgends hin (sonst sprang der Fokus aufs Profilbild).
+                  onKeyEvent: (node, event) => event is! KeyUpEvent && event.logicalKey == LogicalKeyboardKey.arrowLeft
+                      ? KeyEventResult.handled
+                      : KeyEventResult.ignored,
+                  child: TvNavRail(router: router, path: path, expanded: _railExpanded, activeNode: _railActive),
                 ),
               ),
             ),

@@ -33,6 +33,7 @@ class PeopleRow extends ConsumerWidget {
           return SizedBox(
             width: 120,
             child: Focusable(
+              tvRing: false,
               semanticLabel: p.role == null ? p.name : '${p.name}, ${p.role}',
               onTap: () => context.push('/person/${p.id}'),
               builder: (context, hovered) => Column(
