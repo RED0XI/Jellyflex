@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'core/layouts.dart';
 import 'core/platform/device.dart';
 import 'core/themes.dart';
+import 'core/power.dart';
 
 /// Aktives Farbschema (wird aus den Einstellungen gesetzt).
 AppPalette appPalette = appPalettes.first;
@@ -166,6 +167,9 @@ class _FadeScaleTransitionsBuilder extends PageTransitionsBuilder {
     }
     final origin = _routeOrigins[route];
     final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+    // Energiesparen (immer auf dem Fernseher): nur einblenden – Zoom und Ausschnitt kosten auf
+    // schwachen Chips sichtbar Bilder, gerade in dem Moment, in dem die neue Seite aufgebaut wird.
+    if (Power.energySaving.value) return FadeTransition(opacity: curved, child: child);
     if (origin == null) {
       return FadeTransition(
         opacity: curved,

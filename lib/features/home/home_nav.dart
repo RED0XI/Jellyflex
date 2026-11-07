@@ -612,3 +612,127 @@ class _NavLink extends StatelessWidget {
     );
   }
 }
+
+/// Fernseher: schmale Symbolleiste links (wie Google TV, Netflix, Disney+). Mit Fokus klappt sie
+/// über die Seite auf und zeigt die Namen; sonst nur Symbole – der Inhalt hat die volle Fläche.
+class TvNavRail extends ConsumerWidget {
+  const TvNavRail({super.key, required this.router, required this.path, required this.expanded});
+
+  /// Breite eingeklappt – so viel Platz bekommt die Seite daneben nicht.
+  static const collapsedWidth = 88.0;
+  static const expandedWidth = 300.0;
+
+  final GoRouter router;
+  final String path;
+  final bool expanded;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final entries = [
+      NavEntry(icon: Icons.search_rounded, label: tr.search, path: '/search', onTap: () => router.go('/search')),
+      ...navEntries(() => router, ref, replace: true),
+      NavEntry(icon: Icons.bookmarks_outlined, label: tr.myLists, path: '/lists', onTap: () => router.go('/lists')),
+      NavEntry(
+        icon: Icons.calendar_month_outlined,
+        label: tr.upcoming,
+        path: '/calendar',
+        onTap: () => router.go('/calendar'),
+      ),
+      NavEntry(
+        icon: Icons.settings_outlined,
+        label: tr.settings,
+        path: '/settings',
+        onTap: () => router.go('/settings'),
+      ),
+    ];
+    bool isActive(NavEntry e) => e.path == '/' ? path == '/' : path.startsWith(e.path);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      width: expanded ? expandedWidth : collapsedWidth,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: expanded
+              ? [
+                  AppColors.background,
+                  AppColors.background.withValues(alpha: 0.96),
+                  AppColors.background.withValues(alpha: 0),
+                ]
+              : [AppColors.background.withValues(alpha: 0.85), AppColors.background.withValues(alpha: 0)],
+          stops: expanded ? const [0, 0.75, 1] : const [0, 1],
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(18, 40, 0, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: 40, child: expanded ? const BrandLogo(size: 24) : const SizedBox.shrink()),
+          const Spacer(),
+          for (final e in entries) _TvRailLink(entry: e, active: isActive(e), expanded: expanded),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.only(left: 6),
+            child: ProfileMenuButton(router: router, size: 40, extraActions: true),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TvRailLink extends StatelessWidget {
+  const _TvRailLink({required this.entry, required this.active, required this.expanded});
+
+  final NavEntry entry;
+  final bool active;
+  final bool expanded;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Focusable(
+        onTap: entry.onTap,
+        semanticLabel: entry.label,
+        builder: (context, focused) => AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          height: 48,
+          width: expanded ? TvNavRail.expandedWidth - 44 : 52,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: focused ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                entry.icon,
+                size: 24,
+                color: focused
+                    ? Colors.black
+                    : active
+                    ? AppColors.accent
+                    : AppColors.textSecondary,
+              ),
+              if (expanded) ...[
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    entry.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: active || focused ? FontWeight.w700 : FontWeight.w500,
+                      color: focused ? Colors.black : (active ? AppColors.textPrimary : AppColors.textSecondary),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -22,7 +22,12 @@ class Focusable extends StatefulWidget {
     this.scrollAlignment = 0.5,
     this.semanticLabel,
     this.focusNode,
+    this.onFocusChange,
   });
+
+  /// Meldet, wenn das Element den Fokus bekommt bzw. verliert (z. B. für die Infos oben auf der
+  /// Startseite am Fernseher).
+  final ValueChanged<bool>? onFocusChange;
 
   /// Eigener Fokus-Knoten – um das Element gezielt anzuspringen (z. B. Play beim Einblenden).
   final FocusNode? focusNode;
@@ -54,6 +59,7 @@ class _FocusableState extends State<Focusable> {
 
   void _onFocusChange(bool focused) {
     setState(() => _focused = focused);
+    widget.onFocusChange?.call(focused);
     if (focused) {
       Scrollable.ensureVisible(
         context,

@@ -23,6 +23,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:jellyflex/app.dart';
+import 'package:jellyflex/core/platform/platform_info.dart';
 import 'package:jellyflex/core/power.dart';
 import 'package:jellyflex/core/session.dart';
 import 'package:jellyflex/core/settings.dart';
@@ -68,6 +69,8 @@ void main() {
 
   testWidgets('Flüssigkeit auf dem Gerät', (tester) async {
     if (!await demoServerRunning()) return;
+    // Wie main.dart: Fernseher erkennen (Skalierung, Energiesparen) – vor Power.init.
+    await PlatformInfo.init();
     await Power.init();
     final temp = Directory.systemTemp.createTempSync('jellyflex_devperf_');
     final hz = PlatformDispatcher.instance.views.first.display.refreshRate;
@@ -76,6 +79,7 @@ void main() {
       'refresh_hz': hz.round(),
       'energy_saving': Power.energySaving.value,
       'mode': kProfileMode ? 'profile' : (kReleaseMode ? 'release' : 'debug'),
+      'tv': PlatformInfo.isTv,
     };
 
     await tester.pumpWidget(

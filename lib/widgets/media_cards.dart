@@ -26,6 +26,10 @@ double get kLandscapeWidth => 320 * _cardScale;
 /// Platz für Titel unter den Karten (0, wenn das Layout sie im Bild zeigt).
 double get kCardTextHeight => appLayout.cardTitles ? 52 : 0;
 
+/// Fernseher: der Titel, dessen Karte gerade den Fokus hat (die Startseite zeigt oben sein Bild und
+/// seine Infos).
+final tvFocusedItem = ValueNotifier<BaseItem?>(null);
+
 /// Öffnet die Detailseite eines Eintrags – sie wächst aus der angeklickten Karte heraus.
 void openItem(BuildContext context, BaseItem item) {
   final box = context.findRenderObject();
@@ -101,7 +105,18 @@ Future<void> playShuffled(
 
 /// Gemeinsame Hover-Logik: leicht vergrößern, Schatten, Rahmen.
 class _HoverCard extends StatefulWidget {
-  const _HoverCard({required this.builder, required this.onTap, this.onContextMenu, this.label});
+  const _HoverCard({
+    required this.builder,
+    required this.onTap,
+    this.onContextMenu,
+    this.label,
+    this.item,
+    this.autofocus = false,
+  });
+
+  /// Titel der Karte – am Fernseher wird er beim Fokussieren zu [tvFocusedItem].
+  final BaseItem? item;
+  final bool autofocus;
 
   /// Name für Bildschirmleser (in Layouts, die den Titel nur beim Auswählen zeigen).
   final String? label;
@@ -119,9 +134,12 @@ class _HoverCard extends StatefulWidget {
 class _HoverCardState extends State<_HoverCard> {
   @override
   Widget build(BuildContext context) {
+    final item = widget.item;
     return Focusable(
       onTap: widget.onTap,
       onSecondaryTap: widget.onContextMenu,
+      autofocus: widget.autofocus,
+      onFocusChange: isTv && item != null ? (focused) => focused ? tvFocusedItem.value = item : null : null,
       semanticLabel: appLayout.cardTitles ? null : widget.label,
       builder: (context, highlighted) => widget.builder(highlighted),
     );
@@ -382,9 +400,10 @@ class _Badge extends StatelessWidget {
 
 /// Hochformat-Karte (Poster).
 class PosterCard extends ConsumerWidget {
-  const PosterCard({super.key, required this.item, this.width});
+  const PosterCard({super.key, required this.item, this.width, this.autofocus = false});
 
   final BaseItem item;
+  final bool autofocus;
 
   /// Breite (Standard: Größe des Layouts).
   final double? width;
@@ -399,6 +418,8 @@ class PosterCard extends ConsumerWidget {
     return SizedBox(
       width: width,
       child: _HoverCard(
+        item: item,
+        autofocus: autofocus,
         label: [cardTitle(item), ?cardSubtitle(item)].join(', '),
         onTap: () => openItem(context, item),
         onContextMenu: (pos) => showItemContextMenu(context, item, pos),
@@ -434,9 +455,18 @@ class PosterCard extends ConsumerWidget {
 
 /// Querformat-Karte (Weiterschauen, Episoden). Beim Hover erscheint ein Play-Knopf.
 class LandscapeCard extends ConsumerWidget {
-  const LandscapeCard({super.key, required this.item, this.width, this.onTap, this.title, this.subtitle});
+  const LandscapeCard({
+    super.key,
+    required this.item,
+    this.width,
+    this.onTap,
+    this.title,
+    this.subtitle,
+    this.autofocus = false,
+  });
 
   final BaseItem item;
+  final bool autofocus;
 
   /// Breite (Standard: Größe des Layouts).
   final double? width;
@@ -454,6 +484,8 @@ class LandscapeCard extends ConsumerWidget {
     return SizedBox(
       width: width,
       child: _HoverCard(
+        item: item,
+        autofocus: autofocus,
         label: [title ?? cardTitle(item), ?(subtitle ?? cardSubtitle(item))].join(', '),
         onTap: onTap ?? () => openItem(context, item),
         onContextMenu: (pos) => showItemContextMenu(context, item, pos),

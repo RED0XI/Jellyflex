@@ -58,6 +58,8 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     super.initState();
     widget.router.routerDelegate.addListener(_onChange);
     windowChromeVisible.addListener(_onChange);
+    // Fernseher: Leiste klappt mit Fokus auf.
+    _sideScope.addListener(_onSideFocus);
     focusEdgeHandler = _onFocusEdge;
   }
 
@@ -66,8 +68,15 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     widget.router.routerDelegate.removeListener(_onChange);
     windowChromeVisible.removeListener(_onChange);
     if (focusEdgeHandler == _onFocusEdge) focusEdgeHandler = null;
+    _sideScope.removeListener(_onSideFocus);
     _sideScope.dispose();
     super.dispose();
+  }
+
+  bool _railExpanded = false;
+
+  void _onSideFocus() {
+    if (_sideScope.hasFocus != _railExpanded && mounted) setState(() => _railExpanded = _sideScope.hasFocus);
   }
 
   /// Pfeiltaste am Rand: von der Seite nach links in die Leiste, aus der Leiste
@@ -105,13 +114,19 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     final media = MediaQuery.of(context);
     final phone = isPhone(context);
     final browse = _isBrowsePage(path) && windowChromeVisible.value;
-    final sidebar = !phone && layout.nav == NavStyle.sidebar && browse;
+    // Fernseher: immer die schmale Symbolleiste (TvNavRail) statt Leiste oben oder Seitenleiste.
+    final tvRail = isTv && browse;
+    final sidebar = !phone && !isTv && layout.nav == NavStyle.sidebar && browse;
     // Während getippt wird (Tastatur offen), macht die Leiste der Tastatur Platz.
     final tabBar = phone && browse && media.viewInsets.bottom == 0;
     _lastTab = MobileTabBar.indexFor(path) ?? _lastTab;
-    _sidebarShown = sidebar;
+    _sidebarShown = sidebar || tvRail;
     final scanlines = layout.retro && !path.startsWith('/play');
-    final width = sidebar ? SideNav.width : 0.0;
+    final width = sidebar
+        ? SideNav.width
+        : tvRail
+        ? TvNavRail.collapsedWidth
+        : 0.0;
     final barHeight = tabBar ? MobileTabBar.height + media.padding.bottom : 0.0;
     return Stack(
       children: [
@@ -168,6 +183,24 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
             if (tabBar) MobileTabBar(router: router, active: _lastTab),
           ],
         ),
+        // Fernseher: die Leiste liegt über der Seite (aufgeklappt deckt sie sie teilweise ab).
+        if (tvRail)
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: ValueListenableBuilder<int>(
+              valueListenable: popupTracker.open,
+              builder: (context, popups, child) => ExcludeFocus(excluding: popups > 0, child: child!),
+              child: Material(
+                type: MaterialType.transparency,
+                child: FocusScope(
+                  node: _sideScope,
+                  child: TvNavRail(router: router, path: path, expanded: _railExpanded),
+                ),
+              ),
+            ),
+          ),
         Positioned.fill(
           child: IgnorePointer(
             child: scanlines ? const RepaintBoundary(child: CustomPaint(painter: _Scanlines())) : null,
