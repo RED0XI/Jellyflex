@@ -21,7 +21,11 @@ class Focusable extends StatefulWidget {
     this.enabled = true,
     this.scrollAlignment = 0.5,
     this.semanticLabel,
+    this.focusNode,
   });
+
+  /// Eigener Fokus-Knoten – um das Element gezielt anzuspringen (z. B. Play beim Einblenden).
+  final FocusNode? focusNode;
 
   /// Name für Bildschirmleser. Ohne Angabe gilt der sichtbare Text im Inneren
   /// (z. B. Titel und Jahr einer Karte).
@@ -73,6 +77,7 @@ class _FocusableState extends State<Focusable> {
     return FocusableActionDetector(
       // Ohne Aktion nicht per Tastatur/Controller anspringbar.
       enabled: enabled,
+      focusNode: widget.focusNode,
       autofocus: widget.autofocus,
       mouseCursor: enabled ? widget.cursor : SystemMouseCursors.basic,
       onShowHoverHighlight: (v) => setState(() => _hovered = v),

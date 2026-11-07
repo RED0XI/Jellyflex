@@ -12,7 +12,11 @@ class PrimaryButton extends StatefulWidget {
     this.icon,
     this.loading = false,
     this.autofocus = false,
+    this.scrollAlignment = 0.5,
   });
+
+  /// Wohin die Seite beim Fokussieren scrollt (siehe [Focusable.scrollAlignment]).
+  final double scrollAlignment;
 
   final String label;
 
@@ -33,6 +37,7 @@ class _PrimaryButtonState extends State<PrimaryButton> {
     return Focusable(
       onTap: enabled ? widget.onPressed : null,
       autofocus: widget.autofocus,
+      scrollAlignment: widget.scrollAlignment,
       builder: (context, hovered) => AnimatedScale(
         scale: hovered && enabled ? 1.04 : 1,
         duration: const Duration(milliseconds: 180),
@@ -81,9 +86,12 @@ class _PrimaryButtonState extends State<PrimaryButton> {
 
 /// Halbtransparenter Button mit Glas-Look (z. B. "Mehr Infos").
 class GlassButton extends StatefulWidget {
-  const GlassButton({super.key, required this.label, required this.onPressed, this.icon});
+  const GlassButton({super.key, required this.label, required this.onPressed, this.icon, this.scrollAlignment = 0.5});
 
   final String label;
+
+  /// Wohin die Seite beim Fokussieren scrollt (siehe [Focusable.scrollAlignment]).
+  final double scrollAlignment;
   final IconData? icon;
   final VoidCallback? onPressed;
 
@@ -95,6 +103,7 @@ class _GlassButtonState extends State<GlassButton> {
   @override
   Widget build(BuildContext context) {
     return Focusable(
+      scrollAlignment: widget.scrollAlignment,
       onTap: widget.onPressed,
       builder: (context, hovered) => AnimatedContainer(
         duration: const Duration(milliseconds: 180),

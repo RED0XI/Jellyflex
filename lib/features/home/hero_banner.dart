@@ -563,6 +563,8 @@ class _HeroInfo extends ConsumerWidget {
                 icon: Icons.play_arrow_rounded,
                 // Fernseher: OK spielt gleich ab (ohne erst den Fokus suchen zu müssen).
                 autofocus: isTv,
+                // Das Banner bleibt ganz zu sehen (Fokus hier = Seite oben, nicht Knopf in der Mitte).
+                scrollAlignment: 1,
                 onPressed: () => playItem(context, item),
               )
             else
@@ -570,10 +572,16 @@ class _HeroInfo extends ConsumerWidget {
                 label: tr.watch,
                 icon: Icons.play_arrow_rounded,
                 autofocus: isTv,
+                scrollAlignment: 1,
                 onPressed: () => openItem(context, item),
               ),
             const SizedBox(width: 12),
-            GlassButton(label: tr.moreInfo, icon: Icons.info_outline_rounded, onPressed: () => openItem(context, item)),
+            GlassButton(
+              label: tr.moreInfo,
+              icon: Icons.info_outline_rounded,
+              scrollAlignment: 1,
+              onPressed: () => openItem(context, item),
+            ),
           ],
         ),
       ],

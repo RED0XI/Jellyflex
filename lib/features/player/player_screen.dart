@@ -41,6 +41,7 @@ import '../details/subtitle_search_dialog.dart';
 import '../home/home_providers.dart';
 import 'apple_player.dart';
 import 'player_overlays.dart';
+import '../../widgets/focus_navigation.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/jf_image.dart';
 import '../live_handler.dart' show appMessengerKey;
@@ -55,6 +56,7 @@ part 'player_subtitle_panel.dart';
 part 'player_tracks_panel.dart';
 part 'player_extras.dart';
 part 'player_widgets.dart';
+part 'player_tv.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({
@@ -127,6 +129,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// Schon in initState gelesen – beim Schließen (dispose) ist ref nicht mehr nutzbar.
   late final SettingsController _settings = ref.read(settingsProvider.notifier);
   final _focus = FocusNode();
+
+  /// Fernseher: Play/Pause-Knopf – bekommt beim Einblenden den Fokus.
+  final _tvPlayFocus = FocusNode();
+
+  /// Fernseher: Zeitleiste (von dort führt "runter" zu Play/Pause).
+  final _tvSeekFocus = FocusNode();
   final _subscriptions = <StreamSubscription<dynamic>>[];
 
   BaseItem? _item;
@@ -634,6 +642,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
+    _tvPlayFocus.dispose();
+    _tvSeekFocus.dispose();
     if (isMobile) {
       // Helligkeit wie vor dem Video (auf dem iPhone gilt sie sonst systemweit weiter).
       ScreenBrightness.restore();
@@ -1357,6 +1367,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (!_controlsVisible) return;
     setState(() => _controlsVisible = false);
     _syncWindowChrome();
+    // Fernseher: kein Fokus auf unsichtbaren Knöpfen (OK würde sie sonst auslösen).
+    if (isTv) _focus.requestFocus();
   }
 
   void _scheduleHide() {
@@ -1365,6 +1377,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       if (!mounted || _hoveringControls || _anyPanelOpen || !_player.state.playing) return;
       setState(() => _controlsVisible = false);
       _syncWindowChrome();
+      if (isTv) _focus.requestFocus();
     });
   }
 
@@ -1445,6 +1458,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       }
     }
 
+    if (isTv && isDown) {
+      final tv = _onTvKey(node, key);
+      if (tv != null) return tv;
+    }
+
     // In offenen Panels bewegen die Pfeiltasten die Auswahl, Enter wählt.
     final arrows = {
       LogicalKeyboardKey.arrowUp,
@@ -1465,9 +1483,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _seekBy(-_seekStep);
     } else if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.keyL) {
       _seekBy(_seekStep);
-    } else if (key == LogicalKeyboardKey.arrowUp) {
+    } else if (key == LogicalKeyboardKey.arrowUp && !isTv) {
       _setVolume(_volume + 5, showBar: true);
-    } else if (key == LogicalKeyboardKey.arrowDown) {
+    } else if (key == LogicalKeyboardKey.arrowDown && !isTv) {
       _setVolume(_volume - 5, showBar: true);
     } else if (isRepeat) {
       return KeyEventResult.ignored;
@@ -1502,6 +1520,86 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
     _showControls(autoHide: _player.state.playing);
     return KeyEventResult.handled;
+  }
+
+  /// Fernseher: Tasten der Fernbedienung. `null` = wie überall sonst weiterverarbeiten.
+  ///
+  /// Bedienung ausgeblendet: OK pausiert/spielt und blendet ein, hoch/runter blenden ein (die
+  /// Lautstärke regelt der Fernseher), links/rechts spulen. Eingeblendet: das Steuerkreuz wandert
+  /// zwischen Zeitleiste und Knöpfen, ganz oben geht der Fokus zurück aufs Bild.
+  KeyEventResult? _onTvKey(FocusNode node, LogicalKeyboardKey key) {
+    final media = {
+      LogicalKeyboardKey.mediaPlayPause: () => _player.playOrPause(),
+      LogicalKeyboardKey.mediaPlay: () => _player.play(),
+      LogicalKeyboardKey.mediaPause: () => _player.pause(),
+      LogicalKeyboardKey.mediaFastForward: () => _seekBy(const Duration(seconds: 30)),
+      LogicalKeyboardKey.mediaRewind: () => _seekBy(const Duration(seconds: -30)),
+      LogicalKeyboardKey.mediaTrackNext: () => _playNext(),
+      LogicalKeyboardKey.mediaStop: () => _close(),
+    };
+    if (media[key] case final action?) {
+      action();
+      _showControls(autoHide: _player.state.playing);
+      return KeyEventResult.handled;
+    }
+    if (_anyPanelOpen) return null;
+    final ok = {LogicalKeyboardKey.select, LogicalKeyboardKey.enter, LogicalKeyboardKey.gameButtonA};
+    final direction = switch (key) {
+      LogicalKeyboardKey.arrowUp => TraversalDirection.up,
+      LogicalKeyboardKey.arrowDown => TraversalDirection.down,
+      LogicalKeyboardKey.arrowLeft => TraversalDirection.left,
+      LogicalKeyboardKey.arrowRight => TraversalDirection.right,
+      _ => null,
+    };
+    if (node.hasPrimaryFocus) {
+      // Fokus auf dem Bild.
+      if (ok.contains(key)) {
+        _player.playOrPause();
+        _showTvControls();
+        return KeyEventResult.handled;
+      }
+      if (direction == TraversalDirection.up || direction == TraversalDirection.down) {
+        _showTvControls();
+        return KeyEventResult.handled;
+      }
+      return null; // links/rechts: spulen (unten)
+    }
+    // Fokus auf Zeitleiste oder Knopf: das Steuerkreuz wandert.
+    if (direction != null) {
+      _showControls(autoHide: _player.state.playing);
+      if (direction == TraversalDirection.down && _tvSeekFocus.hasFocus) {
+        _tvPlayFocus.requestFocus();
+        return KeyEventResult.handled;
+      }
+      // Ganz oben (über der Zeitleiste) gibt es nichts mehr: Bedienung aus.
+      if (direction == TraversalDirection.up && _tvSeekFocus.hasFocus) {
+        _hideControlsNow();
+        return KeyEventResult.handled;
+      }
+      moveFocusInDirection(direction);
+      return KeyEventResult.handled;
+    }
+    _showControls(autoHide: _player.state.playing);
+    return null; // OK: der Knopf selbst
+  }
+
+  /// Fernseher: Bedienung zeigen, Fokus auf der Zeitleiste.
+  void _showTvControls() {
+    _showControls(autoHide: _player.state.playing);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _controlsVisible && _focus.hasPrimaryFocus) _tvSeekFocus.requestFocus();
+    });
+  }
+
+  /// Fernseher, Zurück-Taste: erst Menü zu, dann Bedienung aus, dann Player schließen.
+  void _onTvBack() {
+    if (_anyPanelOpen) {
+      _closePanels();
+    } else if (_controlsVisible) {
+      _hideControlsNow();
+    } else {
+      _close();
+    }
   }
 
   // --- Oberfläche ------------------------------------------------------------
@@ -1544,6 +1642,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             },
             child: Stack(
               children: [
+                // Fernseher: Zurück schließt erst Menü und Bedienung, dann den Player.
+                if (isTv)
+                  PopScope(
+                    canPop: false,
+                    onPopInvokedWithResult: (didPop, _) => didPop ? null : _onTvBack(),
+                    child: const SizedBox.shrink(),
+                  ),
                 // Ambilight: unscharfe, vergrößerte Kopie des Bildes hinter dem Video – leuchtet in
                 // den Balken. Platz bleibt immer bestehen (sonst verlieren Elemente den Fokus).
                 // Beim Energiesparen aus: das Weichzeichnen kostet in jedem Bild viel GPU-Arbeit.
@@ -1626,7 +1731,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     child: AnimatedOpacity(
                       opacity: _controlsVisible ? 1 : 0,
                       duration: const Duration(milliseconds: 250),
-                      child: _mini ? _buildMiniControls() : _buildControls(),
+                      child: _mini
+                          ? _buildMiniControls()
+                          : isTv
+                          ? _buildTvControls()
+                          : _buildControls(),
                     ),
                   ),
                 ),
@@ -1789,6 +1898,201 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Fernseher – aufgebaut wie die TV-Apps der großen Anbieter: unten links Titel und Folge,
+  /// darunter die Zeitleiste über die ganze Breite (hat beim Einblenden den Fokus: links/rechts
+  /// spult, OK pausiert), darunter eine Zeile mit Pillen. Oben rechts das Ende, bei Pause ein
+  /// großes Play-Symbol in der Mitte.
+  Widget _buildTvControls() {
+    final item = _item;
+    final title = item == null ? '' : (item.isEpisode ? (item.seriesName ?? item.name) : item.name);
+    final subtitle = item == null
+        ? null
+        : item.isEpisode
+        ? [?item.episodeLabel, item.name].join('  ·  ')
+        : yearLabel(item);
+    return Stack(
+      children: [
+        const Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  stops: [0, 0.45, 1],
+                  colors: [Color(0xEE000000), Color(0x66000000), Color(0x33000000)],
+                ),
+              ),
+            ),
+          ),
+        ),
+        // Pause: großes Symbol in der Mitte.
+        Center(
+          child: StreamBuilder<bool>(
+            stream: _player.stream.playing,
+            initialData: _player.state.playing,
+            builder: (context, snap) => AnimatedOpacity(
+              opacity: (snap.data ?? true) ? 0 : 1,
+              duration: const Duration(milliseconds: 200),
+              child: Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: 0.35)),
+                child: const Icon(Icons.play_arrow_rounded, size: 64),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 36,
+          right: 64,
+          child: StreamBuilder<Duration>(
+            stream: _player.stream.position,
+            builder: (context, _) {
+              final left = _player.state.duration - _player.state.position;
+              if (_player.state.duration <= Duration.zero) return const SizedBox.shrink();
+              return Text(
+                tr.endsAt(formatClock(DateTime.now().add(left))),
+                style: TextStyle(fontSize: 16, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+              );
+            },
+          ),
+        ),
+        Positioned(
+          left: 64,
+          right: 64,
+          bottom: 40,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, height: 1.1),
+              ),
+              if (subtitle != null && subtitle.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 18, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              const SizedBox(height: 18),
+              _TvSeekBar(player: _player, onSeek: _seekBy, onToggle: _toggleTvPlayback, focusNode: _tvSeekFocus),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  StreamBuilder<bool>(
+                    stream: _player.stream.playing,
+                    initialData: _player.state.playing,
+                    builder: (context, snap) => _TvPill(
+                      focusNode: _tvPlayFocus,
+                      icon: (snap.data ?? false) ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      tooltip: (snap.data ?? false) ? tr.pause : tr.play,
+                      onPressed: _toggleTvPlayback,
+                    ),
+                  ),
+                  _TvPill(
+                    icon: Icons.subtitles_outlined,
+                    label: tr.audioAndSubtitles,
+                    onPressed: () => _setTrackPanel(true),
+                  ),
+                  _TvPill(icon: Icons.tune_rounded, label: tr.optionsShort, onPressed: () => _setPlaybackPanel(true)),
+                  if (_nextEpisode != null)
+                    _TvPill(icon: Icons.skip_next_rounded, label: tr.nextEpisodeShort, onPressed: _playNext),
+                ],
+              ),
+            ],
+          ),
+        ),
+        _buildPanels(bottom: 150),
+      ],
+    );
+  }
+
+  /// Fernseher: Pause/Weiter; pausiert bleibt die Bedienung stehen.
+  void _toggleTvPlayback() {
+    _player.playOrPause();
+    _showControls(autoHide: !_player.state.playing);
+  }
+
+  /// Menüs über der Leiste (Ton & Untertitel, Wiedergabe, Kapitel, Untertitel-Stil) – für die
+  /// Desktop- und die Fernseher-Bedienung.
+  Widget _buildPanels({required double bottom}) {
+    return Positioned(
+      right: 32,
+      bottom: bottom,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        transitionBuilder: (child, anim) => FadeTransition(
+          opacity: anim,
+          child: ScaleTransition(
+            scale: Tween(begin: 0.96, end: 1.0).animate(anim),
+            alignment: Alignment.bottomRight,
+            child: child,
+          ),
+        ),
+        child: _trackPanelOpen
+            ? _hoverZone(
+                _TracksPanel(
+                  key: const ValueKey('tracks'),
+                  player: _player,
+                  audioEntries: _audioEntries,
+                  subtitleEntries: _subtitleEntries,
+                  selectedAudio: _selectedAudioId,
+                  selectedSubtitle: _selectedSubtitleId,
+                  onAudio: _selectAudio,
+                  onSubtitle: _selectSubtitle,
+                  onClose: () => _setTrackPanel(false),
+                  onStyle: () => _setSubtitleStylePanel(true),
+                  maxHeight: _panelMaxHeight(context),
+                ),
+              )
+            : _subtitleStyleOpen
+            ? _hoverZone(
+                _SubtitleStylePanel(
+                  key: const ValueKey('subtitle-style'),
+                  libraryId: _libraryId,
+                  maxHeight: _panelMaxHeight(context),
+                ),
+              )
+            : _chaptersOpen
+            ? _hoverZone(
+                _ChaptersPanel(
+                  key: const ValueKey('chapters'),
+                  chapters: _chapters,
+                  current: _currentChapterIndex(),
+                  imageUrl: (i) => _api.chapterImageUrl(_item!, _chapters[i], i),
+                  onSelect: (chapter) {
+                    _player.seek(chapter.start);
+                    _setChaptersPanel(false);
+                  },
+                ),
+              )
+            : _playbackPanelOpen
+            ? _hoverZone(
+                PlaybackPanel(
+                  key: const ValueKey('playback'),
+                  rate: _player.state.rate,
+                  onRate: _setRate,
+                  maxBitrate: _maxBitrate,
+                  onQuality: _setQuality,
+                  audioDelay: _audioDelay,
+                  subtitleDelay: _subtitleDelay,
+                  onAudioDelay: (v) => _setDelay(audio: v),
+                  onSubtitleDelay: (v) => _setDelay(subtitle: v),
+                ),
+              )
+            : const SizedBox.shrink(),
+      ),
     );
   }
 
@@ -2033,73 +2337,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             ),
           ),
         ),
-        Positioned(
-          right: 32,
-          bottom: 112,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            transitionBuilder: (child, anim) => FadeTransition(
-              opacity: anim,
-              child: ScaleTransition(
-                scale: Tween(begin: 0.96, end: 1.0).animate(anim),
-                alignment: Alignment.bottomRight,
-                child: child,
-              ),
-            ),
-            child: _trackPanelOpen
-                ? _hoverZone(
-                    _TracksPanel(
-                      key: const ValueKey('tracks'),
-                      player: _player,
-                      audioEntries: _audioEntries,
-                      subtitleEntries: _subtitleEntries,
-                      selectedAudio: _selectedAudioId,
-                      selectedSubtitle: _selectedSubtitleId,
-                      onAudio: _selectAudio,
-                      onSubtitle: _selectSubtitle,
-                      onClose: () => _setTrackPanel(false),
-                      onStyle: () => _setSubtitleStylePanel(true),
-                      maxHeight: _panelMaxHeight(context),
-                    ),
-                  )
-                : _subtitleStyleOpen
-                ? _hoverZone(
-                    _SubtitleStylePanel(
-                      key: const ValueKey('subtitle-style'),
-                      libraryId: _libraryId,
-                      maxHeight: _panelMaxHeight(context),
-                    ),
-                  )
-                : _chaptersOpen
-                ? _hoverZone(
-                    _ChaptersPanel(
-                      key: const ValueKey('chapters'),
-                      chapters: _chapters,
-                      current: _currentChapterIndex(),
-                      imageUrl: (i) => _api.chapterImageUrl(_item!, _chapters[i], i),
-                      onSelect: (chapter) {
-                        _player.seek(chapter.start);
-                        _setChaptersPanel(false);
-                      },
-                    ),
-                  )
-                : _playbackPanelOpen
-                ? _hoverZone(
-                    PlaybackPanel(
-                      key: const ValueKey('playback'),
-                      rate: _player.state.rate,
-                      onRate: _setRate,
-                      maxBitrate: _maxBitrate,
-                      onQuality: _setQuality,
-                      audioDelay: _audioDelay,
-                      subtitleDelay: _subtitleDelay,
-                      onAudioDelay: (v) => _setDelay(audio: v),
-                      onSubtitleDelay: (v) => _setDelay(subtitle: v),
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ),
+        _buildPanels(bottom: 112),
       ],
     );
   }
