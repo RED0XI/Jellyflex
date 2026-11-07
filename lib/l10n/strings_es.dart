@@ -499,6 +499,8 @@ final class _Es extends S {
   @override
   String get energySaverLowPower => 'En modo de bajo consumo';
   @override
+  String get energySaverOnTv => 'En el televisor';
+  @override
   String get energySaverActive => 'Activo ahora mismo.';
   @override
   String get theme => 'Tema';
@@ -1019,6 +1021,10 @@ final class _Es extends S {
   String get forward10 => 'Avanzar 10 s (→)';
   @override
   String get audioAndSubtitles => 'Audio y subtítulos';
+  @override
+  String get optionsShort => 'Opciones';
+  @override
+  String get nextEpisodeShort => 'Siguiente episodio';
   @override
   String get playbackOptions => 'Reproducción: velocidad, calidad, sincronía';
   @override

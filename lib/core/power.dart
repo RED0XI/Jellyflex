@@ -3,8 +3,11 @@ import 'dart:io' show Platform;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'platform/platform_info.dart';
+
 /// Energiesparen: automatisch (Mac: im Akkubetrieb oder Stromsparmodus; iPhone/iPad: nur im
-/// Stromsparmodus – sie laufen fast immer auf Akku), immer oder nie.
+/// Stromsparmodus – sie laufen fast immer auf Akku; Fernseher: immer – ihre Chips sind zu schwach
+/// für Trailer, Zoom und Weichzeichner neben der Oberfläche), immer oder nie.
 enum EnergySaver { auto, on, off }
 
 /// Stromversorgung und was daraus für die Oberfläche folgt (Gegenstücke: macos/Runner/Power.swift,
@@ -85,7 +88,7 @@ abstract final class Power {
     energySaving.value = switch (_mode) {
       EnergySaver.on => true,
       EnergySaver.off => false,
-      EnergySaver.auto => Platform.isIOS ? _lowPower : onBattery,
+      EnergySaver.auto => PlatformInfo.isTv || (Platform.isIOS ? _lowPower : onBattery),
     };
     ambientMotion.value = !energySaving.value && appActive.value;
   }

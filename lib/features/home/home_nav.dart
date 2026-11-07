@@ -15,6 +15,7 @@ import '../../theme.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/focusable.dart';
 import 'home_providers.dart';
+import '../../core/power.dart';
 
 /// Ein Ziel der Navigation (Startseite, Bibliothek, Downloads …).
 class NavEntry {
@@ -543,7 +544,10 @@ class _FrostedBar extends StatelessWidget {
       builder: (context, child) {
         final offset = scroll.hasClients ? scroll.offset : 0.0;
         final t = (offset / 240).clamp(0.0, 1.0);
-        final solid = AppColors.background.withValues(alpha: 0.72);
+        // Energiesparen (auch immer auf dem Fernseher): kein Weichzeichner – er rechnet bei jedem
+        // Scroll-Bild die ganze Leiste neu; dafür ist die Leiste fast deckend.
+        final blur = !Power.energySaving.value;
+        final solid = AppColors.background.withValues(alpha: blur ? 0.72 : 0.94);
         final bar = Container(
           padding: EdgeInsets.only(top: topInset(context) - 4, left: kPageGutter, right: kPageGutter + 4),
           height: height,
@@ -562,7 +566,7 @@ class _FrostedBar extends StatelessWidget {
           ),
           child: child,
         );
-        if (t == 0) return bar;
+        if (t == 0 || !blur) return bar;
         return ClipRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 24 * t, sigmaY: 24 * t),

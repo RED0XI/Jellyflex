@@ -498,6 +498,8 @@ final class _Tr extends S {
   @override
   String get energySaverLowPower => 'Düşük Güç Modunda';
   @override
+  String get energySaverOnTv => 'Televizyonda';
+  @override
   String get energySaverActive => 'Şu anda etkin.';
   @override
   String get theme => 'Tema';
@@ -1015,6 +1017,10 @@ final class _Tr extends S {
   String get forward10 => '10 sn ileri (→)';
   @override
   String get audioAndSubtitles => 'Ses ve altyazılar';
+  @override
+  String get optionsShort => 'Seçenekler';
+  @override
+  String get nextEpisodeShort => 'Sonraki bölüm';
   @override
   String get playbackOptions => 'Oynatma: hız, kalite, eşitleme';
   @override

@@ -145,11 +145,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     label: switch (s.energySaver) {
                       // Den Akku melden bisher nur die Runner für macOS und iOS.
                       EnergySaver.auto =>
-                        Platform.isMacOS ? tr.energySaverOnBattery : (Platform.isIOS ? tr.energySaverLowPower : tr.off),
+                        isTv
+                            ? tr.energySaverOnTv
+                            : Platform.isMacOS
+                            ? tr.energySaverOnBattery
+                            : (Platform.isIOS ? tr.energySaverLowPower : tr.off),
                       EnergySaver.on => tr.always,
                       EnergySaver.off => tr.off,
                     },
                     options: [
+                      if (isTv) (EnergySaver.auto, tr.energySaverOnTv),
                       if (Platform.isMacOS) (EnergySaver.auto, tr.energySaverOnBattery),
                       if (Platform.isIOS) (EnergySaver.auto, tr.energySaverLowPower),
                       (EnergySaver.on, tr.always),

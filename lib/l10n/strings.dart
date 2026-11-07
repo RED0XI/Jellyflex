@@ -534,6 +534,7 @@ class S {
   );
   String get energySaverOnBattery => _t('On battery', 'Im Akkubetrieb');
   String get energySaverLowPower => _t('In Low Power Mode', 'Im Stromsparmodus');
+  String get energySaverOnTv => _t('On the TV', 'Auf dem Fernseher');
   String get energySaverActive => _t('Active right now.', 'Gerade aktiv.');
   String get theme => _t('Theme', 'Theme');
   String get themeHint => _t('Colours of the whole app – changes instantly.', 'Farben der ganzen App – wirkt sofort.');
@@ -897,6 +898,8 @@ class S {
   String get rewind10 => _t('Back 10 s (←)', '10 s zurück (←)');
   String get forward10 => _t('Forward 10 s (→)', '10 s vor (→)');
   String get audioAndSubtitles => _t('Audio & subtitles', 'Audio & Untertitel');
+  String get optionsShort => _t('Options', 'Optionen');
+  String get nextEpisodeShort => _t('Next episode', 'Nächste Folge');
   String get playbackOptions =>
       _t('Playback: speed, quality, sync', 'Wiedergabe: Geschwindigkeit, Qualität, Synchronisation');
   String get miniPlayer => _t('Mini player (P)', 'Mini-Player (P)');

@@ -498,6 +498,8 @@ final class _Fr extends S {
   @override
   String get energySaverLowPower => 'En mode économie d’énergie';
   @override
+  String get energySaverOnTv => 'Sur le téléviseur';
+  @override
   String get energySaverActive => 'Actif en ce moment.';
   @override
   String get theme => 'Thème';
@@ -1019,6 +1021,10 @@ final class _Fr extends S {
   String get forward10 => 'Avancer de 10 s (→)';
   @override
   String get audioAndSubtitles => 'Audio et sous-titres';
+  @override
+  String get optionsShort => 'Options';
+  @override
+  String get nextEpisodeShort => 'Épisode suivant';
   @override
   String get playbackOptions => 'Lecture : vitesse, qualité, synchro';
   @override
