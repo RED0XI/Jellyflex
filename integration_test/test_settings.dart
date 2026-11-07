@@ -19,9 +19,9 @@ SettingsController testSettings([Directory? dir, AppLanguage language = AppLangu
   SeriesTracks.instance = SeriesTracks.forFile(File('${folder.path}${Platform.pathSeparator}series_tracks.json'));
   DownloadManager.testDirectory = folder;
   final file = File('${folder.path}${Platform.pathSeparator}settings.json');
-  // "Was ist neu" schon gesehen – sonst läge das Fenster in jedem Test über der App.
+  // "Was ist neu" schon gesehen und kein Intro – sonst läge beides in jedem Test über der App.
   if (!file.existsSync()) {
-    file.writeAsStringSync(jsonEncode({'language': language.name, 'lastSeenVersion': appVersion}));
+    file.writeAsStringSync(jsonEncode({'language': language.name, 'lastSeenVersion': appVersion, 'intro': false}));
   }
   return SettingsController(file);
 }

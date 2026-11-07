@@ -535,6 +535,11 @@ class S {
   String get energySaverOnBattery => _t('On battery', 'Im Akkubetrieb');
   String get energySaverLowPower => _t('In Low Power Mode', 'Im Stromsparmodus');
   String get energySaverOnTv => _t('On the TV', 'Auf dem Fernseher');
+  String get introSetting => _t('Intro at start', 'Intro beim Start');
+  String get introSettingHint => _t(
+    'A short animated logo when Jellyflex starts (with sound if sounds are on). Any key skips it.',
+    'Kurzes animiertes Logo beim Start (mit Klang, wenn Klänge an sind). Jede Taste überspringt es.',
+  );
   String get energySaverActive => _t('Active right now.', 'Gerade aktiv.');
   String get theme => _t('Theme', 'Theme');
   String get themeHint => _t('Colours of the whole app – changes instantly.', 'Farben der ganzen App – wirkt sofort.');

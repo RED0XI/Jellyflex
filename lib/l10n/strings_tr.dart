@@ -500,6 +500,11 @@ final class _Tr extends S {
   @override
   String get energySaverOnTv => 'Televizyonda';
   @override
+  String get introSetting => 'Açılışta intro';
+  @override
+  String get introSettingHint =>
+      'Jellyflex açılırken kısa animasyonlu logo (sesler açıksa sesli). Herhangi bir tuş atlar.';
+  @override
   String get energySaverActive => 'Şu anda etkin.';
   @override
   String get theme => 'Tema';

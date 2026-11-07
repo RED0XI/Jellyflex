@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/branding.dart';
 import '../core/settings.dart';
 import '../theme.dart';
+import 'brand_mark.dart';
 
 /// App-Name mit Farbverlauf – mit eigenem Logo davor, falls in den
 /// Einstellungen eins gewählt wurde.
@@ -25,7 +26,17 @@ class BrandLogo extends ConsumerWidget {
         style: TextStyle(fontSize: size, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: Colors.white),
       ),
     );
-    if (logo == null) return name;
+    // Ohne eigenes Logo: das Zeichen von Jellyflex vor dem Namen.
+    if (logo == null) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          BrandMark(size: size * 1.15),
+          SizedBox(width: size * 0.3),
+          Flexible(child: name),
+        ],
+      );
+    }
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

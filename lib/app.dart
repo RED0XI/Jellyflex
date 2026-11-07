@@ -40,6 +40,7 @@ import 'l10n/strings.dart';
 import 'features/home/home_providers.dart';
 import 'widgets/offline_banner.dart';
 import 'widgets/layout_shell.dart';
+import 'widgets/app_intro.dart';
 
 /// Seite mit Material-Übergang (siehe buildTheme). go_router erkennt die App
 /// sonst nicht zuverlässig als MaterialApp und blendet Seiten ohne Übergang ein.
@@ -220,19 +221,22 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
       scaffoldMessengerKey: appMessengerKey,
       // Fernseher: Oberfläche auf 1280×720 aufbauen und passend verkleinern (siehe TvScale).
       builder: (context, child) => TvScale(
-        child: Screensaver(
-          router: router,
-          child: IdleLock(
+        // Intro beim Start: liegt über allem, die App lädt darunter schon.
+        child: AppIntro(
+          child: Screensaver(
             router: router,
-            child: LiveHandler(
+            child: IdleLock(
               router: router,
-              child: DownloadNotifier(
-                messenger: appMessengerKey,
-                child: WindowFrame(
-                  router: router,
-                  child: LayoutShell(
+              child: LiveHandler(
+                router: router,
+                child: DownloadNotifier(
+                  messenger: appMessengerKey,
+                  child: WindowFrame(
                     router: router,
-                    child: OfflineBanner(router: router, child: child!),
+                    child: LayoutShell(
+                      router: router,
+                      child: OfflineBanner(router: router, child: child!),
+                    ),
                   ),
                 ),
               ),

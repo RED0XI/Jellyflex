@@ -500,6 +500,11 @@ final class _Fr extends S {
   @override
   String get energySaverOnTv => 'Sur le téléviseur';
   @override
+  String get introSetting => 'Intro au démarrage';
+  @override
+  String get introSettingHint =>
+      'Un court logo animé au démarrage de Jellyflex (avec son si les sons sont activés). Une touche le passe.';
+  @override
   String get energySaverActive => 'Actif en ce moment.';
   @override
   String get theme => 'Thème';

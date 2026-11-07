@@ -4,6 +4,8 @@ import android.app.UiModeManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.media.AudioAttributes
+import android.media.SoundPool
 import android.net.ConnectivityManager
 import android.os.Environment
 import android.security.keystore.KeyGenParameterSpec
@@ -25,9 +27,25 @@ import javax.crypto.spec.GCMParameterSpec
  *   eigentliche 32-Byte-Schlüssel liegt verschlüsselt in den App-Einstellungen; entschlüsseln
  *   kann ihn nur ein nicht exportierbarer Schlüssel im Android-Keystore dieses Geräts.
  * - `jellyflex/platform`: App-Ordner und ob die App auf einem Fernseher läuft.
- * - `jellyflex/shell`: getaktete Verbindung (mobile Daten) für "Nur über WLAN/LAN".
+ * - `jellyflex/shell`: getaktete Verbindung (mobile Daten) für "Nur über WLAN/LAN",
+ *   Bildschirmhelligkeit, kurze Oberflächen-Klänge (`loadSound`/`playSound`, wie unter iOS/macOS).
  */
 class MainActivity : FlutterActivity() {
+    /** Oberflächen-Klänge (Intro, Glücksrad): einmal geladen, ohne Verzögerung abspielbar. */
+    private val soundPool: SoundPool by lazy {
+        SoundPool.Builder()
+            .setMaxStreams(2)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
+            .build()
+    }
+    private val sounds = HashMap<String, Int>()
+    private var streamId = 0
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val messenger = flutterEngine.dartExecutor.binaryMessenger
@@ -64,6 +82,30 @@ class MainActivity : FlutterActivity() {
                 "connectionCost" -> {
                     val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
                     result.success(if (cm.isActiveNetworkMetered) "metered" else "unmetered")
+                }
+                // Klang aus den Bytes einer WAV-Datei laden (SoundPool braucht eine Datei).
+                "loadSound" -> {
+                    val name = call.argument<String>("name")
+                    val data = call.argument<ByteArray>("data")
+                    if (name == null || data == null) {
+                        result.success(false)
+                    } else {
+                        val file = java.io.File(cacheDir, "sound_$name.wav")
+                        file.writeBytes(data)
+                        sounds[name] = soundPool.load(file.path, 1)
+                        result.success(true)
+                    }
+                }
+                // Ein neuer Klang beendet den vorherigen (wie unter Windows/macOS).
+                "playSound" -> {
+                    val id = sounds[call.arguments as? String]
+                    if (id == null) {
+                        result.success(false)
+                    } else {
+                        if (streamId != 0) soundPool.stop(streamId)
+                        streamId = soundPool.play(id, 1f, 1f, 1, 0, 1f)
+                        result.success(streamId != 0)
+                    }
                 }
                 // Helligkeit nur für dieses Fenster (0…1; -1 = wie im System) – Wischen im Player.
                 "getBrightness" -> {

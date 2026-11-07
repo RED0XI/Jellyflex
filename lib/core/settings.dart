@@ -69,6 +69,7 @@ class AppSettings {
     this.language = AppLanguage.en,
     this.themeId = 'midnight',
     this.soundEffects = true,
+    this.intro = true,
     this.playerVolume = 100,
     this.downloadFolder,
     this.downloadFolderAsked = false,
@@ -137,6 +138,9 @@ class AppSettings {
 
   /// Klänge bei "Überrasch mich".
   final bool soundEffects;
+
+  /// Kurzes Intro (animiertes Logo, Klang nur mit [soundEffects]) beim Start der App.
+  final bool intro;
 
   /// Farbschema (siehe lib/core/themes.dart).
   final String themeId;
@@ -245,6 +249,7 @@ class AppSettings {
     AppLanguage? language,
     String? themeId,
     bool? soundEffects,
+    bool? intro,
     double? playerVolume,
     String? Function()? downloadFolder,
     bool? downloadFolderAsked,
@@ -284,6 +289,7 @@ class AppSettings {
     language: language ?? this.language,
     themeId: themeId ?? this.themeId,
     soundEffects: soundEffects ?? this.soundEffects,
+    intro: intro ?? this.intro,
     playerVolume: playerVolume ?? this.playerVolume,
     downloadFolder: downloadFolder != null ? downloadFolder() : this.downloadFolder,
     downloadFolderAsked: downloadFolderAsked ?? this.downloadFolderAsked,
@@ -325,6 +331,7 @@ class AppSettings {
     'language': language.name,
     'themeId': themeId,
     'soundEffects': soundEffects,
+    'intro': intro,
     'playerVolume': playerVolume,
     'downloadFolder': downloadFolder,
     'downloadFolderAsked': downloadFolderAsked,
@@ -370,6 +377,7 @@ class AppSettings {
     language: AppLanguage.values.asNameMap()[json['language']] ?? AppLanguage.en,
     themeId: json['themeId'] as String? ?? 'midnight',
     soundEffects: json['soundEffects'] as bool? ?? true,
+    intro: json['intro'] as bool? ?? true,
     playerVolume: ((json['playerVolume'] as num?)?.toDouble() ?? 100).clamp(0, 100).toDouble(),
     downloadFolder: json['downloadFolder'] as String?,
     downloadFolderAsked: json['downloadFolderAsked'] as bool? ?? false,
