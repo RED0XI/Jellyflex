@@ -16,6 +16,7 @@ import '../../widgets/jf_image.dart';
 import '../../widgets/media_cards.dart';
 import 'hero_banner.dart';
 import 'home_providers.dart';
+import '../../core/platform/device.dart';
 
 /// Kopf ohne Banner (Layouts "Bibliothek" und "Minimal"): Begrüßung nach Tageszeit.
 class GreetingHeader extends ConsumerWidget {
@@ -177,12 +178,14 @@ class _MagazineHeroState extends ConsumerState<MagazineHero> {
                                   PrimaryButton(
                                     label: item.userData.hasResumePosition ? tr.resume : tr.play,
                                     icon: Icons.play_arrow_rounded,
+                                    autofocus: isTv,
                                     onPressed: () => playItem(context, item),
                                   )
                                 else
                                   PrimaryButton(
                                     label: tr.watch,
                                     icon: Icons.play_arrow_rounded,
+                                    autofocus: isTv,
                                     onPressed: () => openItem(context, item),
                                   ),
                                 const SizedBox(width: 12),

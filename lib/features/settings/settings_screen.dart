@@ -35,6 +35,7 @@ import '../../widgets/pin_dialog.dart';
 import '../../core/download_folder.dart';
 import '../../core/downloads.dart';
 import '../downloads/download_flow.dart';
+import '../../widgets/tv_text_input.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key, this.initialSection});
@@ -51,11 +52,19 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _scroll = ScrollController();
-  late final _nameController = TextEditingController(text: ref.read(settingsProvider).appName ?? '');
+  // Gleich anlegen: Bliebe der Bereich mit dem App-Namen zu, entstünde der Controller sonst erst in
+  // dispose() – und dort ist `ref` nicht mehr erlaubt.
+  late final TextEditingController _nameController;
   final _searchController = TextEditingController();
   bool _importingLogo = false;
   late SettingsSection _section = widget.initialSection ?? SettingsScreen.lastSection;
   String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: ref.read(settingsProvider).appName ?? '');
+  }
 
   @override
   void dispose() {
@@ -553,11 +562,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: tr.appNameHint,
               trailing: SizedBox(
                 width: 260,
-                child: TextField(
-                  controller: _nameController,
-                  maxLength: 30,
-                  decoration: const InputDecoration(hintText: defaultAppName, counterText: '', isDense: true),
-                  onChanged: (v) => ctrl.update((s) => s.copyWith(appName: () => v.trim().isEmpty ? null : v.trim())),
+                child: TvTextInput(
+                  builder: (context, readOnly, done) => TextField(
+                    controller: _nameController,
+                    readOnly: readOnly,
+                    maxLength: 30,
+                    decoration: const InputDecoration(hintText: defaultAppName, counterText: '', isDense: true),
+                    onChanged: (v) => ctrl.update((s) => s.copyWith(appName: () => v.trim().isEmpty ? null : v.trim())),
+                    onSubmitted: (_) => done(),
+                  ),
                 ),
               ),
             ),
@@ -744,27 +757,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
-  Widget _searchField() => TextField(
-    controller: _searchController,
-    onChanged: (v) => setState(() => _query = v),
-    style: const TextStyle(fontSize: 15),
-    decoration: InputDecoration(
-      hintText: tr.searchSettings,
-      isDense: true,
-      prefixIcon: const Icon(Icons.search_rounded, size: 20),
-      suffixIcon: _query.isEmpty
-          ? null
-          : IconButton(
-              tooltip: tr.clear,
-              icon: const Icon(Icons.close_rounded, size: 18),
-              onPressed: () {
-                _searchController.clear();
-                setState(() => _query = '');
-              },
-            ),
-      filled: true,
-      fillColor: AppColors.surface,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+  Widget _searchField() => TvTextInput(
+    builder: (context, readOnly, done) => TextField(
+      controller: _searchController,
+      readOnly: readOnly,
+      onSubmitted: (_) => done(),
+      onChanged: (v) => setState(() => _query = v),
+      style: const TextStyle(fontSize: 15),
+      decoration: InputDecoration(
+        hintText: tr.searchSettings,
+        isDense: true,
+        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+        suffixIcon: _query.isEmpty
+            ? null
+            : IconButton(
+                tooltip: tr.clear,
+                icon: const Icon(Icons.close_rounded, size: 18),
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() => _query = '');
+                },
+              ),
+        filled: true,
+        fillColor: AppColors.surface,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      ),
     ),
   );
 

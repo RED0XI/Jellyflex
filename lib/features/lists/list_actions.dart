@@ -6,6 +6,7 @@ import '../../core/models.dart';
 import '../../l10n/strings.dart';
 import '../../theme.dart';
 import '../../widgets/buttons.dart';
+import '../../widgets/tv_text_input.dart';
 
 /// Lesezeichen-Knopf auf der Detailseite: auf die Merkliste / herunter.
 class WatchlistButton extends ConsumerStatefulWidget {
@@ -119,12 +120,18 @@ Future<String?> askListName(BuildContext context) {
         title: Text(tr.newList),
         content: SizedBox(
           width: 360,
-          child: TextField(
-            controller: controller,
-            autofocus: true,
-            maxLength: 80,
-            decoration: InputDecoration(hintText: tr.listNameHint),
-            onSubmitted: (_) => submit(),
+          child: TvTextInput(
+            builder: (context, readOnly, done) => TextField(
+              controller: controller,
+              readOnly: readOnly,
+              autofocus: true,
+              maxLength: 80,
+              decoration: InputDecoration(hintText: tr.listNameHint),
+              onSubmitted: (_) {
+                done();
+                submit();
+              },
+            ),
           ),
         ),
         actions: [

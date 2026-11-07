@@ -33,6 +33,7 @@ import 'subtitle_search_dialog.dart';
 import 'theme_music.dart';
 import '../lists/list_actions.dart';
 import '../../l10n/strings.dart';
+import '../../core/platform/device.dart';
 
 final itemProvider = FutureProvider.autoDispose.family<BaseItem, String>((ref, id) async {
   try {
@@ -679,6 +680,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       playButtons = PrimaryButton(
         label: next == null ? tr.play : '${tr.play}  ·  ${next.name}',
         icon: Icons.play_arrow_rounded,
+        autofocus: isTv,
         onPressed: next == null || next.isSeries ? null : () => playItem(context, next),
       );
     } else if (item.isSeries) {
@@ -690,6 +692,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
             ? tr.play
             : '${resuming ? tr.resume : tr.play}  ·  ${episode.episodeLabel ?? episode.name}',
         icon: Icons.play_arrow_rounded,
+        autofocus: isTv,
         loading: nextUp.isLoading,
         onPressed: episode == null ? null : () => playItem(context, episode),
       );
@@ -703,6 +706,8 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
           PrimaryButton(
             label: resuming ? '${tr.resume}  ·  ${remainingLabel(item) ?? ''}' : tr.play,
             icon: Icons.play_arrow_rounded,
+            // Fernseher: OK spielt gleich ab.
+            autofocus: isTv,
             onPressed: () => playItem(
               context,
               item,

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/platform/platform_info.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../core/search_history.dart';
@@ -17,6 +16,7 @@ import '../../widgets/states.dart';
 import '../../widgets/top_scrim.dart';
 import '../genre/genre_screen.dart';
 import '../../l10n/strings.dart';
+import '../../widgets/tv_text_input.dart';
 
 /// Was die Suche zeigt.
 enum _Filter { all, movies, shows, episodes, people }
@@ -142,42 +142,46 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(kPageGutter, topInset(context) + 28, kPageGutter, 16),
-                    child: TextField(
-                      controller: _controller,
-                      // Fernseher: Tastatur erst auf Klick, nicht sofort über die ganze Seite.
-                      autofocus: !PlatformInfo.isTv,
-                      onChanged: _onChanged,
-                      onSubmitted: (v) {
-                        _search(v.trim());
-                        _rememberTerm(v.trim());
-                      },
-                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        hintText: tr.searchHint,
-                        prefixIcon: const Padding(
-                          padding: EdgeInsets.only(left: 18, right: 10),
-                          child: Icon(Icons.search_rounded, size: 30),
-                        ),
-                        suffixIcon: _loading
-                            ? const Padding(
-                                padding: EdgeInsets.all(18),
-                                child: SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                    child: TvTextInput(
+                      builder: (context, readOnly, done) => TextField(
+                        controller: _controller,
+                        readOnly: readOnly,
+                        // Fernseher: Fokus gleich hier, die Tastatur kommt aber erst auf OK (TvTextInput).
+                        autofocus: true,
+                        onChanged: _onChanged,
+                        onSubmitted: (v) {
+                          done();
+                          _search(v.trim());
+                          _rememberTerm(v.trim());
+                        },
+                        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
+                        decoration: InputDecoration(
+                          hintText: tr.searchHint,
+                          prefixIcon: const Padding(
+                            padding: EdgeInsets.only(left: 18, right: 10),
+                            child: Icon(Icons.search_rounded, size: 30),
+                          ),
+                          suffixIcon: _loading
+                              ? const Padding(
+                                  padding: EdgeInsets.all(18),
+                                  child: SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(strokeWidth: 2.4),
+                                  ),
+                                )
+                              : _controller.text.isEmpty
+                              ? null
+                              : IconButton(
+                                  icon: const Icon(Icons.close_rounded),
+                                  tooltip: tr.clear,
+                                  onPressed: () {
+                                    _controller.clear();
+                                    _search('');
+                                  },
                                 ),
-                              )
-                            : _controller.text.isEmpty
-                            ? null
-                            : IconButton(
-                                icon: const Icon(Icons.close_rounded),
-                                tooltip: tr.clear,
-                                onPressed: () {
-                                  _controller.clear();
-                                  _search('');
-                                },
-                              ),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 22),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 22),
+                        ),
                       ),
                     ),
                   ),

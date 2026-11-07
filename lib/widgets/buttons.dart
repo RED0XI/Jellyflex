@@ -5,9 +5,19 @@ import 'focusable.dart';
 
 /// Großer Haupt-Button (z. B. "Abspielen") in der Knopffarbe des Themes.
 class PrimaryButton extends StatefulWidget {
-  const PrimaryButton({super.key, required this.label, required this.onPressed, this.icon, this.loading = false});
+  const PrimaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.loading = false,
+    this.autofocus = false,
+  });
 
   final String label;
+
+  /// Fokus beim Öffnen der Seite (Fernseher: OK spielt dann gleich ab).
+  final bool autofocus;
   final IconData? icon;
   final VoidCallback? onPressed;
   final bool loading;
@@ -22,6 +32,7 @@ class _PrimaryButtonState extends State<PrimaryButton> {
     final enabled = widget.onPressed != null && !widget.loading;
     return Focusable(
       onTap: enabled ? widget.onPressed : null,
+      autofocus: widget.autofocus,
       builder: (context, hovered) => AnimatedScale(
         scale: hovered && enabled ? 1.04 : 1,
         duration: const Duration(milliseconds: 180),

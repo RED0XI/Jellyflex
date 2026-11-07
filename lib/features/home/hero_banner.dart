@@ -22,6 +22,7 @@ import 'home_providers.dart';
 import '../../l10n/strings.dart';
 import '../../core/system_certs.dart';
 import '../../core/image_cache.dart';
+import '../../core/platform/device.dart';
 
 /// Großes Banner oben auf der Startseite. Wechselt alle paar Sekunden
 /// mit Überblendung und langsamem Zoom ("Ken-Burns-Effekt").
@@ -44,6 +45,10 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
 
   int _index = 0;
   bool _hovered = false;
+
+  /// Fokus (Fernbedienung, Tastatur) auf Knöpfen oder Punkten: anhalten wie bei der Maus –
+  /// sonst baut der nächste Titel die Knöpfe neu und der Fokus ist weg.
+  int _focusInside = 0;
 
   /// Beim Energiesparen: füllt den Fortschritt im Sekundentakt statt mit [_cycle.forward].
   Timer? _stepTimer;
@@ -139,7 +144,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
   /// Jellyflex gerade vorne ist (im Hintergrund schaut niemand zu).
   void _syncCycle() {
     _stepTimer?.cancel();
-    if (_hovered || _trailerVisible || !_pageVisible || !Power.appActive.value) {
+    if (_hovered || _focusInside > 0 || _trailerVisible || !_pageVisible || !Power.appActive.value) {
       _cycle.stop();
     } else if (_cycle.value < 1) {
       if (Power.energySaving.value) {
@@ -294,7 +299,16 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
         _hovered = false;
         _syncCycle();
       },
-      child: child,
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onFocusChange: (focused) {
+          // Zwei Bereiche (Knöpfe, Punkte) – die Reihenfolge der Meldungen ist nicht festgelegt.
+          _focusInside = math.max(0, _focusInside + (focused ? 1 : -1));
+          _syncCycle();
+        },
+        child: child,
+      ),
     );
 
     return SizedBox(
@@ -543,10 +557,17 @@ class _HeroInfo extends ConsumerWidget {
               PrimaryButton(
                 label: item.userData.hasResumePosition ? tr.resume : tr.play,
                 icon: Icons.play_arrow_rounded,
+                // Fernseher: OK spielt gleich ab (ohne erst den Fokus suchen zu müssen).
+                autofocus: isTv,
                 onPressed: () => playItem(context, item),
               )
             else
-              PrimaryButton(label: tr.watch, icon: Icons.play_arrow_rounded, onPressed: () => openItem(context, item)),
+              PrimaryButton(
+                label: tr.watch,
+                icon: Icons.play_arrow_rounded,
+                autofocus: isTv,
+                onPressed: () => openItem(context, item),
+              ),
             const SizedBox(width: 12),
             GlassButton(label: tr.moreInfo, icon: Icons.info_outline_rounded, onPressed: () => openItem(context, item)),
           ],

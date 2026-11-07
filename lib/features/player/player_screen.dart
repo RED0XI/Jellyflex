@@ -912,7 +912,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _fitOutputSize(Size box, double zoom) {
     final w = _player.state.width;
     final h = _player.state.height;
-    if (w == null || h == null || w <= 0 || h <= 0 || box.isEmpty) return;
+    // Android: Die Bildfläche (Surface) hat ohnehin die Größe auf dem Bildschirm – media_kit
+    // kennt dort kein setSize (würde eine Ausnahme werfen).
+    if (Platform.isAndroid || w == null || h == null || w <= 0 || h <= 0 || box.isEmpty) return;
     final aspect = w / h;
     var fit = box.width / box.height > aspect
         ? Size(box.height * aspect, box.height)
@@ -1841,8 +1843,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       tooltip: tr.forward10,
                       onPressed: () => _seekBy(_seekStep),
                     ),
-                    const SizedBox(width: 4),
-                    _VolumeControl(player: _player, onToggleMute: _toggleMute, onChanged: _setVolume),
+                    // Fernseher: Lautstärke regelt die Fernbedienung (der Fernseher selbst) – ein
+                    // Regler wäre nur ein Fokus-Ziel mehr zwischen Spulen und Leiste.
+                    if (!isTv) ...[
+                      const SizedBox(width: 4),
+                      _VolumeControl(player: _player, onToggleMute: _toggleMute, onChanged: _setVolume),
+                    ],
                     const Spacer(),
                     StreamBuilder<Duration>(
                       stream: _player.stream.position,
