@@ -2,6 +2,8 @@
 //
 // Start:   dart run tool/mock_server.dart
 // In der App als Server-Adresse eingeben:  http://localhost:8097
+// Fürs Handy/den Fernseher im selben WLAN:  dart run tool/mock_server.dart --lan
+//   (lauscht im ganzen Heimnetz und antwortet auf die Heimnetz-Suche mit der Adresse dieses Rechners)
 // Beliebiger Benutzername/Passwort funktioniert.
 //
 // Liefert fiktive Filme/Serien und erzeugt farbige Platzhalterbilder. Als Video
@@ -15,6 +17,7 @@
 //   GET  /debug/laststream            zuletzt angefragter Video-Stream (Fassung)
 //   GET  /debug/images?delay=150&reset=1   Bilder verzögern (langsames Netz) / Zähler
 //   POST /debug/addmovie?name=X       neuen Film hinzufügen + "LibraryChanged" senden
+//   POST /debug/report?name=X         Messergebnis eines Geräts (JSON) → build/device_reports/X.json
 
 import 'dart:async';
 import 'dart:convert';
@@ -23,6 +26,9 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 const port = 8097;
+
+/// `--lan`: im ganzen Heimnetz erreichbar statt nur auf diesem Rechner.
+var _lan = false;
 
 /// Offene Live-Verbindungen (WebSocket).
 final _sockets = <WebSocket>{};
@@ -932,15 +938,25 @@ Object? _handle(HttpRequest req) {
   return null;
 }
 
-/// Heimnetz-Suche wie bei Jellyfin (UDP 7359) – nur auf localhost, für die Tests.
-Future<void> _answerDiscovery() async {
+/// Erste IPv4-Adresse im Heimnetz (für `--lan`).
+Future<String?> _lanAddress() async {
+  for (final nic in await NetworkInterface.list(type: InternetAddressType.IPv4)) {
+    for (final a in nic.addresses) {
+      if (!a.isLoopback && !a.isLinkLocal) return a.address;
+    }
+  }
+  return null;
+}
+
+/// Heimnetz-Suche wie bei Jellyfin (UDP 7359) – auf localhost, mit `--lan` im ganzen Heimnetz.
+Future<void> _answerDiscovery(String host) async {
   try {
-    final socket = await RawDatagramSocket.bind(InternetAddress.loopbackIPv4, 7359);
+    final socket = await RawDatagramSocket.bind(_lan ? InternetAddress.anyIPv4 : InternetAddress.loopbackIPv4, 7359);
     socket.listen((event) {
       if (event != RawSocketEvent.read) return;
       final datagram = socket.receive();
       if (datagram == null || utf8.decode(datagram.data, allowMalformed: true) != 'who is JellyfinServer?') return;
-      final answer = {'Address': 'http://localhost:$port', 'Id': 'mock-server', 'Name': 'Demo-Server'};
+      final answer = {'Address': 'http://$host:$port', 'Id': 'mock-server', 'Name': 'Demo-Server'};
       socket.send(utf8.encode(jsonEncode(answer)), datagram.address, datagram.port);
     });
   } on SocketException catch (e) {
@@ -948,11 +964,13 @@ Future<void> _answerDiscovery() async {
   }
 }
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
+  _lan = args.contains('--lan');
   _seed();
-  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
-  stdout.writeln('Jellyfin-Demo-Server läuft auf http://localhost:$port');
-  await _answerDiscovery();
+  final host = _lan ? (await _lanAddress() ?? 'localhost') : 'localhost';
+  final server = await HttpServer.bind(_lan ? InternetAddress.anyIPv4 : InternetAddress.loopbackIPv4, port);
+  stdout.writeln('Jellyfin-Demo-Server läuft auf http://$host:$port');
+  await _answerDiscovery(host);
 
   await for (final req in server) {
     final res = req.response;
@@ -1008,6 +1026,17 @@ Future<void> main() async {
         if (q['reset'] == '1') _imageRequests = 0;
         res.headers.contentType = ContentType.json;
         res.write(jsonEncode({'delay': _imageDelayMs, 'requests': _imageRequests}));
+        await res.close();
+        continue;
+      }
+      if (req.uri.path == '/debug/report' && req.method == 'POST') {
+        // Messungen von iPhone/Fernseher ohne Debug-Verbindung (integration_test/device_perf_test.dart).
+        final body = await utf8.decoder.bind(req).join();
+        final name = (req.uri.queryParameters['name'] ?? 'report').replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+        File('build/device_reports/$name.json')
+          ..createSync(recursive: true)
+          ..writeAsStringSync(body);
+        stdout.writeln('Messung $name: $body');
         await res.close();
         continue;
       }
