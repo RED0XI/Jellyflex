@@ -61,17 +61,22 @@ class _TvHomeState extends ConsumerState<_TvHome> {
             right: 0,
             width: size.width * 0.74,
             height: size.height * 0.7,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 450),
-              child: KeyedSubtree(
-                key: ValueKey(backdrop),
-                child: backdrop == null
-                    ? const SizedBox.expand()
-                    : JfImage(
-                        url: api.imageUrlOrNull(backdrop, maxWidth: (size.width * 0.74 * 1.5).round()),
-                        blurHash: backdrop.blurHash,
-                        alignment: Alignment.topCenter,
-                      ),
+            // Eigene Ebene: Scrollen der Reihen zeichnet das Bild nicht neu. Bild höchstens 1280 px
+            // breit (liegt ohnehin unter Verläufen) – große Bilder dekodieren auf TV-Chips spürbar.
+            child: RepaintBoundary(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 280),
+                child: KeyedSubtree(
+                  key: ValueKey(backdrop),
+                  child: backdrop == null
+                      ? const SizedBox.expand()
+                      : JfImage(
+                          url: api.imageUrlOrNull(backdrop, maxWidth: 1280),
+                          // Kein Blurhash: der würde bei jedem Fokuswechsel neu berechnet.
+                          placeholderColor: Colors.transparent,
+                          alignment: Alignment.topCenter,
+                        ),
+                ),
               ),
             ),
           ),

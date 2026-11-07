@@ -34,6 +34,7 @@ import 'theme_music.dart';
 import '../lists/list_actions.dart';
 import '../../l10n/strings.dart';
 import '../../core/platform/device.dart';
+import '../../widgets/after_transition.dart';
 
 final itemProvider = FutureProvider.autoDispose.family<BaseItem, String>((ref, id) async {
   try {
@@ -274,18 +275,28 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                 ),
               if (!item.isSeries && !item.isCollection && item.chapters.length > 1)
                 SliverToBoxAdapter(
-                  child: _ScenesRow(
-                    item: item,
-                    mediaSourceId: _sourceId,
-                    audioIndex: _audioIndex,
-                    subtitleIndex: _subtitleIndex,
+                  child: AfterTransition(
+                    height: 260,
+                    child: _ScenesRow(
+                      item: item,
+                      mediaSourceId: _sourceId,
+                      audioIndex: _audioIndex,
+                      subtitleIndex: _subtitleIndex,
+                    ),
                   ),
                 ),
+              // Weiter unten: erst nach dem Einblenden der Seite aufbauen (Energiesparen/Fernseher).
               if (people.isNotEmpty)
                 SliverToBoxAdapter(
-                  child: PeopleRow(title: tr.cast, people: people),
+                  child: AfterTransition(
+                    height: 300,
+                    child: PeopleRow(title: tr.cast, people: people),
+                  ),
                 ),
-              if (similarId != null) SliverToBoxAdapter(child: _SimilarRow(itemId: similarId)),
+              if (similarId != null)
+                SliverToBoxAdapter(
+                  child: AfterTransition(height: 300, child: _SimilarRow(itemId: similarId)),
+                ),
               const SliverToBoxAdapter(child: SizedBox(height: 72)),
             ],
           ),

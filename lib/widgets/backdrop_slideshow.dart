@@ -64,8 +64,9 @@ class _BackdropSlideshowState extends ConsumerState<BackdropSlideshow> {
     final image = widget.images[_index % widget.images.length];
     final width = screenImageWidth(context);
 
-    // Das nächste Bild schon vorladen, damit die Überblendung nicht ruckelt.
-    if (widget.images.length > 1) {
+    // Das nächste Bild schon vorladen, damit die Überblendung nicht ruckelt – nur wenn die
+    // Diashow überhaupt weiterblättert (beim Energiesparen steht sie).
+    if (widget.images.length > 1 && Power.ambientMotion.value) {
       final next = widget.images[(_index + 1) % widget.images.length];
       precacheImage(CachedNetworkImage(api.imageUrl(next, maxWidth: width)), context).ignore();
     }
