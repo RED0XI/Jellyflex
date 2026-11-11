@@ -45,17 +45,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   _Filter _filter = _Filter.all;
   bool _onlyUnwatched = false;
 
-  /// Alle Genres der Bibliotheken (Kacheln zum Stöbern ohne Suchbegriff).
-  List<String> _genres = const [];
-
-  @override
-  void initState() {
-    super.initState();
-    ref.read(apiProvider).getGenres(null).then((g) {
-      if (mounted) setState(() => _genres = g);
-    }, onError: (_) {});
-  }
-
   @override
   void dispose() {
     _debounce?.cancel();
@@ -119,6 +108,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Alle Genres (Kacheln zum Stöbern ohne Suchbegriff) – einmal je App-Start geholt.
+    final genres = ref.watch(genresProvider).value ?? const <String>[];
     bool show(_Filter f) => _filter == _Filter.all || _filter == f;
     final visible = _onlyUnwatched ? _results.where((i) => !i.userData.played).toList() : _results;
     final movies = show(_Filter.movies) ? visible.where((i) => i.isMovie).toList() : const <BaseItem>[];
@@ -220,7 +211,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   )
                 else if (_term.isEmpty)
                   SliverToBoxAdapter(
-                    child: recent.isEmpty && _genres.isEmpty
+                    child: recent.isEmpty && genres.isEmpty
                         ? EmptyState(
                             icon: Icons.movie_filter_rounded,
                             title: tr.whatDoYouFeelLike,
@@ -231,7 +222,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             children: [
                               if (recent.isNotEmpty)
                                 _RecentSearches(terms: recent, onUse: _useRecent, onRemove: _forget),
-                              if (_genres.isNotEmpty)
+                              if (genres.isNotEmpty)
                                 Padding(
                                   padding: EdgeInsets.fromLTRB(kPageGutter, recent.isEmpty ? 16 : 34, kPageGutter, 48),
                                   child: Column(
@@ -244,7 +235,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                       const SizedBox(height: 4),
                                       Text(tr.browseByGenreHint, style: TextStyle(color: AppColors.textSecondary)),
                                       const SizedBox(height: 18),
-                                      GenreTiles(genres: _genres),
+                                      GenreTiles(genres: genres),
                                     ],
                                   ),
                                 ),

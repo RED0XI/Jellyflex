@@ -11,6 +11,8 @@ import Security
 enum Keychain {
   private static let service = "Jellyflex"
   private static let account = "secure-store-key"
+  /// Ein Zugriff nach dem anderen (Anlegen beim ersten Mal nicht doppelt).
+  private static let queue = DispatchQueue(label: "jellyflex.keychain", qos: .userInitiated)
 
   static func register(with messenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(name: "jellyflex/keychain", binaryMessenger: messenger)
@@ -19,10 +21,17 @@ enum Keychain {
         result(FlutterMethodNotImplemented)
         return
       }
-      if let key = loadOrCreateKey() {
-        result(FlutterStandardTypedData(bytes: key))
-      } else {
-        result(FlutterError(code: "keychain", message: "Schlüsselbund nicht verfügbar", details: nil))
+      // Nicht auf dem Hauptthread: Der Schlüsselbund kann warten (z. B. auf eine Freigabe-
+      // Abfrage des Systems) – auf dem Hauptthread stünde so lange die ganze App still.
+      queue.async {
+        let key = loadOrCreateKey()
+        DispatchQueue.main.async {
+          if let key {
+            result(FlutterStandardTypedData(bytes: key))
+          } else {
+            result(FlutterError(code: "keychain", message: "Schlüsselbund nicht verfügbar", details: nil))
+          }
+        }
       }
     }
   }

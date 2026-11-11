@@ -229,18 +229,29 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
     _trailerDoneSub = player.stream.completed.listen((done) {
       if (done && mounted && _trailerItemId == item.id) _goTo(_index + 1);
     });
-    await player.setVolume(_muted ? 0 : 70);
-    // Zertifikate prüfen, bevor mit dem Anmelde-Token gestreamt wird.
-    await SystemCerts.secure(player);
-    final sourceId = trailer.mediaSources.firstOrNull?.id ?? trailer.id;
-    await player.open(
-      Media(
-        api.streamUrl(trailer.id, mediaSourceId: sourceId),
-        httpHeaders: {'Authorization': api.authorizationHeader},
-      ),
-    );
-    // Trailer im Hintergrund ohne Untertitel.
-    await player.setSubtitleTrack(SubtitleTrack.no());
+    // Noch derselbe Player und derselbe Trailer? Während der Wartezeiten kann eine andere Seite
+    // geöffnet worden sein – dann ist der Player schon freigegeben (didPushNext) und darf nichts
+    // mehr öffnen.
+    bool current() => mounted && _trailerPlayer == player && _trailerItemId == item.id;
+    try {
+      await player.setVolume(_muted ? 0 : 70);
+      // Zertifikate prüfen, bevor mit dem Anmelde-Token gestreamt wird.
+      await SystemCerts.secure(player);
+      if (!current()) return;
+      final sourceId = trailer.mediaSources.firstOrNull?.id ?? trailer.id;
+      await player.open(
+        Media(
+          api.streamUrl(trailer.id, mediaSourceId: sourceId),
+          httpHeaders: {'Authorization': api.authorizationHeader},
+        ),
+      );
+      if (!current()) return;
+      // Trailer im Hintergrund ohne Untertitel.
+      await player.setSubtitleTrack(SubtitleTrack.no());
+    } catch (e) {
+      // Ein Trailer ist Beiwerk – scheitert er, bleibt einfach das Bild stehen.
+      debugPrint('Trailer: $e');
+    }
   }
 
   void _stopTrailer() {

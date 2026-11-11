@@ -3,6 +3,8 @@
 // Voraussetzung:  dart run tool/mock_server.dart
 // Start:          flutter test integration_test/fullscreen_nav_test.dart -d windows
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,9 +60,14 @@ void main() {
     expect(router.state.uri.path, '/');
 
     await tester.tap(titleBar(Icons.fullscreen_exit_rounded));
-    await pumpFor(tester, const Duration(seconds: 1));
+    // macOS verlässt das Vollbild mit einer Animation (eigener Space) – das kann dauern.
+    for (var i = 0; i < 30 && windowFullscreen.value; i++) {
+      await pumpFor(tester, const Duration(milliseconds: 200));
+    }
+    await pumpFor(tester, const Duration(milliseconds: 500));
     expect(windowFullscreen.value, isFalse);
-    expect(reachable(Icons.remove_rounded), isTrue, reason: 'Fensterknöpfe wieder da');
+    // Auf dem Mac sind es die Ampel-Knöpfe des Systems – keine eigenen.
+    expect(reachable(Icons.remove_rounded), !Platform.isMacOS, reason: 'Fensterknöpfe wieder da');
 
     await tester.pumpWidget(const SizedBox());
   });

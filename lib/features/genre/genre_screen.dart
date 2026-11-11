@@ -30,12 +30,18 @@ final genreRowsProvider = FutureProvider.autoDispose.family<GenreRows, String>((
   return (topRated: topRated, newest: newest, unwatched: unwatched, series: series);
 });
 
+/// Alle Genres der Bibliotheken – einmal je App-Start (bzw. Konto) geholt und behalten.
+final genresProvider = FutureProvider<List<String>>((ref) => ref.watch(apiProvider).getGenres(null));
+
 /// Je Genre ein passendes Hintergrundbild für die Kacheln – jedes Bild nur einmal. Erst aus einer
 /// Anfrage (zufällige Titel mit Hintergrundbild); Genres, für die dort nichts Eigenes übrig ist,
 /// holen sich gezielt eigene Titel.
-final genreArtProvider = FutureProvider.autoDispose<Map<String, BaseItem>>((ref) async {
+///
+/// Einmal je App-Start ausgewählt und behalten (die Startseite stößt es kurz nach dem Laden im
+/// Hintergrund an) – die Suche zeigt die Kacheln dann sofort; beim nächsten Start neu gemischt.
+final genreArtProvider = FutureProvider<Map<String, BaseItem>>((ref) async {
   final api = ref.watch(apiProvider);
-  final (genres, pool) = await (api.getGenres(null), api.getRandomWithBackdrops()).wait;
+  final (genres, pool) = await (ref.watch(genresProvider.future), api.getRandomWithBackdrops()).wait;
   final art = assignGenreArt(genres, pool);
   final missing = [
     for (final g in genres)

@@ -31,6 +31,7 @@ import '../../widgets/focus_navigation.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/layout_shell.dart';
 import '../../l10n/strings.dart';
+import '../genre/genre_screen.dart';
 
 part 'tv_home.dart';
 
@@ -80,6 +81,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.listen(homeProvider, (_, next) {
       final session = ref.read(sessionProvider).value;
       if (session == null || !next.hasValue || next.isLoading) return;
+      // Genre-Kacheln der Suche schon im Hintergrund auswählen (einmal je Start) – die Suche
+      // zeigt sie dann sofort. Kurz warten, damit es der Startseite nicht in die Quere kommt.
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) ref.read(genreArtProvider.future).ignore();
+      });
       final container = ProviderScope.containerOf(context, listen: false);
       AppShell.updateJumpList(
         ref.read(apiProvider),
