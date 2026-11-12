@@ -2,6 +2,18 @@ part of 'player_screen.dart';
 
 // Bausteine des Players: Knöpfe, Spulleiste, Lautstärke, Ambilight, "Gute Nacht".
 
+/// Symbol für Zurück/Vor um [seconds] – mit der Zahl darin, wo es eins gibt (5, 10, 30).
+IconData seekIcon(int seconds, {required bool forward}) => switch ((seconds, forward)) {
+  (5, false) => Icons.replay_5_rounded,
+  (10, false) => Icons.replay_10_rounded,
+  (30, false) => Icons.replay_30_rounded,
+  (5, true) => Icons.forward_5_rounded,
+  (10, true) => Icons.forward_10_rounded,
+  (30, true) => Icons.forward_30_rounded,
+  (_, false) => Icons.fast_rewind_rounded,
+  (_, true) => Icons.fast_forward_rounded,
+};
+
 /// Leuchten aus den Farben des Bildes: dieselbe Videotextur, stark weichgezeichnet
 /// und etwas vergrößert, gedämpft hinter dem eigentlichen Video.
 class _Ambilight extends StatelessWidget {
@@ -377,9 +389,10 @@ enum _ZoomMode { fit, fill, custom }
 
 /// Gewählten Bildausschnitt kurz in der Bildmitte zeigen.
 class _ZoomOsd extends StatelessWidget {
-  const _ZoomOsd({required this.label});
+  const _ZoomOsd({required this.label, this.icon = Icons.fit_screen_rounded});
 
   final ValueListenable<String?> label;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -398,7 +411,7 @@ class _ZoomOsd extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.fit_screen_rounded, size: 28),
+                Icon(icon, size: 28),
                 const SizedBox(width: 12),
                 Text(text ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               ],

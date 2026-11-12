@@ -28,7 +28,11 @@ abstract final class MediaSession {
     String? artUrl,
     required bool playing,
     bool canNext = false,
+    int skipBack = 10,
+    int skipForward = 10,
   }) => _invoke('update', {
+    'skipBack': skipBack,
+    'skipForward': skipForward,
     'title': title,
     'subtitle': subtitle ?? '',
     'artUrl': artUrl ?? '',

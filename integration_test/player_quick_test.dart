@@ -1,5 +1,6 @@
 // Kleine Player-Verbesserungen gegen den Demo-Server: Mausrad-Lautstärke bis 150 %,
-// Zurückspulen beim Fortsetzen, "Schaust du noch?" und "Zufällig abspielen".
+// Zurückspulen beim Fortsetzen, "Schaust du noch?", "Zufällig abspielen", Zoom (mit Untertiteln im
+// sichtbaren Teil), eigene Spulweiten und "Halten für schneller".
 //
 // Voraussetzung:  dart run tool/mock_server.dart   (und %TEMP%\jellyflex_test.mkv)
 // Start:          flutter test integration_test/player_quick_test.dart -d windows
@@ -31,6 +32,8 @@ void main() {
 
   Future<void> startApp(WidgetTester tester) async {
     await windowManager.ensureInitialized();
+    // Fenster nicht im Seitenverhältnis des Testvideos (16:9) – sonst gibt es nichts auszufüllen.
+    await windowManager.setSize(const Size(1280, 860));
     PlayerScreen.debugBeforeOpen = (p) async => player = p;
     await tester.pumpWidget(
       ProviderScope(
@@ -189,6 +192,67 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
     await pumpFor(tester, const Duration(milliseconds: 400));
     expect(scale(), 1);
+
+    // Untertitel bleiben im sichtbaren Teil und so groß wie ohne Zoom.
+    final native = player!.platform as NativePlayer;
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+    await pumpFor(tester, const Duration(milliseconds: 600));
+    expect(scale(), greaterThan(1));
+    expect(double.parse(await native.getProperty('sub-scale')), lessThan(1));
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+    await pumpFor(tester, const Duration(milliseconds: 600));
+    expect(double.parse(await native.getProperty('sub-scale')), 1);
+    expect(await native.getProperty('sub-pos'), '100');
+
+    await closePlayer(tester);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('Eigene Spulweiten, Halten für schneller', (tester) async {
+    if (!await demoServerRunning()) return;
+    await startApp(tester);
+    container
+        .read(settingsProvider.notifier)
+        .update((s) => s.copyWith(seekBackSeconds: 5, seekForwardSeconds: 30, holdSpeed: 2));
+
+    container.read(routerProvider).push('/play/movie1?start=${30 * 10000000}');
+    final p = await waitForPlayer(tester);
+    await p.pause();
+    await pumpFor(tester, const Duration(milliseconds: 300));
+
+    // Pfeiltasten springen so weit wie eingestellt; die Knöpfe zeigen die Weite.
+    final before = p.state.position;
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await pumpFor(tester, const Duration(milliseconds: 800));
+    expect((p.state.position - before).inSeconds, inInclusiveRange(29, 31));
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await pumpFor(tester, const Duration(milliseconds: 800));
+    expect((p.state.position - before).inSeconds, inInclusiveRange(24, 26));
+    expect(find.byIcon(Icons.forward_30_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.replay_5_rounded), findsOneWidget);
+
+    // Bild gedrückt halten: doppelt so schnell (spielt dabei), loslassen: wieder normal.
+    // Neben den Knöpfen in der Mitte aufs Bild.
+    final spot =
+        tester.getTopLeft(find.byType(PlayerScreen)) +
+        tester.getSize(find.byType(PlayerScreen)).center(Offset.zero) * 0.6;
+    final gesture = await tester.startGesture(spot, kind: PointerDeviceKind.mouse);
+    await pumpFor(tester, const Duration(milliseconds: 900));
+    expect(p.state.rate, 2);
+    expect(p.state.playing, isTrue);
+    expect(find.text('2×'), findsOneWidget);
+    await saveShot(tester, 'player_hold_speed');
+    await gesture.up();
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    expect(p.state.rate, 1);
+    expect(find.text('2×'), findsNothing);
+
+    // Ausgeschaltet: Halten ändert nichts.
+    container.read(settingsProvider.notifier).update((s) => s.copyWith(holdSpeed: 0));
+    final again = await tester.startGesture(spot, kind: PointerDeviceKind.mouse);
+    await pumpFor(tester, const Duration(milliseconds: 900));
+    expect(p.state.rate, 1);
+    await again.up();
 
     await closePlayer(tester);
     await tester.pumpWidget(const SizedBox());

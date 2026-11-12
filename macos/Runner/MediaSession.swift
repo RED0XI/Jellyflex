@@ -45,7 +45,7 @@ final class MediaSession {
       self.send(self.playing ? "pause" : "play")
       return .success
     }
-    // 10 s vor/zurück (Sperrbildschirm, Kopfhörer) und Ziehen an der Leiste.
+    // Vor/zurück (Sperrbildschirm, Kopfhörer; Weite kommt mit "update") und Ziehen an der Leiste.
     commands.skipForwardCommand.preferredIntervals = [10]
     commands.skipBackwardCommand.preferredIntervals = [10]
     bind(commands.skipForwardCommand, "skipForward")
@@ -113,6 +113,12 @@ final class MediaSession {
         return
       }
       setEnabled(true, canNext: args["canNext"] as? Bool ?? false)
+      // Sprungweiten aus den Einstellungen (Symbol auf dem Sperrbildschirm zeigt die Sekunden).
+      let commands = MPRemoteCommandCenter.shared()
+      if let back = args["skipBack"] as? Int { commands.skipBackwardCommand.preferredIntervals = [NSNumber(value: back)] }
+      if let forward = args["skipForward"] as? Int {
+        commands.skipForwardCommand.preferredIntervals = [NSNumber(value: forward)]
+      }
       let title = args["title"] as? String ?? ""
       let subtitle = args["subtitle"] as? String ?? ""
       info[MPMediaItemPropertyTitle] = title

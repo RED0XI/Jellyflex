@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../core/layouts.dart';
@@ -107,14 +108,16 @@ class _MediaRowState extends State<MediaRow> {
                     _updateArrows();
                     return false;
                   },
-                  child: ListView.separated(
-                    controller: _controller,
-                    scrollDirection: Axis.horizontal,
-                    clipBehavior: Clip.none,
-                    padding: EdgeInsets.symmetric(horizontal: kPageGutter, vertical: _vPad),
-                    itemCount: widget.itemCount,
-                    separatorBuilder: (_, _) => SizedBox(width: widget.spacing ?? appLayout.cardGap),
-                    itemBuilder: widget.itemBuilder,
+                  child: HorizontalSwipe(
+                    child: ListView.separated(
+                      controller: _controller,
+                      scrollDirection: Axis.horizontal,
+                      clipBehavior: Clip.none,
+                      padding: EdgeInsets.symmetric(horizontal: kPageGutter, vertical: _vPad),
+                      itemCount: widget.itemCount,
+                      separatorBuilder: (_, _) => SizedBox(width: widget.spacing ?? appLayout.cardGap),
+                      itemBuilder: widget.itemBuilder,
+                    ),
                   ),
                 ),
                 _Arrow(
@@ -187,6 +190,26 @@ class _Arrow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Waagerechte Reihe in einer senkrecht scrollenden Seite: Wischen auf dem Touchscreen gehört
+/// schon bei schräger Bewegung der Reihe. Sonst entscheidet, welche Richtung zuerst die
+/// Wisch-Schwelle erreicht – schräg gewischt rutschte dann oft die ganze Seite hoch oder runter.
+class HorizontalSwipe extends StatelessWidget {
+  const HorizontalSwipe({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    // Halb so viel Weg wie die Seite (Gerätewert, sonst Flutters 18 px). Antippen bleibt wie es ist.
+    final slop = (media.gestureSettings.touchSlop ?? kTouchSlop) / 2;
+    return MediaQuery(
+      data: media.copyWith(gestureSettings: DeviceGestureSettings(touchSlop: slop)),
+      child: child,
     );
   }
 }

@@ -211,6 +211,19 @@ final class _Tr extends S {
   @override
   String get autoplayNextHint => 'Bölümün sonunda geri sayımla.';
   @override
+  String get seekBack => 'Geri sar';
+  @override
+  String get seekForward => 'İleri sar';
+  @override
+  String get seekStepHint => 'Düğmeler, ok tuşları, çift dokunma ve kumanda bu kadar atlar.';
+  @override
+  String get holdSpeed => 'Basılı tutunca hızlandır';
+  @override
+  String get holdSpeedHint =>
+      'Görüntüye basılı tutun (parmak, fare veya kumandadaki OK) – tuttuğunuz sürece daha hızlı oynatılır.';
+  @override
+  String speedTimes(double speed) => '${speed.toString().replaceAll(RegExp(r'\.0$'), '').replaceAll('.', ',')}×';
+  @override
   String get subtitleAppearance => 'Altyazı görünümü';
   @override
   String get size => 'Boyut';

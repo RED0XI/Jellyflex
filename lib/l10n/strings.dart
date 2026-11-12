@@ -244,6 +244,19 @@ class S {
       _t('Off: only the “Skip intro” button appears.', 'Aus: Es erscheint nur der Knopf „Intro überspringen“.');
   String get autoplayNext => _t('Play next episode automatically', 'Nächste Folge automatisch abspielen');
   String get autoplayNextHint => _t('With a countdown at the end of an episode.', 'Mit Countdown am Ende einer Folge.');
+  String get seekBack => _t('Skip back', 'Zurückspulen');
+  String get seekForward => _t('Skip forward', 'Vorspulen');
+  String get seekStepHint => _t(
+    'Buttons, arrow keys, double tap and remote jump this far.',
+    'So weit springen Knöpfe, Pfeiltasten, Doppeltipp und Fernbedienung.',
+  );
+  String get holdSpeed => _t('Hold for faster playback', 'Halten für schnelleres Abspielen');
+  String get holdSpeedHint => _t(
+    'Press and hold the picture (finger, mouse or OK on the remote) – plays faster while held.',
+    'Bild gedrückt halten (Finger, Maus oder OK auf der Fernbedienung) – spielt schneller, solange du hältst.',
+  );
+  String speedTimes(double speed) =>
+      '${speed.toString().replaceAll(RegExp(r'\.0$'), '').replaceAll('.', _de ? ',' : '.')}×';
   String get subtitleAppearance => _t('Subtitle appearance', 'Untertitel-Darstellung');
   String get size => _t('Size', 'Größe');
   String get subtitleFont => _t('Font', 'Schrift');

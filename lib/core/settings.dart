@@ -42,6 +42,9 @@ bool sameLanguage(String? a, String? b) {
   return ka != null && ka == languageKey(b);
 }
 
+/// Wählbare Sprungweiten (Sekunden) für Zurück/Vor im Player.
+const seekStepOptions = [5, 10, 15, 30, 60];
+
 /// Ambilight: aus, nur im Fenster oder auch im Vollbild.
 enum AmbilightMode { off, window, always }
 
@@ -71,6 +74,9 @@ class AppSettings {
     this.soundEffects = true,
     this.intro = true,
     this.introSound = true,
+    this.seekBackSeconds = 10,
+    this.seekForwardSeconds = 10,
+    this.holdSpeed = 2.0,
     this.playerVolume = 100,
     this.downloadFolder,
     this.downloadFolderAsked = false,
@@ -145,6 +151,14 @@ class AppSettings {
 
   /// Klang zum Intro – eigener Schalter, unabhängig von [soundEffects].
   final bool introSound;
+
+  /// So weit springen Zurück/Vor im Player (Knöpfe, Pfeiltasten, Doppeltipp, Fernbedienung).
+  final int seekBackSeconds;
+  final int seekForwardSeconds;
+
+  /// Bild gedrückt halten (Finger, Maus, OK auf der Fernbedienung): so schnell abspielen,
+  /// solange gehalten wird. 0 = aus.
+  final double holdSpeed;
 
   /// Farbschema (siehe lib/core/themes.dart).
   final String themeId;
@@ -255,6 +269,9 @@ class AppSettings {
     bool? soundEffects,
     bool? intro,
     bool? introSound,
+    int? seekBackSeconds,
+    int? seekForwardSeconds,
+    double? holdSpeed,
     double? playerVolume,
     String? Function()? downloadFolder,
     bool? downloadFolderAsked,
@@ -296,6 +313,9 @@ class AppSettings {
     soundEffects: soundEffects ?? this.soundEffects,
     intro: intro ?? this.intro,
     introSound: introSound ?? this.introSound,
+    seekBackSeconds: seekBackSeconds ?? this.seekBackSeconds,
+    seekForwardSeconds: seekForwardSeconds ?? this.seekForwardSeconds,
+    holdSpeed: holdSpeed ?? this.holdSpeed,
     playerVolume: playerVolume ?? this.playerVolume,
     downloadFolder: downloadFolder != null ? downloadFolder() : this.downloadFolder,
     downloadFolderAsked: downloadFolderAsked ?? this.downloadFolderAsked,
@@ -339,6 +359,9 @@ class AppSettings {
     'soundEffects': soundEffects,
     'intro': intro,
     'introSound': introSound,
+    'seekBackSeconds': seekBackSeconds,
+    'seekForwardSeconds': seekForwardSeconds,
+    'holdSpeed': holdSpeed,
     'playerVolume': playerVolume,
     'downloadFolder': downloadFolder,
     'downloadFolderAsked': downloadFolderAsked,
@@ -386,6 +409,9 @@ class AppSettings {
     soundEffects: json['soundEffects'] as bool? ?? true,
     intro: json['intro'] as bool? ?? true,
     introSound: json['introSound'] as bool? ?? true,
+    seekBackSeconds: ((json['seekBackSeconds'] as num?)?.toInt() ?? 10).clamp(1, 600),
+    seekForwardSeconds: ((json['seekForwardSeconds'] as num?)?.toInt() ?? 10).clamp(1, 600),
+    holdSpeed: ((json['holdSpeed'] as num?)?.toDouble() ?? 2.0).clamp(0, 4).toDouble(),
     playerVolume: ((json['playerVolume'] as num?)?.toDouble() ?? 100).clamp(0, 100).toDouble(),
     downloadFolder: json['downloadFolder'] as String?,
     downloadFolderAsked: json['downloadFolderAsked'] as bool? ?? false,

@@ -63,9 +63,20 @@ class _TvPill extends StatelessWidget {
 
 /// Zeitleiste für die Fernbedienung: mit Fokus spulen links/rechts (gedrückt halten = weiter).
 class _TvSeekBar extends StatefulWidget {
-  const _TvSeekBar({required this.player, required this.onSeek, required this.onToggle, this.focusNode});
+  const _TvSeekBar({
+    required this.player,
+    required this.back,
+    required this.forward,
+    required this.onSeek,
+    required this.onToggle,
+    this.focusNode,
+  });
 
   final Player player;
+
+  /// Sprungweiten aus den Einstellungen.
+  final Duration back;
+  final Duration forward;
   final FocusNode? focusNode;
   final void Function(Duration by) onSeek;
 
@@ -79,7 +90,7 @@ class _TvSeekBar extends StatefulWidget {
 class _TvSeekBarState extends State<_TvSeekBar> {
   bool _focused = false;
 
-  /// Gedrückt halten: erst 10 s, nach einer Weile 30 s je Schritt.
+  /// Gedrückt halten: erst die eingestellte Weite, nach einer Weile das Dreifache je Schritt.
   int _repeats = 0;
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
@@ -102,7 +113,8 @@ class _TvSeekBarState extends State<_TvSeekBar> {
         : 0;
     if (dir == 0) return KeyEventResult.ignored;
     _repeats = event is KeyRepeatEvent ? _repeats + 1 : 0;
-    widget.onSeek(Duration(seconds: dir * (_repeats > 8 ? 30 : 10)));
+    final step = dir < 0 ? widget.back : widget.forward;
+    widget.onSeek(step * (dir * (_repeats > 8 ? 3 : 1)));
     return KeyEventResult.handled;
   }
 

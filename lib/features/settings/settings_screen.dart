@@ -307,6 +307,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             _Row(
+              title: tr.seekBack,
+              subtitle: tr.seekStepHint,
+              trailing: _Choice<int>(
+                value: s.seekBackSeconds,
+                label: tr.seconds(s.seekBackSeconds),
+                options: [for (final sec in seekStepOptions) (sec, tr.seconds(sec))],
+                onChanged: (v) => ctrl.update((s) => s.copyWith(seekBackSeconds: v)),
+              ),
+            ),
+            _Row(
+              title: tr.seekForward,
+              subtitle: tr.seekStepHint,
+              trailing: _Choice<int>(
+                value: s.seekForwardSeconds,
+                label: tr.seconds(s.seekForwardSeconds),
+                options: [for (final sec in seekStepOptions) (sec, tr.seconds(sec))],
+                onChanged: (v) => ctrl.update((s) => s.copyWith(seekForwardSeconds: v)),
+              ),
+            ),
+            _Row(
+              title: tr.holdSpeed,
+              subtitle: tr.holdSpeedHint,
+              trailing: _Choice<double>(
+                value: s.holdSpeed,
+                label: s.holdSpeed == 0 ? tr.off : tr.speedTimes(s.holdSpeed),
+                options: [
+                  (0.0, tr.off),
+                  for (final x in const [1.5, 2.0, 3.0]) (x, tr.speedTimes(x)),
+                ],
+                onChanged: (v) => ctrl.update((s) => s.copyWith(holdSpeed: v)),
+              ),
+            ),
+            _Row(
               title: tr.ambilight,
               subtitle: tr.ambilightHint,
               trailing: _Choice<AmbilightMode>(

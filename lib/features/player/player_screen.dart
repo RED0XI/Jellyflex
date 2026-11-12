@@ -111,7 +111,9 @@ class PlayerScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
-  static const _seekStep = Duration(seconds: 10);
+  /// Sprungweiten aus den Einstellungen (Zurück/Vor).
+  Duration get _seekBack => Duration(seconds: ref.read(settingsProvider).seekBackSeconds);
+  Duration get _seekForward => Duration(seconds: ref.read(settingsProvider).seekForwardSeconds);
   static const _hideDelay = Duration(seconds: 3);
 
   late final Player _player = Player(
@@ -285,11 +287,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final x = _doubleTapX ?? width / 2;
     HapticFeedback.lightImpact();
     if (x < width / 3) {
-      _seekBy(-_seekStep);
-      _flashOsd('−${_seekStep.inSeconds} s');
+      _seekBy(-_seekBack);
+      _flashOsd('−${_seekBack.inSeconds} s');
     } else if (x > width * 2 / 3) {
-      _seekBy(_seekStep);
-      _flashOsd('+${_seekStep.inSeconds} s');
+      _seekBy(_seekForward);
+      _flashOsd('+${_seekForward.inSeconds} s');
     } else {
       _player.playOrPause();
     }
@@ -368,6 +370,37 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (kind == null) return;
     _levelOsdTimer?.cancel();
     _levelOsd.value = (kind, _swipeValue);
+  }
+
+  // --- Halten für schneller --------------------------------------------------------
+
+  /// Tempo vor dem Halten – gesetzt, solange gehalten wird.
+  double? _rateBeforeHold;
+  final _holdOsd = ValueNotifier<String?>(null);
+
+  /// Fernseher: OK auf dem Bild gedrückt – kurz = Pause/Weiter, lang = schneller.
+  bool _okDown = false;
+  Timer? _okHoldTimer;
+
+  /// Bild wird gehalten (Finger, Maus, OK): schneller abspielen. `false`, wenn ausgeschaltet.
+  bool _startHold() {
+    final speed = ref.read(settingsProvider).holdSpeed;
+    if (speed <= 0 || _rateBeforeHold != null || _mini || _error != null) return false;
+    _rateBeforeHold = _player.state.rate;
+    _player.setRate(speed);
+    if (!_player.state.playing) _player.play();
+    if (isMobile) HapticFeedback.mediumImpact();
+    _holdOsd.value = tr.speedTimes(speed);
+    return true;
+  }
+
+  /// Losgelassen: zurück zum vorherigen Tempo (spielt weiter).
+  void _endHold() {
+    final before = _rateBeforeHold;
+    if (before == null) return;
+    _rateBeforeHold = null;
+    _holdOsd.value = null;
+    if (!_closing) _player.setRate(before);
   }
 
   /// Kurzer Hinweis in der Bildmitte (Zoom, Spulen per Doppeltipp).
@@ -491,9 +524,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
     switch (action) {
       case PadAction.left:
-        _seekBy(-_seekStep);
+        _seekBy(-_seekBack);
       case PadAction.right:
-        _seekBy(_seekStep);
+        _seekBy(_seekForward);
       case PadAction.select || PadAction.playPause:
         _player.playOrPause();
       case PadAction.back:
@@ -524,9 +557,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       case 'NextTrack':
         _playNext();
       case 'Rewind':
-        _seekBy(-_seekStep);
+        _seekBy(-_seekBack);
       case 'FastForward':
-        _seekBy(_seekStep);
+        _seekBy(_seekForward);
       case 'Seek':
         final ticks = (data['SeekPositionTicks'] as num?)?.toInt();
         if (ticks != null) _player.seek(ticksToDuration(ticks));
@@ -585,9 +618,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       case 'next':
         _playNext();
       case 'skipForward':
-        _seekBy(_seekStep);
+        _seekBy(_seekForward);
       case 'skipBackward':
-        _seekBy(-_seekStep);
+        _seekBy(-_seekBack);
       case final seek when seek.startsWith('seek:'):
         final seconds = double.tryParse(seek.substring(5));
         if (seconds != null) _player.seek(Duration(milliseconds: (seconds * 1000).round()));
@@ -631,6 +664,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       artUrl: _api.imageUrlOrNull(Images.landscape(item), fillWidth: 480, fillHeight: 270),
       playing: _player.state.playing,
       canNext: _nextEpisode != null,
+      skipBack: _seekBack.inSeconds,
+      skipForward: _seekForward.inSeconds,
     );
   }
 
@@ -684,6 +719,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _sleepLeft.dispose();
     _zoomOsdTimer?.cancel();
     _zoomOsd.dispose();
+    _holdOsd.dispose();
+    _okHoldTimer?.cancel();
     if (MediaSession.onButton == _onMediaButton) {
       MediaSession.onButton = null;
       // Bei "Nächste Folge" übernimmt gleich der neue Player die Anzeige.
@@ -972,6 +1009,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _fitOutputSize(Size box, double zoom) {
     final w = _player.state.width;
     final h = _player.state.height;
+    _fitSubtitlesToZoom(box, zoom);
     // Android: Die Bildfläche (Surface) hat ohnehin die Größe auf dem Bildschirm – media_kit
     // kennt dort kein setSize (würde eine Ausnahme werfen).
     if (Platform.isAndroid || w == null || h == null || w <= 0 || h <= 0 || box.isEmpty) return;
@@ -990,6 +1028,29 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       if (!mounted || _closing) return;
       _outputSize = target;
       _video.setSize(width: target.width.toInt(), height: target.height.toInt());
+    });
+  }
+
+  /// Vergrößerung und sichtbarer Anteil der Bildhöhe (1 = ganz) – für die Untertitel.
+  (double, double) _subtitleZoom = (1, 1);
+
+  /// Vergrößert (Ausfüllen, Zoom), schneidet das Bild oben und unten ab – mpv zeichnet die
+  /// Untertitel aber ins Bild, unten wären sie dann halb oder ganz weg. Deshalb rücken sie in den
+  /// sichtbaren Teil und bleiben so groß wie ohne Zoom.
+  void _fitSubtitlesToZoom(Size box, double zoom) {
+    final w = _player.state.width;
+    final h = _player.state.height;
+    var visible = 1.0;
+    if (w != null && h != null && w > 0 && h > 0 && !box.isEmpty && zoom > 1) {
+      final fitHeight = box.width / box.height > w / h ? box.height : box.width * h / w;
+      visible = (box.height / (fitHeight * zoom)).clamp(0.0, 1.0);
+    }
+    final next = (zoom, (visible * 100).round() / 100);
+    if (next == _subtitleZoom) return;
+    _subtitleZoom = next;
+    // Nach dem Bauen: setzt mpv-Eigenschaften (nicht während des Layouts).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_closing) _applySubtitleStyle(onlyChanges: true);
     });
   }
 
@@ -1042,7 +1103,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Future<void> _applySubtitleStyle({bool onlyChanges = false}) async {
     final native = _player.platform;
     if (native is! NativePlayer) return;
-    final props = ref.read(settingsProvider).subtitleStyleFor(_libraryId).toMpv();
+    final style = ref.read(settingsProvider).subtitleStyleFor(_libraryId);
+    final props = style.toMpv();
+    final (zoom, visible) = _subtitleZoom;
+    if (zoom > 1.001) {
+      // Siehe _fitSubtitlesToZoom: in den sichtbaren Teil rücken, Größe wie ohne Zoom.
+      final cut = (1 - visible) / 2;
+      props['sub-pos'] = ((1 - cut) * 100 - style.raise * visible).round().clamp(0, 100).toString();
+      props['sub-scale'] = (style.scale / zoom).toStringAsFixed(2);
+      props['sub-margin-y'] = (36 / zoom).round().toString();
+    }
     final before = onlyChanges ? _subtitleProps : const <String, String>{};
     _subtitleProps = props;
     for (final e in props.entries) {
@@ -1436,8 +1506,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     final isDown = event is KeyDownEvent;
     final isRepeat = event is KeyRepeatEvent;
-    if (!isDown && !isRepeat) return KeyEventResult.ignored;
     final key = event.logicalKey;
+    // Fernseher: OK auf dem Bild – kurz gedrückt Pause/Weiter, gehalten schneller (s. _onTvKey).
+    if (_okDown && _tvOk.contains(key)) {
+      if (isRepeat) return KeyEventResult.handled;
+      if (event is KeyUpEvent) {
+        _okDown = false;
+        if (_okHoldTimer?.isActive ?? false) {
+          _okHoldTimer!.cancel();
+          _player.playOrPause();
+          _showTvControls();
+        } else {
+          _endHold();
+        }
+        return KeyEventResult.handled;
+      }
+    }
+    if (!isDown && !isRepeat) return KeyEventResult.ignored;
     _userActive();
 
     if (_askingStillWatching && isDown) {
@@ -1480,9 +1565,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
 
     if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.keyJ) {
-      _seekBy(-_seekStep);
+      _seekBy(-_seekBack);
     } else if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.keyL) {
-      _seekBy(_seekStep);
+      _seekBy(_seekForward);
     } else if (key == LogicalKeyboardKey.arrowUp && !isTv) {
       _setVolume(_volume + 5, showBar: true);
     } else if (key == LogicalKeyboardKey.arrowDown && !isTv) {
@@ -1543,7 +1628,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       return KeyEventResult.handled;
     }
     if (_anyPanelOpen) return null;
-    final ok = {LogicalKeyboardKey.select, LogicalKeyboardKey.enter, LogicalKeyboardKey.gameButtonA};
+    final ok = _tvOk;
     final direction = switch (key) {
       LogicalKeyboardKey.arrowUp => TraversalDirection.up,
       LogicalKeyboardKey.arrowDown => TraversalDirection.down,
@@ -1554,6 +1639,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (node.hasPrimaryFocus) {
       // Fokus auf dem Bild.
       if (ok.contains(key)) {
+        if (ref.read(settingsProvider).holdSpeed > 0) {
+          // Erst beim Loslassen entscheiden: kurz = Pause/Weiter, gehalten = schneller.
+          _okDown = true;
+          _okHoldTimer?.cancel();
+          _okHoldTimer = Timer(const Duration(milliseconds: 450), () {
+            if (!mounted || !_okDown || _startHold()) return;
+            // Schneller geht gerade nicht – dann wie ein normales OK.
+            _okDown = false;
+            _player.playOrPause();
+            _showTvControls();
+          });
+          return KeyEventResult.handled;
+        }
         _player.playOrPause();
         _showTvControls();
         return KeyEventResult.handled;
@@ -1582,6 +1680,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _showControls(autoHide: _player.state.playing);
     return null; // OK: der Knopf selbst
   }
+
+  /// OK-Tasten der Fernbedienung bzw. des Controllers.
+  static final _tvOk = {LogicalKeyboardKey.select, LogicalKeyboardKey.enter, LogicalKeyboardKey.gameButtonA};
 
   /// Fernseher: Bedienung zeigen, Fokus auf der Zeitleiste.
   void _showTvControls() {
@@ -1679,6 +1780,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   ),
                 ),
                 Center(child: _ZoomOsd(label: _zoomOsd)),
+                // Halten für schneller: Hinweis oben, damit er das Bild nicht verdeckt.
+                Positioned(
+                  top: topInset(context) + 24,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: _ZoomOsd(label: _holdOsd, icon: Icons.fast_forward_rounded),
+                  ),
+                ),
                 if (isMobile) Positioned.fill(child: _LevelOsd(level: _levelOsd)),
                 Positioned.fill(
                   child: GestureDetector(
@@ -1696,6 +1806,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       }
                     },
                     onDoubleTapDown: isMobile ? (details) => _doubleTapX = details.localPosition.dx : null,
+                    // Gedrückt halten (Finger oder Maus): schneller abspielen, solange gehalten wird.
+                    onLongPressStart: (_) => _startHold(),
+                    onLongPressEnd: (_) => _endHold(),
+                    onLongPressCancel: _endHold,
                     onVerticalDragStart: isMobile ? _onSwipeStart : null,
                     onVerticalDragUpdate: isMobile ? _onSwipeUpdate : null,
                     onVerticalDragEnd: isMobile ? (_) => _onSwipeEnd() : null,
@@ -1986,7 +2100,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   ),
                 ),
               const SizedBox(height: 18),
-              _TvSeekBar(player: _player, onSeek: _seekBy, onToggle: _toggleTvPlayback, focusNode: _tvSeekFocus),
+              _TvSeekBar(
+                player: _player,
+                back: _seekBack,
+                forward: _seekForward,
+                onSeek: _seekBy,
+                onToggle: _toggleTvPlayback,
+                focusNode: _tvSeekFocus,
+              ),
               const SizedBox(height: 18),
               Row(
                 children: [
@@ -2199,14 +2320,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       ),
                     ),
                     _PlayerIconButton(
-                      icon: Icons.replay_10_rounded,
-                      tooltip: tr.rewind10,
-                      onPressed: () => _seekBy(-_seekStep),
+                      icon: seekIcon(_seekBack.inSeconds, forward: false),
+                      tooltip: tr.rewind10.replaceFirst('10', '${_seekBack.inSeconds}'),
+                      onPressed: () => _seekBy(-_seekBack),
                     ),
                     _PlayerIconButton(
-                      icon: Icons.forward_10_rounded,
-                      tooltip: tr.forward10,
-                      onPressed: () => _seekBy(_seekStep),
+                      icon: seekIcon(_seekForward.inSeconds, forward: true),
+                      tooltip: tr.forward10.replaceFirst('10', '${_seekForward.inSeconds}'),
+                      onPressed: () => _seekBy(_seekForward),
                     ),
                     // Fernseher: Lautstärke regelt die Fernbedienung (der Fernseher selbst) – ein
                     // Regler wäre nur ein Fokus-Ziel mehr zwischen Spulen und Leiste.

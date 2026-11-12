@@ -211,6 +211,19 @@ final class _Fr extends S {
   @override
   String get autoplayNextHint => 'Avec un compte à rebours à la fin de l’épisode.';
   @override
+  String get seekBack => 'Reculer';
+  @override
+  String get seekForward => 'Avancer';
+  @override
+  String get seekStepHint => 'Distance des boutons, des flèches, du double appui et de la télécommande.';
+  @override
+  String get holdSpeed => 'Maintenir pour accélérer';
+  @override
+  String get holdSpeedHint =>
+      'Maintenez l’image (doigt, souris ou OK de la télécommande) – lecture plus rapide tant que vous maintenez.';
+  @override
+  String speedTimes(double speed) => '${speed.toString().replaceAll(RegExp(r'\.0$'), '').replaceAll('.', ',')}×';
+  @override
   String get subtitleAppearance => 'Apparence des sous-titres';
   @override
   String get size => 'Taille';

@@ -920,13 +920,15 @@ class _SeasonsSectionState extends ConsumerState<_SeasonsSection> {
       children: [
         if (isPhone(context))
           // iPhone: Staffeln in einer Zeile zum Wischen – spart Höhe für die Folgen.
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: kPageGutter),
-            child: Row(
-              children: [
-                for (final (i, chip) in chips.indexed) ...[if (i > 0) const SizedBox(width: 8), chip],
-              ],
+          HorizontalSwipe(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: kPageGutter),
+              child: Row(
+                children: [
+                  for (final (i, chip) in chips.indexed) ...[if (i > 0) const SizedBox(width: 8), chip],
+                ],
+              ),
             ),
           )
         else

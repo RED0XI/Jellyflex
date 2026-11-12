@@ -211,6 +211,19 @@ final class _Es extends S {
   @override
   String get autoplayNextHint => 'Con una cuenta atrás al final del episodio.';
   @override
+  String get seekBack => 'Retroceder';
+  @override
+  String get seekForward => 'Avanzar';
+  @override
+  String get seekStepHint => 'Lo que saltan los botones, las flechas, el doble toque y el mando.';
+  @override
+  String get holdSpeed => 'Mantener para acelerar';
+  @override
+  String get holdSpeedHint =>
+      'Mantén pulsada la imagen (dedo, ratón u OK del mando): se reproduce más rápido mientras la mantengas.';
+  @override
+  String speedTimes(double speed) => '${speed.toString().replaceAll(RegExp(r'\.0$'), '').replaceAll('.', ',')}×';
+  @override
   String get subtitleAppearance => 'Aspecto de los subtítulos';
   @override
   String get size => 'Tamaño';
