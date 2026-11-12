@@ -4,6 +4,28 @@ import '../l10n/strings.dart';
 /// Englisch und Deutsch; andere Sprachen zeigen Englisch. Neue Version: oben
 /// einen Eintrag ergänzen (Versionen ohne Eintrag erscheinen nicht).
 const changelog = <String, ({List<String> en, List<String> de})>{
+  '0.3.8': (
+    en: [
+      'A short intro when Jellyflex starts: the new logo draws itself, with its own sound – both can be switched off separately in the settings.',
+      'Subtitles your way: font, colour, edge, size and height in the picture – also per library (e.g. anime large and yellow), right from the player via “Aa”.',
+      'Player: choose how far to skip back and forward (5 to 60 seconds), hold the picture (or OK on the remote) to play faster.',
+      'Energy saving: on battery Jellyflex runs calmer (no trailers in the banner, no ambilight) and keeps playing in the background.',
+      'Series: every episode page shows all seasons – switch seasons without going back to the series.',
+      'Genres in the search: every tile has its own picture, ready as soon as you open the search.',
+      'Arrow keys and controllers move more naturally: left/right stay in the row, long pages scroll along with the focus.',
+      'In the works: Jellyflex for iPhone/iPad and Android TV/Fire TV – the groundwork for both is part of this version.',
+    ],
+    de: [
+      'Kurzes Intro beim Start: Das neue Logo zeichnet sich selbst, mit eigenem Klang – beides lässt sich in den Einstellungen getrennt abschalten.',
+      'Untertitel nach deinem Geschmack: Schrift, Farbe, Rand, Größe und Höhe im Bild – auch je Bibliothek (z. B. Anime groß und gelb), direkt im Player über „Aa“.',
+      'Player: Spulweite selbst wählen (5 bis 60 Sekunden), Bild gedrückt halten (oder OK auf der Fernbedienung) spielt schneller ab.',
+      'Energiesparen: Im Akkubetrieb läuft Jellyflex ruhiger (keine Trailer im Banner, kein Ambilight) und spielt im Hintergrund weiter.',
+      'Serien: Jede Folgenseite zeigt alle Staffeln – Staffel wechseln, ohne zurück zur Serie zu müssen.',
+      'Genres in der Suche: Jede Kachel hat ihr eigenes Bild, gleich beim Öffnen der Suche da.',
+      'Pfeiltasten und Controller bewegen sich natürlicher: links/rechts bleibt in der Reihe, lange Seiten scrollen mit dem Fokus mit.',
+      'In Arbeit: Jellyflex für iPhone/iPad und Android TV/Fire TV – die Grundlagen dafür stecken schon in dieser Version.',
+    ],
+  ),
   '0.3.7': (
     en: [
       'Choose audio and subtitles right on the details page – for series they are remembered for the next episode.',
