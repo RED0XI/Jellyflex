@@ -36,7 +36,12 @@ class PlayerSkipOverlay extends StatefulWidget {
     this.controlsVisible = false,
     this.autoSkip = false,
     this.autoPlayNext = true,
+    this.hidden = false,
   });
+
+  /// Ein Panel (Spuren, Optionen …) ist offen: Knopf/Karte ausblenden, damit sie nicht über den
+  /// Einträgen liegen und Tipps abfangen. Der Zustand (Countdown, schon übersprungen) bleibt.
+  final bool hidden;
 
   /// Intro/Rückblick automatisch überspringen statt nur den Knopf zu zeigen.
   final bool autoSkip;
@@ -120,32 +125,39 @@ class _PlayerSkipOverlayState extends State<PlayerSkipOverlay> {
       curve: Curves.easeOutCubic,
       right: 40,
       bottom: widget.controlsVisible ? 140 : 48,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        transitionBuilder: (child, anim) => FadeTransition(
-          opacity: anim,
-          child: SlideTransition(
-            position: Tween(begin: const Offset(0.1, 0), end: Offset.zero).animate(anim),
-            child: child,
+      child: IgnorePointer(
+        ignoring: widget.hidden,
+        child: AnimatedOpacity(
+          opacity: widget.hidden ? 0 : 1,
+          duration: const Duration(milliseconds: 150),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            transitionBuilder: (child, anim) => FadeTransition(
+              opacity: anim,
+              child: SlideTransition(
+                position: Tween(begin: const Offset(0.1, 0), end: Offset.zero).animate(anim),
+                child: child,
+              ),
+            ),
+            child: showNext
+                ? _NextEpisodeCard(
+                    key: const ValueKey('next'),
+                    episode: widget.nextEpisode!,
+                    countdown: widget.autoPlayNext,
+                    imageUrl: widget.nextEpisodeImageUrl,
+                    onPlay: widget.onPlayNext,
+                    onAutoPlay: widget.onAutoPlayNext ?? widget.onPlayNext,
+                    onDismiss: () => setState(() => _nextUpDismissed = true),
+                  )
+                : skip != null
+                ? _SkipButton(
+                    key: ValueKey('skip-${skip.type}'),
+                    label: _skipLabel(skip.type),
+                    onPressed: () => widget.onSeek(skip.end),
+                  )
+                : const SizedBox.shrink(key: ValueKey('none')),
           ),
         ),
-        child: showNext
-            ? _NextEpisodeCard(
-                key: const ValueKey('next'),
-                episode: widget.nextEpisode!,
-                countdown: widget.autoPlayNext,
-                imageUrl: widget.nextEpisodeImageUrl,
-                onPlay: widget.onPlayNext,
-                onAutoPlay: widget.onAutoPlayNext ?? widget.onPlayNext,
-                onDismiss: () => setState(() => _nextUpDismissed = true),
-              )
-            : skip != null
-            ? _SkipButton(
-                key: ValueKey('skip-${skip.type}'),
-                label: _skipLabel(skip.type),
-                onPressed: () => widget.onSeek(skip.end),
-              )
-            : const SizedBox.shrink(key: ValueKey('none')),
       ),
     );
   }

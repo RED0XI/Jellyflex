@@ -14,6 +14,8 @@ import UIKit
 /// - `stop`
 /// Meldungen an Dart: `progress` {position, paused} (alle 10 s und bei Pause/Weiter),
 /// `restore` {position} (zurück in den Jellyflex-Player), `ended` {position, finished}.
+/// Frage an Dart: `position` → aktuelle Stelle des Jellyflex-Players (Sekunden) – der läuft
+/// weiter, bis das Bild-in-Bild-Fenster steht, dann übernimmt dieser Player genau dort.
 final class ApplePlayer: NSObject {
   static let shared = ApplePlayer()
 
@@ -30,6 +32,10 @@ final class ApplePlayer: NSObject {
   private var viewController: AVPlayerViewController?
 
   private var observations: [NSKeyValueObservation] = []
+
+  /// An die Startstelle gesprungen – erst dann öffnet sich das Bild-in-Bild-Fenster.
+  private var seekedToStart = false
+  private var readyForPip = false
   private var timeObserver: Any?
   private var endObserver: NSObjectProtocol?
 
@@ -74,18 +80,44 @@ final class ApplePlayer: NSObject {
     self.player = player
     startPosition = args["position"] as? Double ?? 0
     handedBack = false
+    let mode = args["mode"] as? String ?? "pip"
+    // Bild-in-Bild: stumm vorbereiten, solange der Jellyflex-Player noch spielt.
+    if mode == "pip" { player.isMuted = true }
 
     let session = AVAudioSession.sharedInstance()
     try? session.setCategory(.playback, mode: .moviePlayback)
     try? session.setActive(true)
 
-    // Erst bei bekannter Länge an die alte Stelle springen.
+    // Erst bei bekannter Länge an die alte Stelle springen – beim Bild-in-Bild an die Stelle, an
+    // der der Jellyflex-Player gerade ist (er lief weiter, während der Server den Stream vorbereitet hat).
     observations.append(
       item.observe(\.status, options: [.new]) { [weak self] item, _ in
-        guard let self, item.status == .readyToPlay, self.startPosition > 0 else { return }
-        let target = CMTime(seconds: self.startPosition, preferredTimescale: 600)
-        self.startPosition = 0
-        item.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero, completionHandler: nil)
+        guard let self else { return }
+        if item.status == .failed {
+          NSLog("Jellyflex ApplePlayer: Stream nicht abspielbar: %@", item.error?.localizedDescription ?? "?")
+          self.failPending()
+          return
+        }
+        guard item.status == .readyToPlay, !self.seekedToStart else { return }
+        self.seekedToStart = true
+        let seek = { (seconds: Double) in
+          self.startPosition = seconds
+          let target = CMTime(seconds: seconds, preferredTimescale: 600)
+          item.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+            guard let self, self.player === player else { return }
+            self.startPosition = 0
+            player.play()
+            self.readyForPip = true
+            self.startPipIfPossible()
+          }
+        }
+        if mode == "pip" {
+          self.channel?.invokeMethod("position", arguments: nil) { value in
+            seek((value as? Double) ?? self.startPosition)
+          }
+        } else if self.startPosition > 0 {
+          seek(self.startPosition)
+        }
       })
     observations.append(
       player.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
@@ -134,10 +166,13 @@ final class ApplePlayer: NSObject {
       result(false)
       return
     }
-    let host = UIView(frame: CGRect(x: 0, y: window.bounds.height - 2, width: 2, height: 2))
+    // Über das ganze Fenster (fast durchsichtig): Das Bild-in-Bild-Fenster schrumpft dann aus dem
+    // Video heraus statt aus einer Ecke zu wachsen. Berührungen gehen weiter an Flutter.
+    let host = UIView(frame: window.bounds)
     host.isUserInteractionEnabled = false
     host.alpha = 0.01
     let layer = AVPlayerLayer(player: player)
+    layer.videoGravity = .resizeAspect
     layer.frame = host.bounds
     host.layer.addSublayer(layer)
     window.addSubview(host)
@@ -151,20 +186,40 @@ final class ApplePlayer: NSObject {
     pip.delegate = self
     self.pip = pip
     pipResult = result
-    // Sobald iOS bereit ist, das Fenster öffnen.
+    // Sobald iOS bereit ist und der Stream an der richtigen Stelle steht, das Fenster öffnen.
     observations.append(
-      pip.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { pip, _ in
-        guard pip.isPictureInPicturePossible, !pip.isPictureInPictureActive else { return }
-        DispatchQueue.main.async { pip.startPictureInPicture() }
+      pip.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { [weak self] _, _ in
+        DispatchQueue.main.async { self?.startPipIfPossible() }
       })
-    player.play()
     // Kommt nichts zustande (Stream lädt nicht …), nicht ewig warten.
-    DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
-      guard let self, let pending = self.pipResult else { return }
-      self.pipResult = nil
-      self.cleanUp()
-      pending(false)
+    DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+      guard let self, self.pipResult != nil else { return }
+      NSLog("Jellyflex ApplePlayer: Bild-in-Bild kam nicht zustande (possible=%d, ready=%d)",
+        self.pip?.isPictureInPicturePossible == true ? 1 : 0, self.readyForPip ? 1 : 0)
+      self.failPending()
     }
+  }
+
+  private var pipStarting = false
+
+  private func startPipIfPossible() {
+    guard let pip, readyForPip, pipResult != nil, !pipStarting, pip.isPictureInPicturePossible,
+      !pip.isPictureInPictureActive
+    else { return }
+    pipStarting = true
+    pip.startPictureInPicture()
+  }
+
+  /// Öffnen ging schief: Dart Bescheid geben (der Jellyflex-Player spielt einfach weiter).
+  private func failPending() {
+    guard let pending = pipResult else {
+      // Lief schon (AirPlay-Vollbild): zurück in den Jellyflex-Player statt ins Leere.
+      handBack()
+      return
+    }
+    pipResult = nil
+    cleanUp()
+    pending(false)
   }
 
   // MARK: Vollbild mit AirPlay
@@ -228,24 +283,31 @@ final class ApplePlayer: NSObject {
     viewController = nil
     player = nil
     inPip = false
+    seekedToStart = false
+    readyForPip = false
+    pipStarting = false
   }
 }
 
 // MARK: - Bild-in-Bild (direkt)
 
 extension ApplePlayer: AVPictureInPictureControllerDelegate {
-  func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
-    inPip = true
+  func pictureInPictureControllerWillStartPictureInPicture(_ controller: AVPictureInPictureController) {
+    // Ab jetzt ist das Fenster zu sehen: Ton hier an, der Jellyflex-Player hält an.
+    player?.isMuted = false
     pipResult?(true)
     pipResult = nil
+  }
+
+  func pictureInPictureControllerDidStartPictureInPicture(_ controller: AVPictureInPictureController) {
+    inPip = true
   }
 
   func pictureInPictureController(
     _ controller: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error
   ) {
-    pipResult?(false)
-    pipResult = nil
-    cleanUp()
+    NSLog("Jellyflex ApplePlayer: Bild-in-Bild nicht gestartet: %@", error.localizedDescription)
+    failPending()
   }
 
   func pictureInPictureController(

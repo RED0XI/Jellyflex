@@ -29,11 +29,17 @@ abstract final class ApplePlayer {
   static const _channel = MethodChannel('jellyflex/apple_player');
   static _Session? _session;
 
+  /// Stelle des Jellyflex-Players, solange Apples Player sich vorbereitet (Bild-in-Bild).
+  static Duration Function()? _positionNow;
+
   /// Übernimmt Apples Player gerade?
   static bool get active => _session != null;
 
   /// Übergibt [item] ab [position]. `false`: ging nicht (kein Stream, kein Bild-in-Bild …) –
   /// dann läuft der Jellyflex-Player einfach weiter.
+  ///
+  /// Beim Bild-in-Bild spielt der Jellyflex-Player weiter, bis das Fenster erscheint; Apples
+  /// Player fragt dann [positionNow] und übernimmt genau dort.
   static Future<bool> open({
     required JellyfinApi api,
     required GoRouter router,
@@ -44,7 +50,9 @@ abstract final class ApplePlayer {
     int? audioIndex,
     int? subtitleIndex,
     int? maxBitrate,
+    Duration Function()? positionNow,
   }) async {
+    _positionNow = positionNow;
     try {
       final info = await api.getApplePlaybackInfo(
         item.id,
@@ -81,12 +89,18 @@ abstract final class ApplePlayer {
     } catch (e) {
       debugPrint('Apples Player nicht gestartet: $e');
       return false;
+    } finally {
+      _positionNow = null;
     }
   }
 
-  static Future<void> _onCall(MethodCall call) async {
+  static Future<Object?> _onCall(MethodCall call) async {
+    if (call.method == 'position') {
+      final now = _positionNow?.call();
+      return now == null ? null : now.inMilliseconds / 1000;
+    }
     final session = _session;
-    if (session == null) return;
+    if (session == null) return null;
     final args = (call.arguments as Map?)?.cast<String, Object?>() ?? const {};
     final position = Duration(milliseconds: (((args['position'] as num?) ?? 0) * 1000).round());
     switch (call.method) {
@@ -100,6 +114,7 @@ abstract final class ApplePlayer {
         _session = null;
         session.api.reportPlaybackStopped(session.body(position)).ignore();
     }
+    return null;
   }
 }
 

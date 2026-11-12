@@ -302,22 +302,42 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Future<void> _handoffToApple(AppleHandoff handoff) async {
     final item = _item;
     final source = _source;
-    if (item == null || source == null || _closing) return;
+    if (item == null || source == null || _closing || _handingOff) return;
     void snack(String text) => appMessengerKey.currentState?.showSnackBar(
       SnackBar(content: Text(text), behavior: SnackBarBehavior.floating, width: 460),
     );
     // Apples Player kann viele Dateien (z. B. MKV) nicht – er bekommt den Stream vom Server.
     if (_localFile != null) return snack(tr.appleHandoffStreamingOnly);
-    final position = _player.state.position;
+    _handingOff = true;
+    try {
+      await _handoff(item, source, handoff, snack);
+    } finally {
+      _handingOff = false;
+    }
+  }
+
+  /// Übergabe an Apples Player läuft (zweites Tippen zählt nicht).
+  bool _handingOff = false;
+
+  Future<void> _handoff(BaseItem item, MediaSource source, AppleHandoff handoff, void Function(String) snack) async {
+    // Bild-in-Bild: Das Video läuft hier weiter, bis das Fenster erscheint – Apples Player holt
+    // sich dann die aktuelle Stelle. AirPlay öffnet gleich Apples Vollbild, also hier anhalten.
+    final pip = handoff == AppleHandoff.pictureInPicture;
     final wasPlaying = _player.state.playing;
-    await _player.pause();
+    if (!pip) await _player.pause();
     if (!mounted) return;
+    if (pip) _flashOsd(tr.pictureInPicture);
+    var last = _player.state.position;
     final ok = await ApplePlayer.open(
       api: _api,
       router: GoRouter.of(context),
       item: item,
       mediaSourceId: source.id,
-      position: position,
+      position: last,
+      positionNow: () {
+        if (mounted && !_closing) last = _player.state.position;
+        return last;
+      },
       handoff: handoff,
       audioIndex: _audioIndex,
       subtitleIndex: _subtitleIndex,
@@ -326,9 +346,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (!mounted) return;
     if (!ok) {
       snack(tr.appleHandoffFailed);
-      if (wasPlaying) await _player.play();
+      if (!pip && wasPlaying) await _player.play();
       return;
     }
+    await _player.pause();
     await _close();
   }
 
@@ -977,6 +998,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       } catch (_) {}
     }
     setState(change);
+    _embeddedViaServer = null;
     // Bei Direct Play wählt _applyDefaultTracks die Spuren neu aus _audioIndex/_subtitleIndex.
     _tracksApplied = _transcoding;
     try {
@@ -1875,6 +1897,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         ? null
                         : _api.imageUrlOrNull(Images.landscape(_nextEpisode!), fillWidth: 760, fillHeight: 428),
                     controlsVisible: _controlsVisible,
+                    hidden: _anyPanelOpen,
                     autoSkip: settings.autoSkipIntro,
                     // Schlaf-Timer "am Ende dieser Folge": keine nächste Folge starten.
                     autoPlayNext: settings.nextEpisodeCountdown && SleepTimer.instance.mode != SleepMode.endOfItem,
@@ -2494,6 +2517,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   String? _selectedSubtitleId() {
     if (_transcoding) return (_subtitleIndex ?? -1) < 0 ? 'no' : 'jf:$_subtitleIndex';
+    if (_embeddedViaServer != null) return _embeddedViaServer;
     final id = _player.state.track.subtitle.id;
     return id == 'auto' ? null : id;
   }
@@ -2560,8 +2584,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final (fresh, added) = found;
     setState(() => _source = fresh);
     _rememberSubtitle(added.index);
-    if (_transcoding) {
+    _embeddedViaServer = null;
+    if (_transcoding && _burnedIn(_subtitleIndex)) {
       await _switchStream(() => _subtitleIndex = added.index);
+    } else if (_transcoding) {
+      setState(() => _subtitleIndex = added.index);
+      await _player.setSubtitleTrack(_serverSubtitleTrack(added));
     } else {
       await _player.setSubtitleTrack(_externalTrack(added));
       _subtitleIndex = added.index;
@@ -2605,10 +2633,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _searchSubtitles();
       return;
     }
+    _embeddedViaServer = null;
     if (_transcoding) {
       final index = id == 'no' ? -1 : int.parse(id.substring(3));
       _rememberSubtitle(index);
-      if (index != _subtitleIndex) _switchStream(() => _subtitleIndex = index);
+      if (index == _subtitleIndex) return;
+      // Text-Untertitel kommen beim Umrechnen ohnehin als eigene Datei: nur austauschen, das Video
+      // läuft weiter. Neu starten muss der Stream nur, wenn ein Bild-Untertitel eingebrannt wird
+      // (oder einer wieder heraus soll).
+      if (!_burnedIn(_subtitleIndex) && !_burnedIn(index)) {
+        final stream = _subtitleStream(index);
+        setState(() => _subtitleIndex = index);
+        _player.setSubtitleTrack(stream == null ? SubtitleTrack.no() : _serverSubtitleTrack(stream));
+        return;
+      }
+      _switchStream(() => _subtitleIndex = index);
       return;
     }
     if (id == 'no') {
@@ -2626,10 +2665,57 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
     final t = _player.state.tracks.subtitle.where((t) => t.id == id).firstOrNull;
     if (t == null) return;
-    _player.setSubtitleTrack(t);
-    _subtitleIndex = _jellyfinStreamFor('Subtitle', id)?.index ?? _subtitleIndex;
+    final stream = _jellyfinStreamFor('Subtitle', id);
+    final overNetwork = _localFile == null && _api.baseUrl.startsWith('http');
+    if (overNetwork && stream != null && stream.isTextSubtitle && _player.state.duration > Duration.zero) {
+      // Eingebettete Text-Spur während der Wiedergabe: als eigene Datei vom Server holen. Wählt
+      // mpv sie in der Datei, liest es dafür die letzten Sekunden Video noch einmal – übers Netz
+      // stockt dabei das Bild, als würde es neu laden.
+      _embeddedViaServer = id;
+      _player.setSubtitleTrack(_serverSubtitleTrack(stream));
+      // Kommt die Datei nicht (alter Server, Fehler), doch die Spur aus dem Video nehmen.
+      Future<void>.delayed(const Duration(seconds: 8), () {
+        if (!mounted || _closing || _embeddedViaServer != id) return;
+        final current = int.tryParse(_player.state.track.subtitle.id);
+        final embedded = _source?.embeddedStreams('Subtitle').length ?? 0;
+        if (current != null && current > embedded) return; // Datei ist da
+        _embeddedViaServer = null;
+        _player.setSubtitleTrack(t);
+      });
+    } else {
+      _player.setSubtitleTrack(t);
+    }
+    _subtitleIndex = stream?.index ?? _subtitleIndex;
     _rememberSubtitle(_subtitleIndex);
   }
+
+  /// Eingebettete Spur, die gerade als Datei vom Server läuft (mpv-ID der Spur im Video) –
+  /// im Panel bleibt sie als gewählt markiert.
+  String? _embeddedViaServer;
+
+  MediaStream? _subtitleStream(int? index) =>
+      _source?.mediaStreams.where((s) => s.type == 'Subtitle' && s.index == index).firstOrNull;
+
+  /// Beim Umrechnen eingebrannt (Bild-Untertitel)?
+  bool _burnedIn(int? index) {
+    final stream = (index ?? -1) < 0 ? null : _subtitleStream(index);
+    return stream != null && !stream.isTextSubtitle;
+  }
+
+  /// Text-Untertitel als Datei vom Server (eingebettete zieht Jellyfin dafür aus dem Video).
+  SubtitleTrack _serverSubtitleTrack(MediaStream stream) => SubtitleTrack.uri(
+    _api.subtitleUrl(
+      widget.itemId,
+      _source!.id,
+      stream,
+      format: switch (stream.codec?.toLowerCase()) {
+        'ass' || 'ssa' => 'ass',
+        _ => 'srt',
+      },
+    ),
+    title: trackLabel(stream),
+    language: stream.language,
+  );
 
   /// Panels stehen über der Steuerleiste – auf dem iPhone im Querformat ist dort wenig Platz.
   double _panelMaxHeight(BuildContext context) => math.min(420, MediaQuery.sizeOf(context).height - 136);
