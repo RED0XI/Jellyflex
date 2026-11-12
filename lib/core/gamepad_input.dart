@@ -42,8 +42,13 @@ abstract final class GamepadInput {
   /// Für Tests: eine Controller-Aktion so auslösen, als käme sie vom Gerät.
   static void simulate(PadAction action) => _dispatch(action);
 
-  static void stop() {
+  /// [owner]: nur beenden, wenn noch dessen [start] gilt – wird der Fensterrahmen neu aufgebaut,
+  /// startet der neue, bevor der alte abgebaut wird; der alte nähme sonst die neue Abfrage mit.
+  static void stop([void Function(PadAction action)? owner]) {
+    if (owner != null && _onAction != owner) return;
     _subscription?.cancel();
+    _subscription = null;
+    _onAction = null;
     _repeat?.cancel();
   }
 

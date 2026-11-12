@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/platform/device.dart';
 import '../../core/branding.dart';
 import '../../core/format.dart';
 import '../../core/images.dart';
@@ -117,7 +118,7 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
           content: Text(tr.savedToPictures(name)),
           behavior: SnackBarBehavior.floating,
           width: 520,
-          action: SnackBarAction(label: tr.show, onPressed: () => AppPaths.reveal(file.path)),
+          action: isDesktop ? SnackBarAction(label: tr.show, onPressed: () => AppPaths.reveal(file.path)) : null,
         ),
       );
     } catch (_) {
@@ -389,12 +390,15 @@ class _WrappedScreenState extends ConsumerState<WrappedScreen> with SingleTicker
                   ),
                 ),
                 const SizedBox(width: 30),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(actor.name, style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w900)),
-                    Text(tr.inTitles(actor.count), style: const TextStyle(fontSize: 26, color: Colors.white70)),
-                  ],
+                // Lange Namen brechen um, statt neben dem Bild aus der Folie zu laufen.
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(actor.name, style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w900, height: 1.05)),
+                      Text(tr.inTitles(actor.count), style: const TextStyle(fontSize: 26, color: Colors.white70)),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -474,6 +478,9 @@ class _Slide extends ConsumerWidget {
   /// Bild rechts neben dem Text (z. B. Poster) – nur in breiten Fenstern.
   final Widget? side;
 
+  /// Schmalste Breite, für die die Folien gesetzt sind (darunter wird verkleinert).
+  static const _designWidth = 640.0;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final api = ref.watch(apiProvider);
@@ -518,6 +525,26 @@ class _Slide extends ConsumerWidget {
             child: _Rise(
               child: LayoutBuilder(
                 builder: (context, box) {
+                  // Schmaler Bildschirm (iPhone): Die Folien sind für breite Fenster gesetzt (große
+                  // Zahlen, Balken und Diagramme mit festen Breiten). Statt rechts aus dem Bild zu
+                  // laufen, werden sie in ihrer Entwurfsbreite aufgebaut und als Ganzes verkleinert.
+                  if (box.maxWidth < _designWidth) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: SizedBox(
+                          width: _designWidth,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: children,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
                   final text = Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,

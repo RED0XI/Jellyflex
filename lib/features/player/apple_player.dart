@@ -94,6 +94,22 @@ abstract final class ApplePlayer {
     }
   }
 
+  /// Beendet Apples Player (Bild-in-Bild-Fenster bzw. Vollbild) und meldet den Stand an Jellyfin.
+  /// Nötig, sobald in Jellyflex ein anderer Titel startet – sonst liefen beide mit Ton.
+  static Future<void> stop() async {
+    final session = _session;
+    _session = null;
+    try {
+      final seconds = await _channel.invokeMethod<double>('stop');
+      if (session != null && seconds != null) {
+        final position = Duration(milliseconds: (seconds * 1000).round());
+        session.api.reportPlaybackStopped(session.body(position)).ignore();
+      }
+    } catch (e) {
+      debugPrint('Apples Player nicht beendet: $e');
+    }
+  }
+
   static Future<Object?> _onCall(MethodCall call) async {
     if (call.method == 'position') {
       final now = _positionNow?.call();

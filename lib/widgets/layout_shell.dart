@@ -17,8 +17,32 @@ import 'window_frame.dart';
 /// Fernseher: hat die Menüleiste den Fokus? (Zurück auf der Startseite: erst Leiste, dann App zu.)
 bool Function() tvMenuFocused = () => false;
 
-/// Fernseher: Fokus in die Menüleiste (auf den Eintrag der aktuellen Seite).
-VoidCallback tvFocusMenu = () {};
+/// Fernseher: Fokus in die Menüleiste (auf den Eintrag der aktuellen Seite). `false`, wenn es
+/// gerade keine Leiste gibt.
+bool Function() tvFocusMenu = () => false;
+
+/// Fernseher: "Zurück" auf einer Seite ohne Vorgänger (Startseite und jeder Bereich aus der
+/// Menüleiste): erst in die Menüleiste, von dort verlässt ein zweites Zurück die App. Ohne das
+/// beendete "Zurück" die App auf jedem Bereich außer der Startseite sofort.
+class TvRootBack extends StatelessWidget {
+  const TvRootBack({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isTv) return child;
+    final root = !(ModalRoute.canPopOf(context) ?? false);
+    return PopScope(
+      canPop: !root,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (tvMenuFocused() || !tvFocusMenu()) SystemNavigator.pop();
+      },
+      child: child,
+    );
+  }
+}
 
 /// Rahmen um alle Seiten, der vom Layout abhängt:
 /// - "Bibliothek": feste Seitenleiste links neben allen Übersichtsseiten
@@ -94,13 +118,22 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
   /// In die Leiste – auf den Eintrag der aktuellen Seite (sonst den ersten).
   bool _enterRail() {
     final current = FocusManager.instance.primaryFocus;
+    if (!_sidebarShown) return false;
     if (current != null && !_sideScope.hasFocus) _lastPageFocus = current;
-    if (_railActive.context != null) {
+    // Nur, wenn der Eintrag gerade in der Leiste hängt: Auf Unterseiten (Titel, Person …) gehört
+    // keiner zur Seite – ein Fokus-Wunsch an den losen Knoten bliebe liegen und zöge den Fokus
+    // erst beim nächsten Seitenwechsel in die Leiste.
+    if (_railActive.parent != null) {
       _railActive.requestFocus();
       return true;
     }
-    _sideScope.requestFocus();
-    return moveFocusInDirection(TraversalDirection.down);
+    // Sonst der zuletzt gewählte Eintrag, sonst der erste.
+    final last = _sideScope.focusedChild;
+    if (last != null && last.parent != null && last.canRequestFocus) {
+      last.requestFocus();
+      return true;
+    }
+    return focusFirstUnder(_sideScope);
   }
 
   void _onSideFocus() {
@@ -115,20 +148,24 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
     final inSidebar = _sideScope.hasFocus;
     if (direction == TraversalDirection.left && !inSidebar) {
       if (isTv) return _enterRail();
-      _sideScope.requestFocus();
-      return moveFocusInDirection(TraversalDirection.down);
+      // Zuletzt gewählter Eintrag der Leiste, sonst der erste.
+      final last = _sideScope.focusedChild;
+      if (last != null && last.parent != null && last.canRequestFocus) {
+        last.requestFocus();
+        return true;
+      }
+      return focusFirstUnder(_sideScope);
     }
     if (direction == TraversalDirection.right && inSidebar) {
-      // Fernseher: zurück zu dem Element, von dem es in die Leiste ging.
+      // Fernseher: zurück zu dem Element, von dem es in die Leiste ging (sofern es noch da ist).
       final last = _lastPageFocus;
-      if (isTv && last != null && last.context != null && last.canRequestFocus) {
+      if (isTv && last != null && last.parent != null && last.canRequestFocus) {
         last.requestFocus();
         return true;
       }
       final page = widget.router.routerDelegate.navigatorKey.currentState?.focusNode;
       if (page == null) return false;
-      page.requestFocus();
-      return moveFocusInDirection(TraversalDirection.right);
+      return focusFirstUnder(page);
     }
     return false;
   }
@@ -145,8 +182,7 @@ class _LayoutShellState extends ConsumerState<LayoutShell> {
         final onPageElement = focus != null && focus is! FocusScopeNode && focus.ancestors.contains(page);
         if (onPageElement) return;
         _lastPageFocus = null;
-        page.requestFocus();
-        moveFocusInDirection(TraversalDirection.down);
+        focusFirstUnder(page);
       });
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {

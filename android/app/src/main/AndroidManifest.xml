@@ -7,12 +7,18 @@
     <uses-feature android:name="android.software.leanback" android:required="false"/>
 
     <!-- usesCleartextTraffic: Jellyfin-Server im Heimnetz laufen oft über http (die App warnt
-         dann selbst vor unverschlüsselten Verbindungen). -->
+         dann selbst vor unverschlüsselten Verbindungen).
+         Keine Sicherung/Übertragung der App-Daten: Der Schlüssel für die Anmeldedaten hängt am
+         Keystore dieses Geräts und kommt bei einer Wiederherstellung nicht mit – zurück kämen nur
+         unlesbare Anmeldedaten (und gigabyteweise Downloads in der Cloud-Sicherung). -->
     <application
         android:label="Jellyflex"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/banner"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
@@ -20,7 +26,7 @@
             android:launchMode="singleTop"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:configChanges="orientation|keyboardHidden|keyboard|navigation|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
             <!-- Specifies an Android theme to apply to this Activity as soon as

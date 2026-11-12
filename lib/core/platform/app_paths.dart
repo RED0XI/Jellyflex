@@ -92,8 +92,13 @@ abstract final class AppPaths {
     return s;
   }
 
+  /// iPhone/iPad und Android: kein Dateimanager und kein Browser, den die App per Befehl starten
+  /// könnte (die Knöpfe dazu gibt es dort nicht).
+  static bool get _noFileManager => Platform.isIOS || Platform.isAndroid;
+
   /// Datei im Dateimanager zeigen (Explorer bzw. Finder) und markieren.
   static Future<void> reveal(String path) async {
+    if (_noFileManager) return;
     try {
       if (Platform.isWindows) {
         await Process.run('explorer.exe', ['/select,$path']);
@@ -107,6 +112,7 @@ abstract final class AppPaths {
 
   /// Ordner im Dateimanager öffnen.
   static Future<void> openFolder(String path) async {
+    if (_noFileManager) return;
     try {
       if (Platform.isWindows) {
         await Process.run('explorer', [path]);
@@ -118,7 +124,7 @@ abstract final class AppPaths {
 
   /// Feste Webadresse im Standardbrowser öffnen (nur `https://`).
   static Future<void> openUrl(String url) async {
-    if (!url.startsWith('https://')) return;
+    if (!url.startsWith('https://') || _noFileManager) return;
     try {
       if (Platform.isWindows) {
         await Process.run('rundll32', ['url.dll,FileProtocolHandler', url]);

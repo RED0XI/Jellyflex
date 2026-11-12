@@ -151,6 +151,8 @@ class JellyfinApi {
     final host = Platform.localHostname.replaceAll(RegExp(r'[^A-Za-z0-9 _-]'), '');
     // iOS gibt den eigenen Gerätenamen nicht mehr heraus – dann wenigstens die Geräteart.
     if (Platform.isIOS) return isPhoneDevice ? 'iPhone' : 'iPad';
+    // Android nennt sich selbst nur "localhost".
+    if (Platform.isAndroid) return isTv ? 'Android TV' : 'Android';
     return host.isEmpty ? (Platform.isMacOS ? 'Mac' : 'Windows') : host;
   }
 

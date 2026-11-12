@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/platform/device.dart';
 import '../core/subtitle_style.dart';
 import '../l10n/strings.dart';
 import '../theme.dart';
@@ -102,6 +103,14 @@ class SubtitleStyleEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Fernseher: Regler ändern sich nur mit links/rechts – hoch/runter wandert weiter. In Flutters
+    // Vorgabe ("traditional") schlucken Regler alle vier Pfeile; der Fokus käme nie wieder heraus.
+    if (isTv && MediaQuery.navigationModeOf(context) != NavigationMode.directional) {
+      return MediaQuery(
+        data: MediaQuery.of(context).copyWith(navigationMode: NavigationMode.directional),
+        child: Builder(builder: build),
+      );
+    }
     return Padding(
       padding: padding,
       child: Column(
@@ -170,7 +179,7 @@ class SubtitleStyleEditor extends StatelessWidget {
               label: tr.subtitleBoxOpacity,
               value: '${(style.boxOpacity * 100).round()} %',
               child: Slider(
-                value: style.boxOpacity,
+                value: style.boxOpacity.clamp(0.1, 1.0),
                 min: 0.1,
                 divisions: 9,
                 semanticFormatterCallback: (v) => '${(v * 100).round()} %',

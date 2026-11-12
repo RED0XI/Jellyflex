@@ -162,13 +162,14 @@ class DownloadEntry {
     int? Function()? audioIndex,
     String? seriesId,
     int? sortIndex,
+    String? folder,
   }) => DownloadEntry(
     itemId: itemId,
     serverUrl: serverUrl,
     userId: userId,
     name: name,
     type: type,
-    folder: folder,
+    folder: folder ?? this.folder,
     seriesName: seriesName,
     seriesId: seriesId ?? this.seriesId,
     episodeLabel: episodeLabel,
@@ -406,6 +407,7 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
     _networkTimer = Timer.periodic(const Duration(seconds: 30), (_) => _checkNetwork());
     _smartTimer = Timer.periodic(const Duration(minutes: 30), (_) => runSmart());
     _roots.add(root.path);
+    if (Platform.isIOS) _keepOutOfBackup();
 
     try {
       var file = _indexFile;
@@ -433,11 +435,19 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
             // Beim letzten Beenden unterbrochene Downloads gelten als wartend.
             .map((e) => e.status == DownloadStatus.downloading ? e.copyWith(status: DownloadStatus.queued) : e)
             .toList();
+        // Ordner umgezogen (iOS: nach jedem App-Update liegt der Container woanders)?
+        var moved = false;
+        for (var i = 0; i < list.length; i++) {
+          final found = _relocated(list[i]);
+          if (found == null) continue;
+          list[i] = found;
+          moved = true;
+        }
         // Wartende Downloads fortsetzen, sobald die App läuft.
         Future.microtask(() {
           if (!ref.mounted) return;
-          // Liste ggf. am neuen Ort speichern.
-          if (file.path != _indexFile.path) _set(state);
+          // Liste ggf. am neuen Ort bzw. mit den neuen Pfaden speichern.
+          if (file.path != _indexFile.path || moved) _set(state);
           _pump();
           syncPending();
           runSmartSoon();
@@ -446,6 +456,42 @@ class DownloadManager extends Notifier<List<DownloadEntry>> {
       }
     } catch (_) {}
     return const [];
+  }
+
+  /// iPhone/iPad: Der Download-Ordner liegt in "Dokumente" (in der Dateien-App sichtbar) – ohne
+  /// diese Markierung wanderten alle Videos in die iCloud-Sicherung.
+  Future<void> _keepOutOfBackup() async {
+    try {
+      final dir = root;
+      await dir.create(recursive: true);
+      await AppShell.excludeFromBackup(dir.path);
+    } catch (_) {}
+  }
+
+  /// Die Liste merkt sich ganze Pfade. iOS verlegt den Container der App aber bei jedem Update
+  /// (neue Kennung im Pfad): Die Dateien ziehen mit, die gemerkten Pfade zeigen ins Leere – der
+  /// Download stünde als "offline verfügbar" da, spielte aber nicht und ließe sich nicht löschen.
+  /// Fehlt der gemerkte Ordner und liegt einer gleichen Namens im aktuellen Download-Ordner,
+  /// gilt der. `null`: nichts zu tun.
+  DownloadEntry? _relocated(DownloadEntry e) {
+    try {
+      if (Directory(e.folder).existsSync()) return null;
+      final folder = AppPaths.join(root.path, _folderName(e.itemId, e.serverUrl, e.userId));
+      if (_norm(folder) == _norm(e.folder) || !Directory(folder).existsSync()) return null;
+      final media = e.mediaFile;
+      // Die Videodatei liegt im Ordner des Downloads (siehe _isSafeEntry) – derselbe Platz im neuen.
+      final inside = media != null && media.length > e.folder.length && media.startsWith(e.folder);
+      return e.copyWith(
+        folder: folder,
+        mediaFile: media == null
+            ? null
+            : () => inside
+                  ? '$folder${media.substring(e.folder.length)}'
+                  : AppPaths.join(folder, media.substring(media.lastIndexOf(AppPaths.sep) + 1)),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Gehört der Download zum angemeldeten Konto? Andere Konten (z. B. ein

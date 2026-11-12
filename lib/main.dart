@@ -58,6 +58,9 @@ Future<void> main(List<String> args) async {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
       SystemChrome.setPreferredOrientations(mobileOrientations);
+      // So früh kennt iOS die Bildschirmgröße mitunter noch nicht – ein iPad gälte dann als iPhone
+      // und bliebe hochkant gesperrt. Nach dem ersten Bild steht sie fest: noch einmal setzen.
+      WidgetsBinding.instance.addPostFrameCallback((_) => SystemChrome.setPreferredOrientations(mobileOrientations));
     }
     // Fernseher: die App füllt ohnehin den ganzen Bildschirm.
     runApp(const ProviderScope(retry: providerRetry, child: JellyflexApp()));

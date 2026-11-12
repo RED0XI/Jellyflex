@@ -75,11 +75,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _pickLogo() async {
-    final file = await openFile(
-      acceptedTypeGroups: [
-        XTypeGroup(label: tr.images, extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']),
-      ],
-    );
+    final XFile? file;
+    try {
+      file = await openFile(
+        acceptedTypeGroups: [
+          XTypeGroup(label: tr.images, extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']),
+        ],
+      );
+    } catch (e) {
+      // Kein Datei-Dialog auf diesem Gerät (z. B. Fire TV ohne Dateiverwaltung).
+      debugPrint('Datei-Dialog nicht verfügbar: $e');
+      return;
+    }
     if (file == null) return;
     setState(() => _importingLogo = true);
     try {
@@ -513,11 +520,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _Row(
               title: tr.downloadFolder,
               subtitle: tr.downloadFolderHint(ref.read(downloadsProvider.notifier).root.path),
-              trailing: TextButton.icon(
-                onPressed: () => changeDownloadFolder(context, ref.read),
-                icon: const Icon(Icons.drive_folder_upload_rounded, size: 18),
-                label: Text(tr.changeFolder),
-              ),
+              // Nur am Desktop: iPhone/iPad und Fernseher kennen keine Ordner-Auswahl – dort
+              // liegen Downloads fest im Bereich der App.
+              trailing: isDesktop
+                  ? TextButton.icon(
+                      onPressed: () => changeDownloadFolder(context, ref.read),
+                      icon: const Icon(Icons.drive_folder_upload_rounded, size: 18),
+                      label: Text(tr.changeFolder),
+                    )
+                  : const SizedBox.shrink(),
             ),
             _Row(
               title: tr.unmeteredOnly,

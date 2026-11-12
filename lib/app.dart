@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -46,7 +47,12 @@ import 'widgets/app_intro.dart';
 /// sonst nicht zuverlässig als MaterialApp und blendet Seiten ohne Übergang ein.
 GoRoute _route(String path, Widget Function(GoRouterState state) build) => GoRoute(
   path: path,
-  pageBuilder: (_, state) => MaterialPage<void>(key: state.pageKey, name: state.uri.path, child: build(state)),
+  pageBuilder: (_, state) => MaterialPage<void>(
+    key: state.pageKey,
+    name: state.uri.path,
+    // Der Player regelt "Zurück" auf dem Fernseher selbst (Menü zu, Bedienung aus, schließen).
+    child: path.startsWith('/play') ? build(state) : TvRootBack(child: build(state)),
+  ),
 );
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -128,6 +134,23 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+/// Tastenkürzel der App: wie Flutters Vorgabe, aber Auswählen (OK, Enter, Leertaste, A-Knopf)
+/// löst nur beim Drücken aus, nicht bei jeder Tastenwiederholung. Sonst öffnete gehaltenes OK auf
+/// einer Karte erst die Detailseite und startete mit der nächsten Wiederholung gleich die
+/// Wiedergabe; Schalter kippten zwanzigmal pro Sekunde.
+final Map<ShortcutActivator, Intent> _appShortcuts = {
+  for (final e in WidgetsApp.defaultShortcuts.entries)
+    if (e.value is! ActivateIntent) e.key: e.value,
+  for (final key in [
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+    LogicalKeyboardKey.space,
+    LogicalKeyboardKey.select,
+    LogicalKeyboardKey.gameButtonA,
+  ])
+    SingleActivator(key, includeRepeats: false): const ActivateIntent(),
+};
 
 class JellyflexApp extends ConsumerStatefulWidget {
   const JellyflexApp({super.key});
@@ -217,6 +240,7 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: buildTheme(ref.watch(settingsProvider.select((s) => '${s.themeId}/${s.layoutId}'))),
       routerConfig: router,
+      shortcuts: _appShortcuts,
       scrollBehavior: const _AppScrollBehavior(),
       scaffoldMessengerKey: appMessengerKey,
       // Fernseher: Oberfläche auf 1280×720 aufbauen und passend verkleinern (siehe TvScale).

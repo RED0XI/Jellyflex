@@ -257,6 +257,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (isMobile) {
       _enterMobilePlayback();
       Power.appVisible.addListener(_onAppVisibleChanged);
+      // Läuft noch ein Titel in Apples Player (Bild-in-Bild, AirPlay)? Der endet jetzt – sonst
+      // spielten beide zugleich.
+      if (ApplePlayer.active) ApplePlayer.stop();
     }
   }
 
@@ -275,6 +278,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// nächsten Folge baut sich der neue auf, bevor der alte geht).
   static void _leaveMobilePlayback() {
     if (--PlayerScreen._mobileSessions > 0) return;
+    // Helligkeit wie vor dem Video (auf dem iPhone gilt sie sonst systemweit weiter) – bei der
+    // nächsten Folge bleibt die eingestellte erhalten.
+    ScreenBrightness.restore();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations(mobileOrientations);
   }
@@ -343,7 +349,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       subtitleIndex: _subtitleIndex,
       maxBitrate: _maxBitrate,
     );
-    if (!mounted) return;
+    if (!mounted) {
+      // Der Player wurde geschlossen, während Apples Player sich vorbereitete: Dann soll auch kein
+      // Bild-in-Bild-Fenster mehr aufgehen (womöglich läuft hier längst ein anderer Titel).
+      if (ok) ApplePlayer.stop();
+      return;
+    }
     if (!ok) {
       snack(tr.appleHandoffFailed);
       if (!pip && wasPlaying) await _player.play();
@@ -701,8 +712,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _tvPlayFocus.dispose();
     _tvSeekFocus.dispose();
     if (isMobile) {
-      // Helligkeit wie vor dem Video (auf dem iPhone gilt sie sonst systemweit weiter).
-      ScreenBrightness.restore();
       _levelOsdTimer?.cancel();
       _leaveMobilePlayback();
       Power.appVisible.removeListener(_onAppVisibleChanged);
@@ -1196,7 +1205,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     playerPlaying.value = playing;
     _updateMediaProgress();
     // Per Medientaste o. Ä. weitergespielt → "Gute Nacht" ausblenden.
-    if (playing && _sleeping && mounted) setState(() => _sleeping = false);
+    if (playing && _sleeping && mounted) {
+      setState(() => _sleeping = false);
+      // Fernseher: Der Fokus lag auf einem Knopf der Abfrage, die jetzt verschwindet.
+      if (isTv) _focus.requestFocus();
+    }
     _reportProgress();
     MediaSession.setPlaying(playing);
     if (playing) {
@@ -1547,8 +1560,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (!isDown && !isRepeat) return KeyEventResult.ignored;
     _userActive();
 
+    // Fernseher: Dort liegt der Fokus auf einem Knopf der Abfrage, und OK wählt diesen Knopf (die
+    // Taste geht weiter an die Kürzel der App). Sonst gilt OK/Leertaste als "weiter" – egal, wo
+    // der Fokus gerade steht (etwa auf einem zuletzt angeklickten Knopf der Bedienung).
+    final onOverlayButton = isTv && !node.hasPrimaryFocus;
     if (_askingStillWatching && isDown) {
-      if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.enter) {
+      if (key == LogicalKeyboardKey.space || _tvOk.contains(key)) {
+        if (onOverlayButton) return KeyEventResult.ignored;
         _continueWatching();
         return KeyEventResult.handled;
       }
@@ -1559,10 +1577,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
 
     if (_sleeping && isDown) {
-      if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.keyK) {
+      if (key == LogicalKeyboardKey.space || _tvOk.contains(key) || key == LogicalKeyboardKey.keyK) {
+        if (onOverlayButton && key != LogicalKeyboardKey.keyK) return KeyEventResult.ignored;
         _wakeUp();
         return KeyEventResult.handled;
       }
+    }
+
+    // Fernseher, "Schaust du noch?"/"Gute Nacht": Der Fokus liegt auf den beiden Knöpfen der
+    // Abfrage (OK wählt den fokussierten selbst, links/rechts wechselt – siehe _SleepOverlay).
+    // Sonst gilt hier nichts: Der Fokus darf nicht auf die verdeckte Bedienung darunter wandern.
+    if (isTv && (_askingStillWatching || _sleeping)) {
+      if (isDown && (key == LogicalKeyboardKey.mediaPlayPause || key == LogicalKeyboardKey.mediaPlay)) {
+        _sleeping ? _wakeUp() : _continueWatching();
+      }
+      return KeyEventResult.handled;
     }
 
     if (isTv && isDown) {
@@ -1716,7 +1745,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   /// Fernseher, Zurück-Taste: erst Menü zu, dann Bedienung aus, dann Player schließen.
   void _onTvBack() {
-    if (_anyPanelOpen) {
+    if (_askingStillWatching || _sleeping) {
+      _close();
+    } else if (_anyPanelOpen) {
       _closePanels();
     } else if (_controlsVisible) {
       _hideControlsNow();
@@ -2127,7 +2158,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 player: _player,
                 back: _seekBack,
                 forward: _seekForward,
-                onSeek: _seekBy,
+                // Solange gespult wird, bleibt die Bedienung stehen.
+                onSeek: (by) {
+                  _seekBy(by);
+                  _showControls(autoHide: _player.state.playing);
+                },
                 onToggle: _toggleTvPlayback,
                 focusNode: _tvSeekFocus,
               ),
@@ -2674,11 +2709,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _embeddedViaServer = id;
       _player.setSubtitleTrack(_serverSubtitleTrack(stream));
       // Kommt die Datei nicht (alter Server, Fehler), doch die Spur aus dem Video nehmen.
-      Future<void>.delayed(const Duration(seconds: 8), () {
+      Future<void>.delayed(const Duration(seconds: 8), () async {
         if (!mounted || _closing || _embeddedViaServer != id) return;
-        final current = int.tryParse(_player.state.track.subtitle.id);
-        final embedded = _source?.embeddedStreams('Subtitle').length ?? 0;
-        if (current != null && current > embedded) return; // Datei ist da
+        if (await _externalSubtitleShown()) return; // Datei ist da
+        if (!mounted || _closing || _embeddedViaServer != id) return;
         _embeddedViaServer = null;
         _player.setSubtitleTrack(t);
       });
@@ -2687,6 +2721,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
     _subtitleIndex = stream?.index ?? _subtitleIndex;
     _rememberSubtitle(_subtitleIndex);
+  }
+
+  /// Zeigt mpv gerade einen nachgeladenen Untertitel (eine Datei, keine Spur aus dem Video)?
+  /// mpv selbst fragen: media_kit führt für nachgeladene Dateien die Adresse als ID, keine Nummer.
+  Future<bool> _externalSubtitleShown() async {
+    final native = _player.platform;
+    if (native is! NativePlayer) return true;
+    try {
+      return await native.getProperty('current-tracks/sub/external') == 'yes';
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Eingebettete Spur, die gerade als Datei vom Server läuft (mpv-ID der Spur im Video) –
@@ -2784,7 +2830,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           content: Text(tr.screenshotSaved),
           behavior: SnackBarBehavior.floating,
           width: 420,
-          action: SnackBarAction(label: tr.show, onPressed: () => AppPaths.reveal(file.path)),
+          action: isDesktop ? SnackBarAction(label: tr.show, onPressed: () => AppPaths.reveal(file.path)) : null,
         ),
       );
     } catch (e) {

@@ -47,108 +47,107 @@ class _TvHomeState extends ConsumerState<_TvHome> {
 
   @override
   Widget build(BuildContext context) {
+    // Anderes Konto: nicht kurz den zuletzt fokussierten Titel des vorigen zeigen.
+    ref.listen(sessionProvider.select((s) => s.value?.accountKey), (_, _) {
+      tvFocusedItem.value = null;
+      _settle?.cancel();
+      if (mounted) setState(() => _shown = null);
+    });
     final size = MediaQuery.sizeOf(context);
     final api = ref.watch(apiProvider);
     final item = _shown;
     final backdrop = item == null ? null : Images.backdrop(item);
     final infoHeight = size.height * 0.46;
-    return PopScope(
-      // Zurück auf der Startseite: erst in die Menüleiste, von dort verlässt ein zweites Zurück die App.
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        tvMenuFocused() ? SystemNavigator.pop() : tvFocusMenu();
-      },
-      child: Scaffold(
-        body: Stack(
-          children: [
-            // Bild des fokussierten Titels oben rechts, weich in den Hintergrund auslaufend.
-            Positioned(
-              top: 0,
-              right: 0,
-              width: size.width * 0.74,
-              height: size.height * 0.7,
-              // Eigene Ebene: Scrollen der Reihen zeichnet das Bild nicht neu. Bild höchstens 1280 px
-              // breit (liegt ohnehin unter Verläufen) – große Bilder dekodieren auf TV-Chips spürbar.
-              child: RepaintBoundary(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 280),
-                  child: KeyedSubtree(
-                    key: ValueKey(backdrop),
-                    child: backdrop == null
-                        ? const SizedBox.expand()
-                        : JfImage(
-                            url: api.imageUrlOrNull(backdrop, maxWidth: 1280),
-                            // Kein Blurhash: der würde bei jedem Fokuswechsel neu berechnet.
-                            placeholderColor: Colors.transparent,
-                            alignment: Alignment.topCenter,
-                          ),
-                  ),
+    // "Zurück" (erst Menüleiste, dann App zu) regelt TvRootBack um jede Seite.
+    return Scaffold(
+      body: Stack(
+        children: [
+          // Bild des fokussierten Titels oben rechts, weich in den Hintergrund auslaufend.
+          Positioned(
+            top: 0,
+            right: 0,
+            width: size.width * 0.74,
+            height: size.height * 0.7,
+            // Eigene Ebene: Scrollen der Reihen zeichnet das Bild nicht neu. Bild höchstens 1280 px
+            // breit (liegt ohnehin unter Verläufen) – große Bilder dekodieren auf TV-Chips spürbar.
+            child: RepaintBoundary(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 280),
+                child: KeyedSubtree(
+                  key: ValueKey(backdrop),
+                  child: backdrop == null
+                      ? const SizedBox.expand()
+                      : JfImage(
+                          url: api.imageUrlOrNull(backdrop, maxWidth: 1280),
+                          // Kein Blurhash: der würde bei jedem Fokuswechsel neu berechnet.
+                          placeholderColor: Colors.transparent,
+                          alignment: Alignment.topCenter,
+                        ),
                 ),
               ),
             ),
-            Positioned(
-              top: 0,
-              right: 0,
-              width: size.width * 0.74,
-              height: size.height * 0.7,
-              child: IgnorePointer(
+          ),
+          Positioned(
+            top: 0,
+            right: 0,
+            width: size.width * 0.74,
+            height: size.height * 0.7,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppColors.background, AppColors.background.withValues(alpha: 0)],
+                    stops: const [0, 0.45],
+                  ),
+                ),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
                       colors: [AppColors.background, AppColors.background.withValues(alpha: 0)],
-                      stops: const [0, 0.45],
-                    ),
-                  ),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [AppColors.background, AppColors.background.withValues(alpha: 0)],
-                        stops: const [0, 0.5],
-                      ),
+                      stops: const [0, 0.5],
                     ),
                   ),
                 ),
               ),
             ),
-            Column(
-              children: [
-                SizedBox(
-                  height: infoHeight,
-                  width: double.infinity,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(48, 44, size.width * 0.42, 12),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 250),
-                      layoutBuilder: (current, previous) =>
-                          Stack(alignment: Alignment.bottomLeft, children: [...previous, ?current]),
-                      child: item == null ? const SizedBox.shrink() : _TvInfo(key: ValueKey(item.id), item: item),
-                    ),
+          ),
+          Column(
+            children: [
+              SizedBox(
+                height: infoHeight,
+                width: double.infinity,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(48, 44, size.width * 0.42, 12),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    layoutBuilder: (current, previous) =>
+                        Stack(alignment: Alignment.bottomLeft, children: [...previous, ?current]),
+                    child: item == null ? const SizedBox.shrink() : _TvInfo(key: ValueKey(item.id), item: item),
                   ),
                 ),
-                Expanded(
-                  child: SingleChildScrollView(
-                    controller: _scroll,
-                    // Platz unten, damit auch die letzte Reihe in die Mitte rücken kann.
-                    padding: EdgeInsets.only(bottom: size.height * 0.3),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (final row in widget.rows)
-                          _TvRowAnchor(
-                            scroll: _scroll,
-                            child: Padding(padding: const EdgeInsets.only(bottom: 18), child: row),
-                          ),
-                      ],
-                    ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _scroll,
+                  // Platz unten, damit auch die letzte Reihe in die Mitte rücken kann.
+                  padding: EdgeInsets.only(bottom: size.height * 0.3),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final row in widget.rows)
+                        _TvRowAnchor(
+                          scroll: _scroll,
+                          child: Padding(padding: const EdgeInsets.only(bottom: 18), child: row),
+                        ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

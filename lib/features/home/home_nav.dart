@@ -682,17 +682,20 @@ class TvNavRail extends ConsumerWidget {
                 padding: const EdgeInsets.only(left: 6),
                 child: ProfileMenuButton(router: router, size: 44, extraActions: true),
               ),
-              if (expanded && session != null) ...[
-                const SizedBox(width: 14),
+              // Abstand im dehnbaren Teil: Solange die Leiste noch aufklappt, ist sie schmaler als
+              // Bild + Abstand – ein fester Abstand liefe in diesen Bildern über.
+              if (expanded && session != null)
                 Expanded(
-                  child: Text(
-                    session.userName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 14),
+                    child: Text(
+                      session.userName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
-              ],
             ],
           ),
           const Spacer(),
@@ -746,21 +749,23 @@ class _TvRailLink extends StatelessWidget {
                     ? AppColors.accent
                     : AppColors.textSecondary,
               ),
-              if (expanded) ...[
-                const SizedBox(width: 18),
+              // Abstand im dehnbaren Teil (siehe Profilzeile): läuft beim Aufklappen nicht über.
+              if (expanded)
                 Expanded(
-                  child: Text(
-                    entry.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight: active || focused ? FontWeight.w700 : FontWeight.w500,
-                      color: focused ? Colors.black : (active ? AppColors.textPrimary : AppColors.textSecondary),
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 18),
+                    child: Text(
+                      entry.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: active || focused ? FontWeight.w700 : FontWeight.w500,
+                        color: focused ? Colors.black : (active ? AppColors.textPrimary : AppColors.textSecondary),
+                      ),
                     ),
                   ),
                 ),
-              ],
             ],
           ),
         ),

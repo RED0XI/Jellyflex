@@ -26,7 +26,12 @@ File? customLogo(AppSettings s) {
   final path = s.logoPath;
   if (path == null) return null;
   final file = File(path);
-  return file.existsSync() ? file : null;
+  if (file.existsSync()) return file;
+  // iOS verlegt den Container der App bei jedem Update – die Datei liegt dann unter demselben
+  // Namen im aktuellen App-Datenordner (dorthin kopiert sie importLogo).
+  final name = path.substring(path.lastIndexOf(RegExp(r'[/\\]')) + 1);
+  final moved = File(AppPaths.join(appDataDir.path, name));
+  return name.isNotEmpty && moved.existsSync() ? moved : null;
 }
 
 /// Taskleisten-Symbol (.ico) zum Logo.

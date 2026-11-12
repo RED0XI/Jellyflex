@@ -43,10 +43,35 @@ class _TvTextInputState extends State<TvTextInput> {
     if (_editing != value && mounted) setState(() => _editing = value);
   }
 
-  void _done() => _setEditing(false);
+  /// Das Textfeld selbst (sein Fokus-Knoten), solange es den Fokus hat.
+  FocusNode? _field;
+
+  /// "Fertig"/"Los" auf der Tastatur: nicht mehr tippen – der Fokus bleibt aber auf dem Feld.
+  /// Flutter nimmt ihn dem Feld bei diesen Tasten weg; dann stünde er nirgends, und die nächste
+  /// Pfeiltaste finge oben links auf der Seite neu an.
+  void _done() {
+    _setEditing(false);
+    final field = _field;
+    if (!isTv || field == null) return;
+    // Erst nachsehen, wenn der Fokuswechsel der Tastatur-Taste durch ist: Bei "Weiter" hat ihn
+    // jetzt das nächste Feld – dann bleibt er dort.
+    scheduleMicrotask(() {
+      final current = FocusManager.instance.primaryFocus;
+      final nowhere = current == null || current is FocusScopeNode;
+      if (mounted && nowhere && field.parent != null && field.canRequestFocus) field.requestFocus();
+    });
+  }
+
+  /// Liegt der Fokus auf dem Textfeld selbst (nicht auf einem Knopf darin, z. B. "Leeren")?
+  bool get _onField {
+    final context = FocusManager.instance.primaryFocus?.context;
+    return context != null &&
+        (context.widget is EditableText || context.findAncestorWidgetOfExactType<EditableText>() != null);
+  }
 
   void _onFocusChange(bool focused) {
     if (focused) {
+      if (_onField) _field = FocusManager.instance.primaryFocus;
       // Erst nachsehen, wenn auch das alte Feld seinen Fokusverlust gemeldet hat (die Reihenfolge
       // der beiden Meldungen ist nicht festgelegt).
       scheduleMicrotask(() {
@@ -72,7 +97,13 @@ class _TvTextInputState extends State<TvTextInput> {
       skipTraversal: true,
       onFocusChange: _onFocusChange,
       onKeyEvent: (node, event) {
-        if (_editing || event is! KeyDownEvent || !_openKeys.contains(event.logicalKey)) {
+        // Nur OK auf dem Feld selbst – ein Knopf im Feld (z. B. "Leeren") bekommt sein OK.
+        if (event is! KeyDownEvent || !_openKeys.contains(event.logicalKey) || !_onField) {
+          return KeyEventResult.ignored;
+        }
+        if (_editing) {
+          // Tastatur mit "Zurück" geschlossen (davon erfährt Flutter nichts): OK holt sie wieder.
+          SystemChannels.textInput.invokeMethod<void>('TextInput.show').ignore();
           return KeyEventResult.ignored;
         }
         _setEditing(true);

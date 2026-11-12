@@ -19,30 +19,41 @@ bool moveFocusInDirection(TraversalDirection direction) {
 /// Wird aufgerufen, wenn es in einer Richtung nichts mehr gibt (Seitenleiste).
 bool Function(TraversalDirection direction)? focusEdgeHandler;
 
+/// Fokussierbare Elemente unter [root] – nur die der gerade sichtbaren Seite (bzw. des offenen Menüs).
+List<FocusNode> _candidatesUnder(FocusNode root) => root.traversalDescendants.where((n) {
+  final context = n.context;
+  if (!n.canRequestFocus || n.skipTraversal || context == null || n.rect.width <= 0) return false;
+  return ModalRoute.of(context)?.isCurrent ?? true;
+}).toList();
+
+/// Fokussiert das erste Element unter [root] (oben links, zeilenweise). `false`, wenn es keines gibt.
+///
+/// Für Sprünge in einen anderen Bereich (Seite ↔ Leiste): [FocusNode.requestFocus] wirkt erst
+/// nach dem laufenden Tastendruck – wer danach [moveFocusInDirection] ruft, bewegt noch den
+/// alten Fokus (und landet am Rand wieder im selben Rand-Handler).
+bool focusFirstUnder(FocusNode root) {
+  final candidates = _candidatesUnder(root);
+  if (candidates.isEmpty) return false;
+  // Zeilenweise (Toleranz 32 px), innerhalb der Zeile von links nach rechts.
+  candidates.sort((a, b) {
+    final rowA = (a.rect.center.dy / 32).floor();
+    final rowB = (b.rect.center.dy / 32).floor();
+    return rowA != rowB ? rowA.compareTo(rowB) : a.rect.left.compareTo(b.rect.left);
+  });
+  candidates.first.requestFocus();
+  revealFocused(candidates.first);
+  return true;
+}
+
 bool _moveWithinScope(TraversalDirection direction) {
   final current = FocusManager.instance.primaryFocus;
   final scope = (current is FocusScopeNode ? current : current?.nearestScope) ?? FocusManager.instance.rootScope;
 
-  // Nur Elemente der gerade sichtbaren Seite (bzw. des offenen Menüs).
-  final candidates = scope.traversalDescendants.where((n) {
-    final context = n.context;
-    if (!n.canRequestFocus || n.skipTraversal || context == null || n.rect.width <= 0) return false;
-    return ModalRoute.of(context)?.isCurrent ?? true;
-  }).toList();
+  final candidates = _candidatesUnder(scope);
   if (candidates.isEmpty) return false;
 
   final onElement = current != null && current is! FocusScopeNode && candidates.contains(current);
-  if (!onElement) {
-    // Zeilenweise (Toleranz 32 px), innerhalb der Zeile von links nach rechts.
-    candidates.sort((a, b) {
-      final rowA = (a.rect.center.dy / 32).floor();
-      final rowB = (b.rect.center.dy / 32).floor();
-      return rowA != rowB ? rowA.compareTo(rowB) : a.rect.left.compareTo(b.rect.left);
-    });
-    candidates.first.requestFocus();
-    revealFocused(candidates.first);
-    return true;
-  }
+  if (!onElement) return focusFirstUnder(scope);
 
   final from = current.rect;
   // Links/rechts zuerst innerhalb derselben Zeile (senkrecht überlappend) – sonst sprang der Fokus

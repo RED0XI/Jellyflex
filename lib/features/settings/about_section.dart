@@ -215,25 +215,27 @@ Future<void> showErrorReport(BuildContext context, WidgetRef ref) {
             icon: const Icon(Icons.copy_rounded, size: 18),
             label: Text(tr.copy),
           ),
-          FilledButton.icon(
-            onPressed: () async {
-              final stamp = DateTime.now().toIso8601String().substring(0, 16).replaceAll(RegExp('[-:T]'), '');
-              final location = await getSaveLocation(
-                suggestedName: 'jellyflex-bericht-$stamp.txt',
-                acceptedTypeGroups: const [
-                  XTypeGroup(label: 'Text', extensions: ['txt']),
-                ],
-              );
-              if (location == null) return;
-              final file = File(location.path);
-              await file.writeAsString(report);
-              if (context.mounted) Navigator.pop(context);
-              // Im Explorer bzw. Finder zeigen.
-              await AppPaths.reveal(file.path);
-            },
-            icon: const Icon(Icons.save_alt_rounded, size: 18),
-            label: Text(tr.saveAs),
-          ),
+          // "Speichern unter" gibt es nur am Desktop (sonst bleibt Kopieren).
+          if (isDesktop)
+            FilledButton.icon(
+              onPressed: () async {
+                final stamp = DateTime.now().toIso8601String().substring(0, 16).replaceAll(RegExp('[-:T]'), '');
+                final location = await getSaveLocation(
+                  suggestedName: 'jellyflex-bericht-$stamp.txt',
+                  acceptedTypeGroups: const [
+                    XTypeGroup(label: 'Text', extensions: ['txt']),
+                  ],
+                );
+                if (location == null) return;
+                final file = File(location.path);
+                await file.writeAsString(report);
+                if (context.mounted) Navigator.pop(context);
+                // Im Explorer bzw. Finder zeigen.
+                await AppPaths.reveal(file.path);
+              },
+              icon: const Icon(Icons.save_alt_rounded, size: 18),
+              label: Text(tr.saveAs),
+            ),
         ],
       );
     },

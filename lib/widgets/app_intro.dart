@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/branding.dart';
+import '../core/gamepad_input.dart';
 import '../core/settings.dart';
 import '../core/ui_sounds.dart';
 import '../theme.dart';
@@ -24,6 +25,10 @@ class AppIntro extends ConsumerStatefulWidget {
 
   /// Schon gezeigt (einmal je Programmstart).
   static bool _shown = false;
+
+  /// Läuft das Intro gerade? Dann gehören Tasten ihm (siehe WindowFrame: keine Kürzel darunter).
+  static bool get showing => _showing;
+  static bool _showing = false;
 
   /// Tests, die das Intro selbst prüfen: auch unter der Test-Bindung zeigen.
   @visibleForTesting
@@ -55,7 +60,12 @@ class _AppIntroState extends ConsumerState<AppIntro> with SingleTickerProviderSt
     if (AppIntro._shown || inTest || !settings.intro) return;
     AppIntro._shown = true;
     _visible = true;
-    HardwareKeyboard.instance.addHandler(_onKey);
+    AppIntro._showing = true;
+    // Früh abfangen: Die Taste gehört dem Intro und kommt in der App darunter gar nicht erst an
+    // (ein HardwareKeyboard-Handler hält sie nicht auf – der Fokus-Baum bekäme sie trotzdem).
+    FocusManager.instance.addEarlyKeyEventHandler(_onKey);
+    _keysHooked = true;
+    GamepadInput.overlayHandler ??= _onPad;
     // Kurz auf die Klänge warten (Laden dauert wenige Millisekunden) – dann beginnen Bild und Ton
     // zusammen. Spätestens nach 400 ms geht es trotzdem los.
     // Und erst, wenn die App darunter ihre ersten Bilder gezeichnet hat: Beim Kaltstart baut sie
@@ -85,9 +95,40 @@ class _AppIntroState extends ConsumerState<AppIntro> with SingleTickerProviderSt
     _anim.forward();
   }
 
-  bool _onKey(KeyEvent event) {
-    if (event is KeyDownEvent) _skip();
-    // Die Taste gehört dem Intro – sie soll nicht zugleich in der App etwas auslösen.
+  /// Tasten, die während des Intros gedrückt wurden und noch nicht losgelassen sind – auch ihr
+  /// Rest (Wiederholungen, Loslassen) gehört nicht der App.
+  final _heldKeys = <PhysicalKeyboardKey>{};
+  bool _keysHooked = false;
+
+  KeyEventResult _onKey(KeyEvent event) {
+    if (_visible) {
+      if (event is KeyDownEvent) {
+        _heldKeys.add(event.physicalKey);
+        _skip();
+      } else if (event is KeyUpEvent) {
+        _heldKeys.remove(event.physicalKey);
+      }
+      return KeyEventResult.handled;
+    }
+    // Intro ist weg: nur noch die Tasten schlucken, die es übersprungen haben.
+    if (!_heldKeys.contains(event.physicalKey)) return KeyEventResult.ignored;
+    if (event is KeyUpEvent) {
+      _heldKeys.remove(event.physicalKey);
+      if (_heldKeys.isEmpty) _unhookKeys();
+    }
+    return KeyEventResult.handled;
+  }
+
+  void _unhookKeys() {
+    if (!_keysHooked) return;
+    _keysHooked = false;
+    FocusManager.instance.removeEarlyKeyEventHandler(_onKey);
+  }
+
+  /// Controller: jede Eingabe überspringt das Intro und gilt nicht der App darunter.
+  bool _onPad(PadAction action) {
+    if (!_visible) return false;
+    _skip();
     return true;
   }
 
@@ -105,38 +146,49 @@ class _AppIntroState extends ConsumerState<AppIntro> with SingleTickerProviderSt
   static const _exitStart = 0.84;
 
   void _finish() {
-    HardwareKeyboard.instance.removeHandler(_onKey);
-    if (mounted && _visible) setState(() => _visible = false);
+    AppIntro._showing = false;
+    if (GamepadInput.overlayHandler == _onPad) GamepadInput.overlayHandler = null;
+    if (_heldKeys.isEmpty) _unhookKeys();
+    if (mounted && _visible) {
+      setState(() => _visible = false);
+    } else {
+      _visible = false;
+    }
   }
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_onKey);
+    if (_visible) AppIntro._showing = false;
+    if (GamepadInput.overlayHandler == _onPad) GamepadInput.overlayHandler = null;
+    _unhookKeys();
     _anim.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_visible) return widget.child;
+    // Immer derselbe Aufbau: Fiele der Stack am Ende weg, entstünde die ganze App darunter neu
+    // (Fensterrahmen, Router …) – und der alte Fensterrahmen nähme beim Abbau die Controller-Abfrage mit.
     return Stack(
+      fit: StackFit.passthrough,
       children: [
         widget.child,
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _skip,
-            child: AnimatedBuilder(
-              animation: _anim,
-              builder: (context, _) => _IntroFrame(
-                t: _anim.value,
-                skipped: _skipped,
-                name: appDisplayName(ref.read(settingsProvider)),
-                logo: customLogo(ref.read(settingsProvider)),
+        if (_visible)
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _skip,
+              child: AnimatedBuilder(
+                animation: _anim,
+                builder: (context, _) => _IntroFrame(
+                  t: _anim.value,
+                  skipped: _skipped,
+                  name: appDisplayName(ref.read(settingsProvider)),
+                  logo: customLogo(ref.read(settingsProvider)),
+                ),
               ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -221,70 +273,77 @@ class _IntroFrame extends StatelessWidget {
               ),
               Transform.scale(
                 scale: 1 + 0.06 * exit,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Transform.translate(
-                      offset: Offset(shift, 0),
-                      child: Transform.scale(
-                        scale: markScale,
-                        child: SizedBox(
-                          width: mark,
-                          height: mark,
-                          child: logo != null
-                              // Eigenes Logo: blendet auf und federt (statt sich zu zeichnen).
-                              ? Opacity(
-                                  opacity: fill,
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(mark * 0.2),
-                                    child: Image.file(
-                                      logo!,
-                                      fit: BoxFit.contain,
-                                      cacheWidth: (mark * MediaQuery.devicePixelRatioOf(context)).ceil(),
-                                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                // Langer eigener Name: verkleinern statt über den Rand zu laufen.
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Transform.translate(
+                          offset: Offset(shift, 0),
+                          child: Transform.scale(
+                            scale: markScale,
+                            child: SizedBox(
+                              width: mark,
+                              height: mark,
+                              child: logo != null
+                                  // Eigenes Logo: blendet auf und federt (statt sich zu zeichnen).
+                                  ? Opacity(
+                                      opacity: fill,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(mark * 0.2),
+                                        child: Image.file(
+                                          logo!,
+                                          fit: BoxFit.contain,
+                                          cacheWidth: (mark * MediaQuery.devicePixelRatioOf(context)).ceil(),
+                                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                                        ),
+                                      ),
+                                    )
+                                  : CustomPaint(
+                                      painter: BrandMarkPainter(
+                                        colors: brandMarkColors(),
+                                        draw: draw,
+                                        fill: fill,
+                                        shine: shine,
+                                        highlight: fill,
+                                        arc1: arc1,
+                                        arc2: arc2,
+                                        glow: glow,
+                                      ),
                                     ),
-                                  ),
-                                )
-                              : CustomPaint(
-                                  painter: BrandMarkPainter(
-                                    colors: brandMarkColors(),
-                                    draw: draw,
-                                    fill: fill,
-                                    shine: shine,
-                                    highlight: fill,
-                                    arc1: arc1,
-                                    arc2: arc2,
-                                    glow: glow,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: gap),
-                    // Der Name schreibt sich Buchstabe für Buchstabe.
-                    ShaderMask(
-                      shaderCallback: (bounds) => AppColors.accentGradient.createShader(bounds),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          for (final (i, letter) in letters.indexed)
-                            Builder(
-                              builder: (context) {
-                                final start = 0.46 + 0.2 * i / letters.length;
-                                final lt = _seg(start, start + 0.08, Curves.easeOutCubic);
-                                return Opacity(
-                                  opacity: lt,
-                                  child: Transform.translate(
-                                    offset: Offset(0, fontSize * 0.25 * (1 - lt)),
-                                    child: Text(letter, style: textStyle),
-                                  ),
-                                );
-                              },
                             ),
-                        ],
-                      ),
+                          ),
+                        ),
+                        SizedBox(width: gap),
+                        // Der Name schreibt sich Buchstabe für Buchstabe.
+                        ShaderMask(
+                          shaderCallback: (bounds) => AppColors.accentGradient.createShader(bounds),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final (i, letter) in letters.indexed)
+                                Builder(
+                                  builder: (context) {
+                                    final start = 0.46 + 0.2 * i / letters.length;
+                                    final lt = _seg(start, start + 0.08, Curves.easeOutCubic);
+                                    return Opacity(
+                                      opacity: lt,
+                                      child: Transform.translate(
+                                        offset: Offset(0, fontSize * 0.25 * (1 - lt)),
+                                        child: Text(letter, style: textStyle),
+                                      ),
+                                    );
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ],

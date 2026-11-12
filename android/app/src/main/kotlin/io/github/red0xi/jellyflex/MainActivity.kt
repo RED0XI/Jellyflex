@@ -42,8 +42,16 @@ class MainActivity : FlutterActivity() {
                     .build(),
             )
             .build()
+            .also { pool ->
+                pool.setOnLoadCompleteListener { _, sampleId, status ->
+                    pendingLoads.remove(sampleId)?.success(status == 0)
+                }
+            }
     }
     private val sounds = HashMap<String, Int>()
+
+    /// Klänge, die noch laden: Antwort an Dart, sobald sie abspielbar sind.
+    private val pendingLoads = HashMap<Int, MethodChannel.Result>()
     private var streamId = 0
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -92,8 +100,11 @@ class MainActivity : FlutterActivity() {
                     } else {
                         val file = java.io.File(cacheDir, "sound_$name.wav")
                         file.writeBytes(data)
-                        sounds[name] = soundPool.load(file.path, 1)
-                        result.success(true)
+                        // Erst antworten, wenn der Klang fertig geladen ist – sonst bliebe ein
+                        // gleich danach gespielter (das Intro) stumm.
+                        val id = soundPool.load(file.path, 1)
+                        sounds[name] = id
+                        pendingLoads[id] = result
                     }
                 }
                 // Ein neuer Klang beendet den vorherigen (wie unter Windows/macOS).
@@ -142,9 +153,27 @@ private object StoreKey {
     fun load(context: Context): ByteArray {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val stored = prefs.getString(WRAPPED, null)
-        if (stored != null) return unwrap(Base64.decode(stored, Base64.NO_WRAP))
+        if (stored != null) {
+            try {
+                return unwrap(Base64.decode(stored, Base64.NO_WRAP))
+            } catch (e: Exception) {
+                // Der abgelegte Schlüssel passt nicht mehr zum Keystore dieses Geräts (App neu
+                // installiert, Daten von einem anderen Gerät übernommen, Keystore zurückgesetzt).
+                // Er ist endgültig verloren – ohne Neuanfang ließe sich nie wieder eine Anmeldung
+                // speichern. Die alte secure.bin lässt sich danach nicht mehr lesen; die App
+                // beginnt dort leer (wie nach einer frischen Installation).
+                prefs.edit().remove(WRAPPED).commit()
+                try {
+                    KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(ALIAS)
+                } catch (ignored: Exception) {
+                }
+            }
+        }
         val key = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        prefs.edit().putString(WRAPPED, Base64.encodeToString(wrap(key), Base64.NO_WRAP)).apply()
+        // commit: erst zurückgeben, wenn der Schlüssel sicher auf dem Speicher liegt – sonst könnte
+        // secure.bin mit einem Schlüssel geschrieben werden, den es nach einem Absturz nicht mehr gibt.
+        val saved = prefs.edit().putString(WRAPPED, Base64.encodeToString(wrap(key), Base64.NO_WRAP)).commit()
+        if (!saved) throw IllegalStateException("Schlüssel nicht gespeichert")
         return key
     }
 

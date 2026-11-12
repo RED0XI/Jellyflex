@@ -195,13 +195,18 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
     final items = ref.read(featuredProvider).value ?? const <BaseItem>[];
     if (items.isEmpty) return;
     final item = items[_index % items.length];
-    _trailerTimer = Timer(_trailerDelay, () => _startTrailer(item));
+    final run = ++_trailerRun;
+    _trailerTimer = Timer(_trailerDelay, () => _startTrailer(item, run));
   }
 
-  Future<void> _startTrailer(BaseItem item) async {
+  /// Zählt die Anläufe: Ein Start, der noch auf den Server wartet, während schon ein neuer
+  /// geplant wurde, gilt nicht mehr – sonst öffnete er den laufenden Trailer ein zweites Mal von vorn.
+  int _trailerRun = 0;
+
+  Future<void> _startTrailer(BaseItem item, int run) async {
     final api = ref.read(apiProvider);
     final trailer = await api.getTrailer(item.id);
-    if (trailer == null || !mounted || !_pageVisible || !_trailersAllowed) return;
+    if (trailer == null || run != _trailerRun || !mounted || !_pageVisible || !_trailersAllowed) return;
     final items = ref.read(featuredProvider).value ?? const <BaseItem>[];
     if (items.isEmpty || items[_index % items.length].id != item.id) return; // inzwischen weitergeblättert
 

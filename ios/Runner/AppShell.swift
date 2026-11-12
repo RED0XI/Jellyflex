@@ -10,6 +10,7 @@ import UIKit
 ///   sonst "unrestricted" bzw. "none" – Downloads warten so auf WLAN.
 /// - `loadSound`/`playSound`: kurze Oberflächen-Klänge aus dem Speicher.
 /// - `getBrightness`/`setBrightness`: Bildschirmhelligkeit 0…1 (Wischen im Player).
+/// - `excludeFromBackup` (Pfad): Ordner nicht in iCloud-/Rechner-Sicherungen aufnehmen.
 ///
 /// Alles Weitere (Dock-Menü, Stammzertifikate …) gibt es hier noch nicht; Dart fängt die
 /// fehlenden Methoden ab.
@@ -48,6 +49,21 @@ final class AppShell: NSObject {
         player.currentTime = 0
         player.play()
         result(true)
+      case "excludeFromBackup":
+        // Ordner (z. B. die Downloads) aus iCloud- und Rechner-Sicherungen heraushalten.
+        guard let path = call.arguments as? String else {
+          result(false)
+          return
+        }
+        var url = URL(fileURLWithPath: path, isDirectory: true)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        do {
+          try url.setResourceValues(values)
+          result(true)
+        } catch {
+          result(false)
+        }
       case "getBrightness":
         // Bildschirmhelligkeit 0…1 (Wischen links im Player).
         result(Double(UIScreen.main.brightness))

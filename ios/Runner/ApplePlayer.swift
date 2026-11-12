@@ -11,7 +11,7 @@ import UIKit
 ///
 /// Kanal `jellyflex/apple_player`:
 /// - `open` {url, headers, position, mode: "pip" | "airplay"} → läuft es? (Bool)
-/// - `stop`
+/// - `stop` → Stelle in Sekunden, an der dieser Player stand (oder nichts, wenn keiner lief)
 /// Meldungen an Dart: `progress` {position, paused} (alle 10 s und bei Pause/Weiter),
 /// `restore` {position} (zurück in den Jellyflex-Player), `ended` {position, finished}.
 /// Frage an Dart: `position` → aktuelle Stelle des Jellyflex-Players (Sekunden) – der läuft
@@ -53,8 +53,11 @@ final class ApplePlayer: NSObject {
       case "open":
         self.open(call.arguments as? [String: Any] ?? [:], result: result)
       case "stop":
+        // Stelle zurückgeben, an der Apples Player stand (für den Fortschritt bei Jellyfin).
+        let position: Double? = self.player == nil ? nil : self.position
+        self.handedBack = true
         self.cleanUp()
-        result(nil)
+        result(position)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -63,8 +66,12 @@ final class ApplePlayer: NSObject {
 
   // MARK: Öffnen
 
+  /// Zählt die Aufrufe von `open` – ein Zeitlimit gilt nur für den Versuch, der es gestellt hat.
+  private var openId = 0
+
   private func open(_ args: [String: Any], result: @escaping FlutterResult) {
     cleanUp()
+    openId += 1
     guard let urlString = args["url"] as? String, let url = URL(string: urlString),
       url.scheme == "https" || url.scheme == "http"
     else {
@@ -191,9 +198,11 @@ final class ApplePlayer: NSObject {
       pip.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { [weak self] _, _ in
         DispatchQueue.main.async { self?.startPipIfPossible() }
       })
-    // Kommt nichts zustande (Stream lädt nicht …), nicht ewig warten.
+    // Kommt nichts zustande (Stream lädt nicht …), nicht ewig warten. Nur für diesen Versuch:
+    // Ein früheres Zeitlimit bräche sonst einen späteren, noch wartenden Versuch vorzeitig ab.
+    let attempt = openId
     DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
-      guard let self, self.pipResult != nil else { return }
+      guard let self, self.openId == attempt, self.pipResult != nil else { return }
       NSLog("Jellyflex ApplePlayer: Bild-in-Bild kam nicht zustande (possible=%d, ready=%d)",
         self.pip?.isPictureInPicturePossible == true ? 1 : 0, self.readyForPip ? 1 : 0)
       self.failPending()
@@ -266,6 +275,12 @@ final class ApplePlayer: NSObject {
   }
 
   private func cleanUp() {
+    // Wartet Dart noch auf die Antwort eines Bild-in-Bild-Versuchs, bekommt es sie jetzt
+    // ("nicht zustande gekommen") – sonst wartete der Aufruf dort für immer.
+    if let pending = pipResult {
+      pipResult = nil
+      pending(false)
+    }
     observations.forEach { $0.invalidate() }
     observations = []
     if let timeObserver { player?.removeTimeObserver(timeObserver) }

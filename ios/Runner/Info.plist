@@ -34,6 +34,12 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<!-- Downloads, Bildschirmfotos und der Jahresrückblick liegen in "Dokumente": in der
+	     Dateien-App sichtbar (Auf meinem iPhone → Jellyflex), auch am Rechner über den Finder. -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Jellyflex sucht und verbindet sich mit deinem Jellyfin-Server im Heimnetz.</string>
 	<!-- Ton läuft weiter, wenn das Display ausgeht oder die App in den Hintergrund wechselt. -->

@@ -14,6 +14,7 @@ import '../core/platform/device.dart';
 import '../core/route_observer.dart';
 import '../core/window_memory.dart';
 import '../theme.dart';
+import 'app_intro.dart';
 import 'focus_navigation.dart';
 import 'focusable.dart';
 import 'shortcut_sheet.dart';
@@ -155,7 +156,7 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
     if (isMacOS) _chromeVisibility.removeListener(_syncMacButtons);
     if (isDesktop) windowManager.removeListener(this);
     widget.router.routerDelegate.removeListener(_onRouteChanged);
-    GamepadInput.stop();
+    GamepadInput.stop(_onPadAction);
     HardwareKeyboard.instance.removeHandler(_onHardwareKey);
     _frameFocus.dispose();
     super.dispose();
@@ -164,6 +165,8 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
   /// Liegt der Fokus auf keinem Element (ganz oben im Fenster), erreichen Tasten
   /// die Seite nicht – Pfeiltasten hier direkt in Fokus-Navigation umsetzen.
   bool _onHardwareKey(KeyEvent event) {
+    // Intro läuft: Tasten überspringen es und lösen darunter nichts aus.
+    if (AppIntro.showing) return false;
     final primary = FocusManager.instance.primaryFocus;
     // "?" zeigt überall die Tastenkürzel – außer beim Tippen in ein Textfeld.
     // Nicht über anderen Dialogen/Menüs (z. B. der PIN-Abfrage).
@@ -263,6 +266,13 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
 
   @override
   void onWindowResized() => WindowMemory.scheduleSave();
+
+  /// macOS meldet "fertig" ([onWindowResized]) nur nach dem Ziehen mit der Maus – Kacheln und
+  /// Größenänderungen per Tastatur kommen nur hier an (gebündelt gespeichert).
+  @override
+  void onWindowResize() {
+    if (isMacOS) WindowMemory.scheduleSave();
+  }
 
   @override
   void onWindowMoved() => WindowMemory.scheduleSave();

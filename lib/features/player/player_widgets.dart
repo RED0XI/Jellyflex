@@ -82,13 +82,39 @@ class _SleepOverlay extends StatefulWidget {
 class _SleepOverlayState extends State<_SleepOverlay> {
   bool _shown = false;
 
+  /// Fernseher: "Weiterschauen" bekommt den Fokus – OK wählt, links/rechts wechselt den Knopf.
+  final _continueFocus = FocusNode(debugLabel: 'Weiterschauen');
+  final _closeFocus = FocusNode(debugLabel: 'Player schließen');
+
+  /// Fernseher: links/rechts wechselt zwischen den beiden Knöpfen; hoch/runter führt nirgends hin
+  /// (sonst wanderte der Fokus auf die verdeckte Bedienung darunter).
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (!isTv) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
+      if (event is KeyDownEvent) (key == LogicalKeyboardKey.arrowLeft ? _continueFocus : _closeFocus).requestFocus();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) return KeyEventResult.handled;
+    return KeyEventResult.ignored;
+  }
+
   @override
   void initState() {
     super.initState();
     // Langsam einblenden.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _shown = true);
+      if (!mounted) return;
+      setState(() => _shown = true);
+      if (isTv) _continueFocus.requestFocus();
     });
+  }
+
+  @override
+  void dispose() {
+    _continueFocus.dispose();
+    _closeFocus.dispose();
+    super.dispose();
   }
 
   @override
@@ -112,13 +138,28 @@ class _SleepOverlayState extends State<_SleepOverlay> {
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
               ),
               const SizedBox(height: 28),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  PrimaryButton(label: tr.keepWatching, icon: Icons.play_arrow_rounded, onPressed: widget.onContinue),
-                  const SizedBox(width: 12),
-                  GlassButton(label: tr.closePlayer, icon: Icons.close_rounded, onPressed: widget.onClose),
-                ],
+              Focus(
+                canRequestFocus: false,
+                skipTraversal: true,
+                onKeyEvent: _onKey,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PrimaryButton(
+                      label: tr.keepWatching,
+                      icon: Icons.play_arrow_rounded,
+                      onPressed: widget.onContinue,
+                      focusNode: _continueFocus,
+                    ),
+                    const SizedBox(width: 12),
+                    GlassButton(
+                      label: tr.closePlayer,
+                      icon: Icons.close_rounded,
+                      onPressed: widget.onClose,
+                      focusNode: _closeFocus,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -29,7 +28,6 @@ import '../../core/layouts.dart';
 import 'home_providers.dart';
 import '../../widgets/focus_navigation.dart';
 import '../../widgets/focusable.dart';
-import '../../widgets/layout_shell.dart';
 import '../../l10n/strings.dart';
 import '../genre/genre_screen.dart';
 

@@ -12,6 +12,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -102,6 +103,37 @@ void main() {
     router.go('/search');
     await pumpFor(tester, const Duration(seconds: 3));
     await shot('search_genres');
+
+    // Personenseite: Bild klein neben dem Namen, Filter umbrechen.
+    router.go('/');
+    await pumpFor(tester, const Duration(seconds: 1));
+    router.push('/person/person3');
+    await pumpFor(tester, const Duration(seconds: 3));
+    await shot('person');
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -420));
+    await pumpFor(tester, const Duration(seconds: 2));
+    await shot('person_titles');
+
+    // Bibliothek mit Mehrfachauswahl: die Leiste passt auf den Bildschirm.
+    router.go('/library/lib-movies?name=Filme&type=movies');
+    await pumpFor(tester, const Duration(seconds: 3));
+    await tester.tap(find.text('Auswählen').first);
+    await pumpFor(tester, const Duration(seconds: 1));
+    await tester.tapAt(const Offset(80, 420));
+    await pumpFor(tester, const Duration(seconds: 1));
+    await shot('library_selection');
+    router.go('/');
+    await pumpFor(tester, const Duration(seconds: 1));
+
+    // Jahresrückblick: jede Folie passt in die Breite.
+    router.push('/wrapped');
+    await pumpFor(tester, const Duration(seconds: 4));
+    for (var i = 0; i < 12; i++) {
+      await shot('wrapped_${i.toString().padLeft(2, '0')}');
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await pumpFor(tester, const Duration(milliseconds: 1800));
+    }
+    expect(tester.takeException(), isNull, reason: 'keine Folie läuft über');
 
     await tester.pumpWidget(const SizedBox());
     temp.deleteSync(recursive: true);

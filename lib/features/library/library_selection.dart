@@ -84,34 +84,56 @@ class SelectionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = count > 0 && !busy;
-    Widget action(IconData icon, String label, VoidCallback? onTap) =>
-        TextButton.icon(onPressed: enabled ? onTap : null, icon: Icon(icon, size: 19), label: Text(label));
+    // Schmaler Bildschirm (iPhone): nur Symbole – mit Beschriftung ist die Leiste fast doppelt so
+    // breit wie der Bildschirm, "Herunterladen", "Alle" und das Schließen lägen außerhalb.
+    final compact = MediaQuery.sizeOf(context).width < 820;
+    Widget action(IconData icon, String label, VoidCallback? onTap) => compact
+        ? IconButton(
+            tooltip: label,
+            visualDensity: VisualDensity.compact,
+            onPressed: enabled ? onTap : null,
+            icon: Icon(icon, size: 21),
+          )
+        : TextButton.icon(onPressed: enabled ? onTap : null, icon: Icon(icon, size: 19), label: Text(label));
     return Material(
       color: AppColors.surfaceHigh,
       elevation: 10,
       shadowColor: Colors.black54,
       shape: StadiumBorder(side: BorderSide(color: AppColors.border)),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 6, 6, 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: busy ? const CircularProgressIndicator(strokeWidth: 2.2) : const Icon(Icons.checklist_rounded),
-            ),
-            const SizedBox(width: 10),
-            Text(tr.selectedCount(count), style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(width: 14),
-            action(Icons.check_rounded, tr.watched, onWatched),
-            action(Icons.remove_done_rounded, tr.unwatched, onUnwatched),
-            action(Icons.favorite_border_rounded, tr.favorite, onFavorite),
-            action(Icons.download_rounded, tr.download, onDownload),
-            const SizedBox(width: 6),
-            TextButton(onPressed: busy ? null : onSelectAll, child: Text(tr.selectAll)),
-            IconButton(tooltip: tr.endSelection, onPressed: onClose, icon: const Icon(Icons.close_rounded)),
-          ],
+        padding: EdgeInsets.fromLTRB(compact ? 14 : 20, 6, 6, 6),
+        // Reicht der Platz trotzdem nicht (große Schrift), schrumpft die Leiste als Ganzes.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: busy ? const CircularProgressIndicator(strokeWidth: 2.2) : const Icon(Icons.checklist_rounded),
+              ),
+              const SizedBox(width: 10),
+              Text(compact ? '$count' : tr.selectedCount(count), style: const TextStyle(fontWeight: FontWeight.w700)),
+              SizedBox(width: compact ? 6 : 14),
+              action(Icons.check_rounded, tr.watched, onWatched),
+              action(Icons.remove_done_rounded, tr.unwatched, onUnwatched),
+              action(Icons.favorite_border_rounded, tr.favorite, onFavorite),
+              action(Icons.download_rounded, tr.download, onDownload),
+              if (compact)
+                IconButton(
+                  tooltip: tr.selectAll,
+                  visualDensity: VisualDensity.compact,
+                  onPressed: busy ? null : onSelectAll,
+                  icon: const Icon(Icons.select_all_rounded, size: 21),
+                )
+              else ...[
+                const SizedBox(width: 6),
+                TextButton(onPressed: busy ? null : onSelectAll, child: Text(tr.selectAll)),
+              ],
+              IconButton(tooltip: tr.endSelection, onPressed: onClose, icon: const Icon(Icons.close_rounded)),
+            ],
+          ),
         ),
       ),
     );

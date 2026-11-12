@@ -520,19 +520,23 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               right: 0,
               // Über Meldungen (Snackbars) und dem Offline-Hinweis.
               bottom: 96,
-              child: Center(
-                child: SelectionBar(
-                  count: selection.length,
-                  busy: _busy,
-                  onWatched: () => _bulk((i) => ref.read(apiProvider).setPlayed(i.id, true), tr.selectionMarkedWatched),
-                  onUnwatched: () =>
-                      _bulk((i) => ref.read(apiProvider).setPlayed(i.id, false), tr.selectionMarkedUnwatched),
-                  onFavorite: () =>
-                      _bulk((i) => ref.read(apiProvider).setFavorite(i.id, true), tr.selectionAddedToFavorites),
-                  // Herunterladen geht nur bei Filmen (Serien über die Staffeln).
-                  onDownload: _selected.any((i) => i.isMovie) ? _downloadSelected : null,
-                  onSelectAll: () => setState(() => selection.addAll(_items.map((i) => i.id))),
-                  onClose: () => setState(() => _selection = null),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Center(
+                  child: SelectionBar(
+                    count: selection.length,
+                    busy: _busy,
+                    onWatched: () =>
+                        _bulk((i) => ref.read(apiProvider).setPlayed(i.id, true), tr.selectionMarkedWatched),
+                    onUnwatched: () =>
+                        _bulk((i) => ref.read(apiProvider).setPlayed(i.id, false), tr.selectionMarkedUnwatched),
+                    onFavorite: () =>
+                        _bulk((i) => ref.read(apiProvider).setFavorite(i.id, true), tr.selectionAddedToFavorites),
+                    // Herunterladen geht nur bei Filmen (Serien über die Staffeln).
+                    onDownload: _selected.any((i) => i.isMovie) ? _downloadSelected : null,
+                    onSelectAll: () => setState(() => selection.addAll(_items.map((i) => i.id))),
+                    onClose: () => setState(() => _selection = null),
+                  ),
                 ),
               ),
             ),

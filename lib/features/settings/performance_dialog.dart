@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app.dart';
+import '../../core/platform/device.dart';
 import '../../core/performance_check.dart';
 import '../../core/platform/app_paths.dart';
 import '../../core/session.dart';
@@ -135,7 +136,7 @@ class _PerformanceDialogState extends ConsumerState<PerformanceDialog> {
       ),
       actions: [
         if (!_running) TextButton(onPressed: () => Navigator.pop(context), child: Text(tr.close)),
-        if (report != null && _file != null)
+        if (report != null && _file != null && isDesktop)
           FilledButton.icon(
             onPressed: () => AppPaths.reveal(_file!.path),
             icon: const Icon(Icons.folder_open_rounded, size: 18),

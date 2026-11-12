@@ -40,16 +40,33 @@ class _IdleLockState extends ConsumerState<IdleLock> {
   /// Solange gesperrt, liegt der Tastatur-Fokus hier – Tasten erreichen die App darunter nicht.
   final _focus = FocusScopeNode(debugLabel: 'IdleLock');
 
+  /// Letzte Bedienung nach der Uhr. Der Timer allein reicht nicht: Solange das Gerät schläft
+  /// (iPhone gesperrt, Fernseher im Standby, Mac zugeklappt), läuft er nicht weiter – nach dem
+  /// Aufwecken hätte er noch fast seine ganze Zeit vor sich, und das Profil stünde offen.
+  DateTime _lastActivity = DateTime.now();
+  late final AppLifecycleListener _lifecycle;
+
   @override
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_onAnyKey);
     GamepadInput.activity.addListener(_onActivity);
+    // Zurück im Vordergrund: gleich sperren, wenn die Zeit inzwischen um ist.
+    _lifecycle = AppLifecycleListener(onResume: _onActivity);
     _restartTimer();
+  }
+
+  /// Ist die Wartezeit seit der letzten Bedienung nach der Uhr schon um?
+  bool get _overdue {
+    final minutes = ref.read(settingsProvider).pinLockMinutes;
+    if (minutes <= 0 || ref.read(sessionProvider).value?.hasPin != true) return false;
+    final limit = IdleLock.debugDelay ?? Duration(minutes: minutes);
+    return DateTime.now().difference(_lastActivity) >= limit;
   }
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _idle?.cancel();
     appLocked.value = false;
     HardwareKeyboard.instance.removeHandler(_onAnyKey);
@@ -59,6 +76,7 @@ class _IdleLockState extends ConsumerState<IdleLock> {
   }
 
   void _restartTimer() {
+    _lastActivity = DateTime.now();
     _idle?.cancel();
     final minutes = ref.read(settingsProvider).pinLockMinutes;
     final session = ref.read(sessionProvider).value;
@@ -90,17 +108,18 @@ class _IdleLockState extends ConsumerState<IdleLock> {
   }
 
   bool _onAnyKey(KeyEvent event) {
-    if (!_locked) _restartTimer();
+    _onActivity();
     return false;
   }
 
+  /// Jemand bedient die App (oder sie kommt in den Vordergrund): Wartezeit neu beginnen – außer
+  /// sie ist nach der Uhr längst um (das Gerät hat geschlafen), dann gilt das als Abwesenheit.
   void _onActivity() {
-    if (!_locked) _restartTimer();
+    if (_locked || !mounted) return;
+    _overdue ? _lockIfAllowed() : _restartTimer();
   }
 
-  void _onPointer(PointerEvent event) {
-    if (!_locked) _restartTimer();
-  }
+  void _onPointer(PointerEvent event) => _onActivity();
 
   @override
   Widget build(BuildContext context) {

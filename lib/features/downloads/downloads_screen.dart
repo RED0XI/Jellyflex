@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/platform/device.dart';
 import '../../core/downloads.dart';
 import '../../core/settings.dart';
 import '../../theme.dart';
@@ -56,14 +57,16 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                         ? tr.savedForOffline
                         : tr.downloadsSummary(done.length, formatBytes(manager.usedBytes)),
                     actions: [
-                      GlassButton(
-                        label: tr.openFolder,
-                        icon: Icons.folder_open_rounded,
-                        onPressed: () {
-                          manager.root.createSync(recursive: true);
-                          AppPaths.openFolder(manager.root.path);
-                        },
-                      ),
+                      // Nur am Desktop gibt es einen Dateimanager, der den Ordner zeigen kann.
+                      if (isDesktop)
+                        GlassButton(
+                          label: tr.openFolder,
+                          icon: Icons.folder_open_rounded,
+                          onPressed: () {
+                            manager.root.createSync(recursive: true);
+                            AppPaths.openFolder(manager.root.path);
+                          },
+                        ),
                     ],
                   ),
                 ),
