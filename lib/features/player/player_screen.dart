@@ -1129,13 +1129,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
   }
 
+  /// Kennt dieses mpv `sub-border-style` noch nicht (vor 0.38 – media_kit unter Windows)? Einmal
+  /// je Programmlauf gefragt, siehe [SubtitleStyle.toMpv].
+  static bool? _legacySubtitleBox;
+
   /// Untertitel-Stil an mpv geben: der der Bibliothek, sonst der allgemeine. [onlyChanges]: nur,
   /// was sich geändert hat (beim Schieben der Regler kommt das sehr oft).
   Future<void> _applySubtitleStyle({bool onlyChanges = false}) async {
     final native = _player.platform;
     if (native is! NativePlayer) return;
+    var legacyBox = _legacySubtitleBox;
+    if (legacyBox == null) {
+      try {
+        legacyBox = _legacySubtitleBox = (await native.getProperty('sub-border-style')).isEmpty;
+      } catch (_) {
+        legacyBox = false;
+      }
+      if (!mounted || _closing) return;
+    }
     final style = ref.read(settingsProvider).subtitleStyleFor(_libraryId);
-    final props = style.toMpv();
+    final props = style.toMpv(legacyBox: legacyBox);
     final (zoom, visible) = _subtitleZoom;
     if (zoom > 1.001) {
       // Siehe _fitSubtitlesToZoom: in den sichtbaren Teil rücken, Größe wie ohne Zoom.

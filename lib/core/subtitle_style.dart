@@ -106,7 +106,11 @@ class SubtitleStyle {
 
   /// Eigenschaften für mpv. Die Standardwerte sind eine ruhige Systemschrift mit schmalem Rand
   /// und weichem Schatten statt der groben mpv-Vorgabe.
-  Map<String, String> toMpv() {
+  ///
+  /// [legacyBox]: mpv vor 0.38 (media_kit unter Windows) kennt `sub-border-style` nicht – dort
+  /// entsteht der Kasten allein dadurch, dass `sub-back-color` nicht durchsichtig ist. Die Farbe
+  /// darf dann nur beim Kasten gesetzt sein, sonst bekäme jeder Untertitel einen.
+  Map<String, String> toMpv({bool legacyBox = false}) {
     String hex(int argb) => '#${argb.toRadixString(16).padLeft(8, '0').toUpperCase()}';
     final boxAlpha = (boxOpacity * 255).round().clamp(0, 255);
     return {
@@ -130,8 +134,8 @@ class SubtitleStyle {
       'sub-margin-y': '36',
       'sub-pos': '${100 - raise}',
       'sub-scale': scale.toStringAsFixed(2),
-      'sub-border-style': edge == SubtitleEdge.box ? 'background-box' : 'outline-and-shadow',
-      'sub-back-color': hex(boxAlpha << 24),
+      if (!legacyBox) 'sub-border-style': edge == SubtitleEdge.box ? 'background-box' : 'outline-and-shadow',
+      'sub-back-color': legacyBox && edge != SubtitleEdge.box ? '#00000000' : hex(boxAlpha << 24),
       'sub-ass-override': forceOnStyled ? 'force' : 'scale',
     };
   }

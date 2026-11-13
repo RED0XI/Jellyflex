@@ -32,7 +32,12 @@ void main() {
       subtitleLanguage: 'eng',
     ).withLibrarySubtitles('lib-test', const LibrarySubtitles(style: anime, language: 'ger'));
 
-    await tester.pumpWidget(buildHarnessApp(settings: settings));
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: shotKey,
+        child: buildHarnessApp(settings: settings),
+      ),
+    );
     await tester.pump();
     await tester.tap(find.text('Test-Player öffnen'));
 
@@ -50,7 +55,34 @@ void main() {
     expect(await mpv.getProperty('sub-color'), '#FFFFE14D');
     expect(await mpv.getProperty('sub-font'), SubtitleFont.serif.family);
     expect(double.parse(await mpv.getProperty('sub-scale')), 1.5);
-    expect(await mpv.getProperty('sub-pos'), '90');
+    // Als Zahl vergleichen: je nach mpv-Version kommt "90" oder "90.000000".
+    expect(double.parse(await mpv.getProperty('sub-pos')), 90);
+
+    // Bild mit Untertitel (Rand ohne Kasten – auch mit dem älteren mpv unter Windows).
+    await p.seek(const Duration(seconds: 5, milliseconds: 500));
+    await p.pause();
+    await pumpFor(tester, const Duration(milliseconds: 1200));
+    await saveShot(tester, 'subtitle_style_library');
+    // Der Kasten erscheint nur, wenn er gewählt ist: Älteres mpv zeichnet ihn, sobald die
+    // Kastenfarbe nicht durchsichtig ist; neueres hat dafür sub-border-style.
+    final borderStyle = await mpv.getProperty('sub-border-style');
+    if (borderStyle.isEmpty) {
+      expect(await mpv.getProperty('sub-back-color'), '#00000000');
+    } else {
+      expect(borderStyle, 'outline-and-shadow');
+    }
+    // Und mit Kasten (Werte direkt an mpv, danach wieder der Stil der Bibliothek).
+    Future<void> apply(SubtitleStyle style) async {
+      for (final e in style.toMpv(legacyBox: borderStyle.isEmpty).entries) {
+        await mpv.setProperty(e.key, e.value);
+      }
+    }
+
+    await apply(anime.copyWith(edge: SubtitleEdge.box));
+    await pumpFor(tester, const Duration(milliseconds: 600));
+    await saveShot(tester, 'subtitle_style_box');
+    await apply(anime);
+    await p.play();
 
     // Panel öffnen: über "Audio & Untertitel".
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);

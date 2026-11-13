@@ -202,7 +202,8 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
     await pumpFor(tester, const Duration(milliseconds: 600));
     expect(double.parse(await native.getProperty('sub-scale')), 1);
-    expect(await native.getProperty('sub-pos'), '100');
+    // Als Zahl vergleichen: je nach mpv-Version kommt "100" oder "100.000000".
+    expect(double.parse(await native.getProperty('sub-pos')), 100);
 
     await closePlayer(tester);
     await tester.pumpWidget(const SizedBox());

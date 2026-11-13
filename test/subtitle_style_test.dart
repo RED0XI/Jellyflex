@@ -47,6 +47,18 @@ void main() {
       expect(props['sub-ass-override'], 'force');
     });
 
+    test('Älteres mpv (Windows): Kasten nur, wenn er gewählt ist', () {
+      // Ohne sub-border-style zeichnet mpv den Kasten, sobald sub-back-color nicht durchsichtig ist.
+      final outline = const SubtitleStyle().toMpv(legacyBox: true);
+      expect(outline.containsKey('sub-border-style'), isFalse);
+      expect(outline['sub-back-color'], '#00000000');
+      expect(outline['sub-border-size'], '1.6');
+
+      final box = const SubtitleStyle(edge: SubtitleEdge.box, boxOpacity: 0.5).toMpv(legacyBox: true);
+      expect(box.containsKey('sub-border-style'), isFalse);
+      expect(box['sub-back-color'], '#80000000');
+    });
+
     test('Speichern und Lesen; kaputte Werte werden begrenzt', () {
       const style = SubtitleStyle(scale: 1.4, font: SubtitleFont.mono, edge: SubtitleEdge.thick, raise: 10);
       expect(SubtitleStyle.fromJson(jsonDecode(jsonEncode(style.toJson()))), style);
