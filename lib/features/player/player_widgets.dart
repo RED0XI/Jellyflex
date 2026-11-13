@@ -2,6 +2,18 @@ part of 'player_screen.dart';
 
 // Bausteine des Players: Knöpfe, Spulleiste, Lautstärke, Ambilight, "Gute Nacht".
 
+/// Symbol für Zurück/Vor um [seconds] – mit der Zahl darin, wo es eins gibt (5, 10, 30).
+IconData seekIcon(int seconds, {required bool forward}) => switch ((seconds, forward)) {
+  (5, false) => Icons.replay_5_rounded,
+  (10, false) => Icons.replay_10_rounded,
+  (30, false) => Icons.replay_30_rounded,
+  (5, true) => Icons.forward_5_rounded,
+  (10, true) => Icons.forward_10_rounded,
+  (30, true) => Icons.forward_30_rounded,
+  (_, false) => Icons.fast_rewind_rounded,
+  (_, true) => Icons.fast_forward_rounded,
+};
+
 /// Leuchten aus den Farben des Bildes: dieselbe Videotextur, stark weichgezeichnet
 /// und etwas vergrößert, gedämpft hinter dem eigentlichen Video.
 class _Ambilight extends StatelessWidget {
@@ -70,13 +82,39 @@ class _SleepOverlay extends StatefulWidget {
 class _SleepOverlayState extends State<_SleepOverlay> {
   bool _shown = false;
 
+  /// Fernseher: "Weiterschauen" bekommt den Fokus – OK wählt, links/rechts wechselt den Knopf.
+  final _continueFocus = FocusNode(debugLabel: 'Weiterschauen');
+  final _closeFocus = FocusNode(debugLabel: 'Player schließen');
+
+  /// Fernseher: links/rechts wechselt zwischen den beiden Knöpfen; hoch/runter führt nirgends hin
+  /// (sonst wanderte der Fokus auf die verdeckte Bedienung darunter).
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (!isTv) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
+      if (event is KeyDownEvent) (key == LogicalKeyboardKey.arrowLeft ? _continueFocus : _closeFocus).requestFocus();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) return KeyEventResult.handled;
+    return KeyEventResult.ignored;
+  }
+
   @override
   void initState() {
     super.initState();
     // Langsam einblenden.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _shown = true);
+      if (!mounted) return;
+      setState(() => _shown = true);
+      if (isTv) _continueFocus.requestFocus();
     });
+  }
+
+  @override
+  void dispose() {
+    _continueFocus.dispose();
+    _closeFocus.dispose();
+    super.dispose();
   }
 
   @override
@@ -100,13 +138,28 @@ class _SleepOverlayState extends State<_SleepOverlay> {
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
               ),
               const SizedBox(height: 28),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  PrimaryButton(label: tr.keepWatching, icon: Icons.play_arrow_rounded, onPressed: widget.onContinue),
-                  const SizedBox(width: 12),
-                  GlassButton(label: tr.closePlayer, icon: Icons.close_rounded, onPressed: widget.onClose),
-                ],
+              Focus(
+                canRequestFocus: false,
+                skipTraversal: true,
+                onKeyEvent: _onKey,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PrimaryButton(
+                      label: tr.keepWatching,
+                      icon: Icons.play_arrow_rounded,
+                      onPressed: widget.onContinue,
+                      focusNode: _continueFocus,
+                    ),
+                    const SizedBox(width: 12),
+                    GlassButton(
+                      label: tr.closePlayer,
+                      icon: Icons.close_rounded,
+                      onPressed: widget.onClose,
+                      focusNode: _closeFocus,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -377,9 +430,10 @@ enum _ZoomMode { fit, fill, custom }
 
 /// Gewählten Bildausschnitt kurz in der Bildmitte zeigen.
 class _ZoomOsd extends StatelessWidget {
-  const _ZoomOsd({required this.label});
+  const _ZoomOsd({required this.label, this.icon = Icons.fit_screen_rounded});
 
   final ValueListenable<String?> label;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -398,7 +452,7 @@ class _ZoomOsd extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.fit_screen_rounded, size: 28),
+                Icon(icon, size: 28),
                 const SizedBox(width: 12),
                 Text(text ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               ],
@@ -430,4 +484,83 @@ class _ChapterTicksPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ChapterTicksPainter old) => old.fractions.length != fractions.length;
+}
+
+/// Was ein senkrechter Wisch im Player ändert (Touch).
+enum _Swipe { brightness, volume }
+
+/// Anzeige beim Wischen: schmaler Balken am Rand der Seite, auf der gewischt wird
+/// (links Helligkeit, rechts Lautstärke).
+class _LevelOsd extends StatelessWidget {
+  const _LevelOsd({required this.level});
+
+  final ValueListenable<(_Swipe, double)?> level;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: ValueListenableBuilder<(_Swipe, double)?>(
+        valueListenable: level,
+        builder: (context, value, _) {
+          final (kind, amount) = value ?? (_Swipe.volume, 0.0);
+          final icon = switch (kind) {
+            _Swipe.brightness => amount < 0.35 ? Icons.brightness_low_rounded : Icons.brightness_high_rounded,
+            _Swipe.volume =>
+              amount == 0
+                  ? Icons.volume_off_rounded
+                  : amount < 0.5
+                  ? Icons.volume_down_rounded
+                  : Icons.volume_up_rounded,
+          };
+          return AnimatedOpacity(
+            opacity: value == null ? 0 : 1,
+            duration: const Duration(milliseconds: 180),
+            child: Align(
+              alignment: kind == _Swipe.brightness ? const Alignment(-0.82, 0) : const Alignment(0.82, 0),
+              child: Container(
+                width: 52,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(26),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 22),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: 6,
+                      height: 130,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: Stack(
+                          children: [
+                            Container(color: Colors.white.withValues(alpha: 0.22)),
+                            Align(
+                              alignment: Alignment.bottomCenter,
+                              child: FractionallySizedBox(
+                                heightFactor: amount,
+                                widthFactor: 1,
+                                child: const ColoredBox(color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '${(amount * 100).round()}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }

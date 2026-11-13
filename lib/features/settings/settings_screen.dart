@@ -1,11 +1,17 @@
+import 'dart:io' show Platform;
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/branding.dart';
 import '../../core/jellyfin_api.dart';
+import '../../core/power.dart';
+import '../../core/models.dart';
+import '../../core/platform/device.dart';
 import '../../core/session.dart';
 import '../../core/settings.dart';
+import '../../core/subtitle_style.dart';
 import '../screensaver/screensaver.dart';
 import '../../theme.dart';
 import '../../widgets/page_header.dart';
@@ -13,6 +19,7 @@ import '../../widgets/brand_logo.dart';
 import '../../widgets/buttons.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/states.dart';
+import '../../widgets/subtitle_style_editor.dart';
 import '../../widgets/smooth_scroll.dart';
 import '../../widgets/top_scrim.dart';
 import '../home/home_providers.dart';
@@ -28,6 +35,7 @@ import '../../widgets/pin_dialog.dart';
 import '../../core/download_folder.dart';
 import '../../core/downloads.dart';
 import '../downloads/download_flow.dart';
+import '../../widgets/tv_text_input.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key, this.initialSection});
@@ -44,11 +52,19 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _scroll = ScrollController();
-  late final _nameController = TextEditingController(text: ref.read(settingsProvider).appName ?? '');
+  // Gleich anlegen: Bliebe der Bereich mit dem App-Namen zu, entstünde der Controller sonst erst in
+  // dispose() – und dort ist `ref` nicht mehr erlaubt.
+  late final TextEditingController _nameController;
   final _searchController = TextEditingController();
   bool _importingLogo = false;
   late SettingsSection _section = widget.initialSection ?? SettingsScreen.lastSection;
   String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: ref.read(settingsProvider).appName ?? '');
+  }
 
   @override
   void dispose() {
@@ -59,11 +75,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _pickLogo() async {
-    final file = await openFile(
-      acceptedTypeGroups: [
-        XTypeGroup(label: tr.images, extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']),
-      ],
-    );
+    final XFile? file;
+    try {
+      file = await openFile(
+        acceptedTypeGroups: [
+          XTypeGroup(label: tr.images, extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']),
+        ],
+      );
+    } catch (e) {
+      // Kein Datei-Dialog auf diesem Gerät (z. B. Fire TV ohne Dateiverwaltung).
+      debugPrint('Datei-Dialog nicht verfügbar: $e');
+      return;
+    }
     if (file == null) return;
     setState(() => _importingLogo = true);
     try {
@@ -115,6 +138,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               trailing: _Toggle(
                 value: s.soundEffects,
                 onChanged: (v) => ctrl.update((s) => s.copyWith(soundEffects: v)),
+              ),
+            ),
+            _Row(
+              title: tr.introSetting,
+              subtitle: tr.introSettingHint,
+              trailing: _Toggle(
+                value: s.intro,
+                onChanged: (v) => ctrl.update((s) => s.copyWith(intro: v)),
+              ),
+            ),
+            if (s.intro)
+              _Row(
+                title: tr.introSoundSetting,
+                subtitle: tr.introSoundSettingHint,
+                trailing: _Toggle(
+                  value: s.introSound,
+                  onChanged: (v) => ctrl.update((s) => s.copyWith(introSound: v)),
+                ),
+              ),
+            _Keywords(
+              text: '${tr.energySaver} ${tr.energySaverHint}',
+              child: ValueListenableBuilder<bool>(
+                valueListenable: Power.energySaving,
+                builder: (context, saving, _) => _Row(
+                  title: tr.energySaver,
+                  subtitle: saving ? '${tr.energySaverHint} ${tr.energySaverActive}' : tr.energySaverHint,
+                  trailing: _Choice<EnergySaver>(
+                    value: s.energySaver,
+                    label: switch (s.energySaver) {
+                      EnergySaver.auto =>
+                        isTv
+                            ? tr.energySaverOnTv
+                            : Platform.isMacOS || Platform.isWindows
+                            ? tr.energySaverOnBattery
+                            : (Platform.isIOS ? tr.energySaverLowPower : tr.off),
+                      EnergySaver.on => tr.always,
+                      EnergySaver.off => tr.off,
+                    },
+                    options: [
+                      if (isTv) (EnergySaver.auto, tr.energySaverOnTv),
+                      if (Platform.isMacOS || Platform.isWindows) (EnergySaver.auto, tr.energySaverOnBattery),
+                      if (Platform.isIOS) (EnergySaver.auto, tr.energySaverLowPower),
+                      (EnergySaver.on, tr.always),
+                      (EnergySaver.off, tr.off),
+                    ],
+                    onChanged: (v) => ctrl.update((s) => s.copyWith(energySaver: v)),
+                  ),
+                ),
               ),
             ),
           ],
@@ -242,6 +313,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             _Row(
+              title: tr.seekBack,
+              subtitle: tr.seekStepHint,
+              trailing: _Choice<int>(
+                value: s.seekBackSeconds,
+                label: tr.seconds(s.seekBackSeconds),
+                options: [for (final sec in seekStepOptions) (sec, tr.seconds(sec))],
+                onChanged: (v) => ctrl.update((s) => s.copyWith(seekBackSeconds: v)),
+              ),
+            ),
+            _Row(
+              title: tr.seekForward,
+              subtitle: tr.seekStepHint,
+              trailing: _Choice<int>(
+                value: s.seekForwardSeconds,
+                label: tr.seconds(s.seekForwardSeconds),
+                options: [for (final sec in seekStepOptions) (sec, tr.seconds(sec))],
+                onChanged: (v) => ctrl.update((s) => s.copyWith(seekForwardSeconds: v)),
+              ),
+            ),
+            _Row(
+              title: tr.holdSpeed,
+              subtitle: tr.holdSpeedHint,
+              trailing: _Choice<double>(
+                value: s.holdSpeed,
+                label: s.holdSpeed == 0 ? tr.off : tr.speedTimes(s.holdSpeed),
+                options: [
+                  (0.0, tr.off),
+                  for (final x in const [1.5, 2.0, 3.0]) (x, tr.speedTimes(x)),
+                ],
+                onChanged: (v) => ctrl.update((s) => s.copyWith(holdSpeed: v)),
+              ),
+            ),
+            _Row(
               title: tr.ambilight,
               subtitle: tr.ambilightHint,
               trailing: _Choice<AmbilightMode>(
@@ -266,30 +370,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           icon: Icons.subtitles_outlined,
           children: [
             _Keywords(
-              text: tr.subtitleAppearance,
-              child: _SubtitlePreview(scale: s.subtitleScale, background: s.subtitleBackground),
-            ),
-            _Row(
-              title: tr.size,
-              subtitle: '${(s.subtitleScale * 100).round()} %',
-              trailing: SizedBox(
-                width: 260,
-                child: Slider(
-                  value: s.subtitleScale,
-                  min: 0.6,
-                  max: 1.8,
-                  divisions: 12,
-                  onChanged: (v) => ctrl.update((s) => s.copyWith(subtitleScale: v)),
+              text:
+                  '${tr.subtitleAppearance} ${tr.size} ${tr.subtitleFont} ${tr.subtitleColor} ${tr.subtitleEdge} '
+                  '${tr.subtitlePosition} ${tr.subtitleBold}',
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SubtitleStylePreview(style: s.subtitleStyle),
+                    const SizedBox(height: 16),
+                    SubtitleStyleEditor(
+                      style: s.subtitleStyle,
+                      onChanged: (v) => ctrl.update((s) => s.copyWith(subtitleStyle: v)),
+                    ),
+                  ],
                 ),
               ),
             ),
-            _Row(
-              title: tr.background,
-              subtitle: tr.subtitleBackgroundHint,
-              trailing: _Toggle(
-                value: s.subtitleBackground,
-                onChanged: (v) => ctrl.update((s) => s.copyWith(subtitleBackground: v)),
-              ),
+          ],
+        ),
+        _Section(
+          title: tr.subtitlesByLibrary,
+          icon: Icons.video_library_outlined,
+          children: [
+            _Keywords(
+              text: '${tr.subtitlesByLibrary} ${tr.subtitlesByLibraryHint}',
+              child: const _LibrarySubtitlesList(),
             ),
           ],
         ),
@@ -337,30 +444,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onChanged: (v) => ctrl.update((s) => s.copyWith(themeMusic: v)),
               ),
             ),
-            _Row(
-              title: tr.screensaver,
-              subtitle: tr.screensaverHint,
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: tr.showNow,
-                    onPressed: () => screensaverPreview.value++,
-                    icon: const Icon(Icons.play_circle_outline_rounded),
-                  ),
-                  const SizedBox(width: 6),
-                  _Choice<int>(
-                    value: s.screensaverMinutes,
-                    label: s.screensaverMinutes == 0 ? tr.off : tr.afterMinutes(s.screensaverMinutes),
-                    options: [
-                      (0, tr.off),
-                      for (final m in const [2, 5, 10, 15, 30]) (m, tr.afterMinutes(m)),
-                    ],
-                    onChanged: (v) => ctrl.update((s) => s.copyWith(screensaverMinutes: v)),
-                  ),
-                ],
+            if (!isPhone(context))
+              _Row(
+                title: tr.screensaver,
+                subtitle: tr.screensaverHint,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: tr.showNow,
+                      onPressed: () => screensaverPreview.value++,
+                      icon: const Icon(Icons.play_circle_outline_rounded),
+                    ),
+                    const SizedBox(width: 6),
+                    _Choice<int>(
+                      value: s.screensaverMinutes,
+                      label: s.screensaverMinutes == 0 ? tr.off : tr.afterMinutes(s.screensaverMinutes),
+                      options: [
+                        (0, tr.off),
+                        for (final m in const [2, 5, 10, 15, 30]) (m, tr.afterMinutes(m)),
+                      ],
+                      onChanged: (v) => ctrl.update((s) => s.copyWith(screensaverMinutes: v)),
+                    ),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
         _Section(
@@ -411,11 +519,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _Row(
               title: tr.downloadFolder,
               subtitle: tr.downloadFolderHint(ref.read(downloadsProvider.notifier).root.path),
-              trailing: TextButton.icon(
-                onPressed: () => changeDownloadFolder(context, ref.read),
-                icon: const Icon(Icons.drive_folder_upload_rounded, size: 18),
-                label: Text(tr.changeFolder),
-              ),
+              // Nur am Desktop: iPhone/iPad und Fernseher kennen keine Ordner-Auswahl – dort
+              // liegen Downloads fest im Bereich der App.
+              trailing: isDesktop
+                  ? TextButton.icon(
+                      onPressed: () => changeDownloadFolder(context, ref.read),
+                      icon: const Icon(Icons.drive_folder_upload_rounded, size: 18),
+                      label: Text(tr.changeFolder),
+                    )
+                  : const SizedBox.shrink(),
             ),
             _Row(
               title: tr.unmeteredOnly,
@@ -515,11 +627,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: tr.appNameHint,
               trailing: SizedBox(
                 width: 260,
-                child: TextField(
-                  controller: _nameController,
-                  maxLength: 30,
-                  decoration: const InputDecoration(hintText: defaultAppName, counterText: '', isDense: true),
-                  onChanged: (v) => ctrl.update((s) => s.copyWith(appName: () => v.trim().isEmpty ? null : v.trim())),
+                child: TvTextInput(
+                  builder: (context, readOnly, done) => TextField(
+                    controller: _nameController,
+                    readOnly: readOnly,
+                    maxLength: 30,
+                    decoration: const InputDecoration(hintText: defaultAppName, counterText: '', isDense: true),
+                    onChanged: (v) => ctrl.update((s) => s.copyWith(appName: () => v.trim().isEmpty ? null : v.trim())),
+                    onSubmitted: (_) => done(),
+                  ),
                 ),
               ),
             ),
@@ -641,7 +757,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             builder: (context, physics) => ListView(
               controller: _scroll,
               physics: physics,
-              padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 28, kPageGutter, 72),
+              padding: EdgeInsets.fromLTRB(kPageGutter, topInset(context) + 28, kPageGutter, 72),
               children: [
                 Center(
                   child: ConstrainedBox(
@@ -650,6 +766,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       builder: (context, box) {
                         // Breites Fenster: Bereiche links als Liste; schmal: oben als Reiter.
                         final wide = box.maxWidth >= 900;
+                        // Ganz schmal (iPhone): Suchfeld unter den Titel statt daneben.
+                        final narrow = box.maxWidth < 560;
                         final nav = _SectionNav(
                           selected: query.isEmpty ? _section : null,
                           vertical: wide,
@@ -661,8 +779,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             PageHeader(
                               title: tr.settings,
                               padding: EdgeInsets.zero,
-                              actions: [SizedBox(width: wide ? 300 : 220, child: _searchField())],
+                              actions: [if (!narrow) SizedBox(width: wide ? 300 : 220, child: _searchField())],
                             ),
+                            if (narrow) ...[const SizedBox(height: 16), _searchField()],
                             const SizedBox(height: 28),
                             if (wide)
                               Row(
@@ -703,27 +822,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
-  Widget _searchField() => TextField(
-    controller: _searchController,
-    onChanged: (v) => setState(() => _query = v),
-    style: const TextStyle(fontSize: 15),
-    decoration: InputDecoration(
-      hintText: tr.searchSettings,
-      isDense: true,
-      prefixIcon: const Icon(Icons.search_rounded, size: 20),
-      suffixIcon: _query.isEmpty
-          ? null
-          : IconButton(
-              tooltip: tr.clear,
-              icon: const Icon(Icons.close_rounded, size: 18),
-              onPressed: () {
-                _searchController.clear();
-                setState(() => _query = '');
-              },
-            ),
-      filled: true,
-      fillColor: AppColors.surface,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+  Widget _searchField() => TvTextInput(
+    builder: (context, readOnly, done) => TextField(
+      controller: _searchController,
+      readOnly: readOnly,
+      onSubmitted: (_) => done(),
+      onChanged: (v) => setState(() => _query = v),
+      style: const TextStyle(fontSize: 15),
+      decoration: InputDecoration(
+        hintText: tr.searchSettings,
+        isDense: true,
+        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+        suffixIcon: _query.isEmpty
+            ? null
+            : IconButton(
+                tooltip: tr.clear,
+                icon: const Icon(Icons.close_rounded, size: 18),
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() => _query = '');
+                },
+              ),
+        filled: true,
+        fillColor: AppColors.surface,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      ),
     ),
   );
 
@@ -867,7 +990,10 @@ class _Section extends StatelessWidget {
 }
 
 class _Row extends StatelessWidget {
-  const _Row({required this.title, this.subtitle, required this.trailing});
+  const _Row({required this.title, this.subtitle, required this.trailing, this.keepInline = false});
+
+  /// Auch auf schmalen Bildschirmen neben dem Text lassen (für kleine Knöpfe).
+  final bool keepInline;
 
   final String title;
   final String? subtitle;
@@ -875,25 +1001,39 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
+        if (subtitle != null) ...[
+          const SizedBox(height: 3),
+          Text(subtitle!, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        ],
+      ],
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 3),
-                  Text(subtitle!, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 20),
-          trailing,
-        ],
+      child: LayoutBuilder(
+        builder: (context, box) {
+          // Schmal (iPhone): Auswahlknöpfe unter den Text, damit er nicht in eine dünne Spalte rutscht.
+          // Schalter und kleine Knöpfe bleiben daneben.
+          if (box.maxWidth < 420 && trailing is! _Toggle && !keepInline) {
+            return SizedBox(
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [text, const SizedBox(height: 10), trailing],
+              ),
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: text),
+              const SizedBox(width: 20),
+              trailing,
+            ],
+          );
+        },
       ),
     );
   }
@@ -907,7 +1047,9 @@ class _Toggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Switch(value: value, onChanged: onChanged);
+    return TvFocusRing(
+      child: Switch(value: value, onChanged: onChanged),
+    );
   }
 }
 
@@ -1096,37 +1238,42 @@ class _Choice<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PopupMenuButton<int>(
-      tooltip: '',
-      offset: const Offset(0, 46),
-      constraints: const BoxConstraints(minWidth: 220, maxHeight: 420),
-      onSelected: (i) => onChanged(options[i].$1),
-      itemBuilder: (_) => [
-        for (var i = 0; i < options.length; i++)
-          PopupMenuItem(
-            value: i,
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 28,
-                  child: options[i].$1 == value ? Icon(Icons.check_rounded, size: 18, color: AppColors.accent) : null,
-                ),
-                Text(options[i].$2),
-              ],
+    return TvFocusRing(
+      child: PopupMenuButton<int>(
+        tooltip: '',
+        offset: const Offset(0, 46),
+        constraints: const BoxConstraints(minWidth: 220, maxHeight: 420),
+        onSelected: (i) => onChanged(options[i].$1),
+        itemBuilder: (_) => [
+          for (var i = 0; i < options.length; i++)
+            PopupMenuItem(
+              value: i,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 28,
+                    child: options[i].$1 == value ? Icon(Icons.check_rounded, size: 18, color: AppColors.accent) : null,
+                  ),
+                  Text(options[i].$2),
+                ],
+              ),
             ),
+        ],
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
           ),
-      ],
-      child: Container(
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(width: 6),
-            const Icon(Icons.expand_more_rounded, size: 20),
-          ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(width: 6),
+              const Icon(Icons.expand_more_rounded, size: 20),
+            ],
+          ),
         ),
       ),
     );
@@ -1134,44 +1281,121 @@ class _Choice<T> extends StatelessWidget {
 }
 
 /// Vorschau, wie Untertitel mit der gewählten Größe aussehen.
-class _SubtitlePreview extends StatelessWidget {
-  const _SubtitlePreview({required this.scale, required this.background});
+/// Bibliotheken mit ihren Untertitel-Regeln; ein Tipp öffnet den Dialog.
+class _LibrarySubtitlesList extends ConsumerWidget {
+  const _LibrarySubtitlesList();
 
-  final double scale;
-  final bool background;
+  static String _summary(LibrarySubtitles? rules) {
+    if (rules == null || rules.isEmpty) return tr.subtitleSameAsGeneral;
+    return [
+      if (rules.language == subtitlesOff) tr.off else if (rules.language case final code?) languageName(code),
+      if (rules.style != null) tr.subtitleOwnStyle,
+    ].join(' · ');
+  }
 
   @override
-  Widget build(BuildContext context) {
-    const baseSize = 22.0;
-    return Container(
-      height: 150,
-      margin: const EdgeInsets.all(16),
-      alignment: Alignment.bottomCenter,
-      padding: const EdgeInsets.only(bottom: 18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2B3A55), Color(0xFF6B4E71), Color(0xFFB0735C)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rules = ref.watch(settingsProvider.select((s) => s.subtitleLibraries));
+    final libraries = ref.watch(libraryViewsProvider).value ?? const <BaseItem>[];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+          child: Text(tr.subtitlesByLibraryHint, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
         ),
-      ),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: background ? Colors.black.withValues(alpha: 0.7) : Colors.transparent,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          tr.subtitlePreview,
-          style: TextStyle(
-            fontSize: baseSize * scale,
-            fontWeight: FontWeight.w600,
-            shadows: background ? null : const [Shadow(color: Colors.black, blurRadius: 4, offset: Offset(1, 1))],
+        for (final library in libraries)
+          _Row(
+            title: library.name,
+            subtitle: _summary(rules[library.id]),
+            keepInline: true,
+            trailing: TextButton.icon(
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (_) => _LibrarySubtitlesDialog(library: library),
+              ),
+              icon: const Icon(Icons.tune_rounded, size: 18),
+              label: Text(tr.customize),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Sprache und Aussehen der Untertitel für eine Bibliothek. Jede Änderung gilt sofort.
+class _LibrarySubtitlesDialog extends ConsumerWidget {
+  const _LibrarySubtitlesDialog({required this.library});
+
+  final BaseItem library;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final ctrl = ref.read(settingsProvider.notifier);
+    final rules = settings.subtitleLibraries[library.id] ?? const LibrarySubtitles();
+    final style = rules.style;
+
+    String languageLabel(String? code) => switch (code) {
+      null => tr.subtitleSameAsGeneral,
+      subtitlesOff => tr.off,
+      _ => languageName(code),
+    };
+
+    void save({required SubtitleStyle? style, required String? language}) =>
+        ctrl.update((s) => s.withLibrarySubtitles(library.id, LibrarySubtitles(style: style, language: language)));
+
+    return AlertDialog(
+      title: Text(library.name),
+      content: SizedBox(
+        width: 520,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr.preferredSubtitles, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _Choice<String?>(
+                value: rules.language,
+                label: languageLabel(rules.language),
+                options: [
+                  (null, tr.subtitleSameAsGeneral),
+                  (subtitlesOff, tr.off),
+                  for (final code in settingsLanguages) (code, languageName(code)),
+                ],
+                onChanged: (v) => save(style: style, language: v),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      tr.subtitleOwnStyle,
+                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  _Toggle(
+                    value: style != null,
+                    // Beim Einschalten vom allgemeinen Aussehen ausgehen.
+                    onChanged: (on) => save(style: on ? settings.subtitleStyle : null, language: rules.language),
+                  ),
+                ],
+              ),
+              if (style != null) ...[
+                const SizedBox(height: 10),
+                SubtitleStylePreview(style: style, height: 120),
+                const SizedBox(height: 14),
+                SubtitleStyleEditor(
+                  style: style,
+                  onChanged: (v) => save(style: v, language: rules.language),
+                ),
+              ],
+            ],
           ),
         ),
       ),
+      actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(tr.close))],
     );
   }
 }

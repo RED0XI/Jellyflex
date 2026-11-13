@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,9 +7,11 @@ import 'package:go_router/go_router.dart';
 import 'core/branding.dart';
 import 'core/changelog.dart';
 import 'core/version.dart';
+import 'widgets/tv_scale.dart';
 import 'widgets/whats_new_dialog.dart';
 import 'core/download_notify.dart';
 import 'core/update_check.dart';
+import 'core/platform/device.dart';
 import 'features/settings/about_section.dart';
 import 'core/route_observer.dart';
 import 'core/session.dart';
@@ -38,12 +41,18 @@ import 'l10n/strings.dart';
 import 'features/home/home_providers.dart';
 import 'widgets/offline_banner.dart';
 import 'widgets/layout_shell.dart';
+import 'widgets/app_intro.dart';
 
 /// Seite mit Material-Übergang (siehe buildTheme). go_router erkennt die App
 /// sonst nicht zuverlässig als MaterialApp und blendet Seiten ohne Übergang ein.
 GoRoute _route(String path, Widget Function(GoRouterState state) build) => GoRoute(
   path: path,
-  pageBuilder: (_, state) => MaterialPage<void>(key: state.pageKey, name: state.uri.path, child: build(state)),
+  pageBuilder: (_, state) => MaterialPage<void>(
+    key: state.pageKey,
+    name: state.uri.path,
+    // Der Player regelt "Zurück" auf dem Fernseher selbst (Menü zu, Bedienung aus, schließen).
+    child: path.startsWith('/play') ? build(state) : TvRootBack(child: build(state)),
+  ),
 );
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -99,7 +108,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           collectionType: state.uri.queryParameters['type'],
         ),
       ),
-      _route('/item/:id', (state) => DetailsScreen(itemId: state.pathParameters['id']!)),
+      _route(
+        '/item/:id',
+        (state) =>
+            DetailsScreen(itemId: state.pathParameters['id']!, initialSeasonId: state.uri.queryParameters['season']),
+      ),
       _route('/person/:id', (state) => PersonScreen(personId: state.pathParameters['id']!)),
       _route(
         '/play/:id',
@@ -121,6 +134,23 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+/// Tastenkürzel der App: wie Flutters Vorgabe, aber Auswählen (OK, Enter, Leertaste, A-Knopf)
+/// löst nur beim Drücken aus, nicht bei jeder Tastenwiederholung. Sonst öffnete gehaltenes OK auf
+/// einer Karte erst die Detailseite und startete mit der nächsten Wiederholung gleich die
+/// Wiedergabe; Schalter kippten zwanzigmal pro Sekunde.
+final Map<ShortcutActivator, Intent> _appShortcuts = {
+  for (final e in WidgetsApp.defaultShortcuts.entries)
+    if (e.value is! ActivateIntent) e.key: e.value,
+  for (final key in [
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+    LogicalKeyboardKey.space,
+    LogicalKeyboardKey.select,
+    LogicalKeyboardKey.gameButtonA,
+  ])
+    SingleActivator(key, includeRepeats: false): const ActivateIntent(),
+};
 
 class JellyflexApp extends ConsumerStatefulWidget {
   const JellyflexApp({super.key});
@@ -156,7 +186,8 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
   void initState() {
     super.initState();
     // Freiwillige Update-Prüfung (Standard: aus) – einmal pro Start, etwas verzögert.
-    if (ref.read(settingsProvider).updateCheck) {
+    // iPhone/iPad bekommen Updates über den App Store.
+    if (isDesktop && ref.read(settingsProvider).updateCheck) {
       Future<void>.delayed(const Duration(seconds: 8), () async {
         final latest = await UpdateCheck.latestRelease();
         if (!mounted || latest == null || !UpdateCheck.isNewer(latest.version)) return;
@@ -209,21 +240,28 @@ class _JellyflexAppState extends ConsumerState<JellyflexApp> {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: buildTheme(ref.watch(settingsProvider.select((s) => '${s.themeId}/${s.layoutId}'))),
       routerConfig: router,
+      shortcuts: _appShortcuts,
       scrollBehavior: const _AppScrollBehavior(),
       scaffoldMessengerKey: appMessengerKey,
-      builder: (context, child) => Screensaver(
-        router: router,
-        child: IdleLock(
-          router: router,
-          child: LiveHandler(
+      // Fernseher: Oberfläche auf 1280×720 aufbauen und passend verkleinern (siehe TvScale).
+      builder: (context, child) => TvScale(
+        // Intro beim Start: liegt über allem, die App lädt darunter schon.
+        child: AppIntro(
+          child: Screensaver(
             router: router,
-            child: DownloadNotifier(
-              messenger: appMessengerKey,
-              child: WindowFrame(
+            child: IdleLock(
+              router: router,
+              child: LiveHandler(
                 router: router,
-                child: LayoutShell(
-                  router: router,
-                  child: OfflineBanner(router: router, child: child!),
+                child: DownloadNotifier(
+                  messenger: appMessengerKey,
+                  child: WindowFrame(
+                    router: router,
+                    child: LayoutShell(
+                      router: router,
+                      child: OfflineBanner(router: router, child: child!),
+                    ),
+                  ),
                 ),
               ),
             ),

@@ -2,6 +2,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 
+import '../../core/platform/device.dart';
 import '../../core/app_shell.dart';
 import '../../core/download_folder.dart';
 import '../../core/downloads.dart';
@@ -82,7 +83,14 @@ Future<int> startDownloads(
 /// Ordner wählen, prüfen und speichern. Liefert `true`, wenn ein neuer Ordner gilt.
 Future<bool> changeDownloadFolder(BuildContext context, ProviderRead read) async {
   final current = read(downloadsProvider.notifier).root.path;
-  final picked = await getDirectoryPath(confirmButtonText: tr.chooseFolder, initialDirectory: current);
+  final String? picked;
+  try {
+    picked = await getDirectoryPath(confirmButtonText: tr.chooseFolder, initialDirectory: current);
+  } catch (e) {
+    // Keine Ordner-Auswahl auf diesem Gerät.
+    debugPrint('Ordner-Auswahl nicht verfügbar: $e');
+    return false;
+  }
   if (picked == null || !context.mounted) return false;
   final path = DownloadFolder.fromPicked(picked);
   String? problem;
@@ -161,13 +169,15 @@ Future<bool> showDownloadFolderDialog(BuildContext context, ProviderRead read) a
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr.cancel)),
-            TextButton.icon(
-              onPressed: () async {
-                if (await changeDownloadFolder(context, read)) setState(() {});
-              },
-              icon: const Icon(Icons.drive_folder_upload_rounded, size: 18),
-              label: Text(tr.changeFolder),
-            ),
+            // Ordner-Auswahl gibt es nur am Desktop.
+            if (isDesktop)
+              TextButton.icon(
+                onPressed: () async {
+                  if (await changeDownloadFolder(context, read)) setState(() {});
+                },
+                icon: const Icon(Icons.drive_folder_upload_rounded, size: 18),
+                label: Text(tr.changeFolder),
+              ),
             FilledButton(autofocus: true, onPressed: () => Navigator.pop(context, true), child: Text(tr.useThisFolder)),
           ],
         );

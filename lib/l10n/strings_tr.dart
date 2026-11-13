@@ -211,13 +211,84 @@ final class _Tr extends S {
   @override
   String get autoplayNextHint => 'Bölümün sonunda geri sayımla.';
   @override
+  String get seekBack => 'Geri sar';
+  @override
+  String get seekForward => 'İleri sar';
+  @override
+  String get seekStepHint => 'Düğmeler, ok tuşları, çift dokunma ve kumanda bu kadar atlar.';
+  @override
+  String get holdSpeed => 'Basılı tutunca hızlandır';
+  @override
+  String get holdSpeedHint =>
+      'Görüntüye basılı tutun (parmak, fare veya kumandadaki OK) – tuttuğunuz sürece daha hızlı oynatılır.';
+  @override
+  String speedTimes(double speed) => '${speed.toString().replaceAll(RegExp(r'\.0$'), '').replaceAll('.', ',')}×';
+  @override
   String get subtitleAppearance => 'Altyazı görünümü';
   @override
   String get size => 'Boyut';
   @override
-  String get background => 'Arka plan';
+  String get subtitleFont => 'Yazı tipi';
   @override
-  String get subtitleBackgroundHint => 'Metnin arkasında yarı saydam bir kutu.';
+  String get subtitleFontStandard => 'Standart';
+  @override
+  String get subtitleFontClear => 'Net';
+  @override
+  String get subtitleFontSerif => 'Serifli';
+  @override
+  String get subtitleFontMono => 'Daktilo';
+  @override
+  String get subtitleFontRounded => 'Yuvarlak';
+  @override
+  String get subtitleColor => 'Renk';
+  @override
+  String get subtitleColorWhite => 'Beyaz';
+  @override
+  String get subtitleColorYellow => 'Sarı';
+  @override
+  String get subtitleColorCyan => 'Camgöbeği';
+  @override
+  String get subtitleColorGreen => 'Yeşil';
+  @override
+  String get subtitleColorPink => 'Pembe';
+  @override
+  String get subtitleEdge => 'Kenar';
+  @override
+  String get subtitleEdgeOutline => 'Kontur';
+  @override
+  String get subtitleEdgeThick => 'Kalın kontur';
+  @override
+  String get subtitleEdgeShadow => 'Gölge';
+  @override
+  String get subtitleEdgeBox => 'Kutu';
+  @override
+  String get subtitleEdgeNone => 'Yok';
+  @override
+  String get subtitleBoxOpacity => 'Kutu opaklığı';
+  @override
+  String get subtitlePosition => 'Görüntüdeki yükseklik';
+  @override
+  String get subtitlePositionBottom => 'Altta';
+  @override
+  String get subtitleBold => 'Kalın';
+  @override
+  String get subtitleForceStyle => 'Biçimli altyazılarda da (ASS)';
+  @override
+  String get subtitleForceStyleHint =>
+      'Kendi görünümlerinin yerine geçer – tabelalar ve efektler kayabilir. Görüntü altyazıları (PGS) yalnızca büyütülüp taşınabilir.';
+  @override
+  String get subtitlesByLibrary => 'Kütüphaneye göre altyazı';
+  @override
+  String get subtitlesByLibraryHint =>
+      'Bir kütüphaneye kendi dilini ve görünümünü verin, ör. anime için büyük sarı altyazılar.';
+  @override
+  String get subtitleSameAsGeneral => 'Genel ayar gibi';
+  @override
+  String get subtitleOwnStyle => 'Kendi görünümü';
+  @override
+  String get subtitleScopeAll => 'Her yerde';
+  @override
+  String get subtitleUseGeneral => 'Genel görünümü kullan';
   @override
   String get subtitlePreview => 'Altyazıların böyle görünüyor.';
   @override
@@ -431,6 +502,27 @@ final class _Tr extends S {
   @override
   String get soundsHint => '“Şaşırt beni” içinde tık sesleri ve müzik.';
   @override
+  String get energySaver => 'Enerji tasarrufu';
+  @override
+  String get energySaverHint =>
+      'Pili korur: afişte fragman yok, Ambilight ve sahne önizlemesi yok, sakin arka planlar ve daha hafif video ölçekleme.';
+  @override
+  String get energySaverOnBattery => 'Pil gücündeyken';
+  @override
+  String get energySaverLowPower => 'Düşük Güç Modunda';
+  @override
+  String get energySaverOnTv => 'Televizyonda';
+  @override
+  String get introSetting => 'Açılışta intro';
+  @override
+  String get introSettingHint => 'Açılışta kısa animasyonlu logo. Herhangi bir tuş atlar.';
+  @override
+  String get introSoundSetting => 'Intro sesi';
+  @override
+  String get introSoundSettingHint => 'İntro ile çalar – diğer seslerden bağımsız.';
+  @override
+  String get energySaverActive => 'Şu anda etkin.';
+  @override
   String get theme => 'Tema';
   @override
   String get themeHint => 'Tüm uygulamanın renkleri – anında değişir.';
@@ -636,6 +728,10 @@ final class _Tr extends S {
   String get quickConnectFailed => 'Quick Connect başlatılamadı.';
   @override
   String get tagline => 'Sinema salonun. Bilgisayarında.';
+  @override
+  String get taglineMobile => 'Sinema salonun. Her yerde.';
+  @override
+  String get taglineTv => 'Sinema salonun. Büyük ekranda.';
   @override
   String get whoIsWatching => 'Kim izliyor?';
   @override
@@ -943,9 +1039,21 @@ final class _Tr extends S {
   @override
   String get audioAndSubtitles => 'Ses ve altyazılar';
   @override
+  String get optionsShort => 'Seçenekler';
+  @override
+  String get nextEpisodeShort => 'Sonraki bölüm';
+  @override
   String get playbackOptions => 'Oynatma: hız, kalite, eşitleme';
   @override
   String get miniPlayer => 'Mini oynatıcı (P)';
+  @override
+  String get pictureInPicture => 'Resim içinde resim';
+  @override
+  String get airPlay => 'AirPlay';
+  @override
+  String get appleHandoffFailed => 'Aktarılamadı – video burada oynamaya devam ediyor.';
+  @override
+  String get appleHandoffStreamingOnly => 'Yalnızca akışta – indirmeler Jellyflex’te oynatılır.';
   @override
   String get exitFullscreen => 'Tam ekrandan çık (F)';
   @override
@@ -1028,6 +1136,8 @@ final class _Tr extends S {
   String get watchlist => 'İzleme listesi';
   @override
   String get myLists => 'Listelerim';
+  @override
+  String get listsTab => 'Listeler';
   @override
   String get searchSubtitles => 'Altyazı ara …';
   @override

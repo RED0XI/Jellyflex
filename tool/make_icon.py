@@ -4,6 +4,8 @@
 #   - assets/icon.png (512 px, in der App)
 #   - macos/Runner/Assets.xcassets/AppIcon.appiconset (16–1024 px, nach Apples Raster:
 #     824 px Fläche auf 1024 px, mit Schatten)
+#   - ios/Runner/Assets.xcassets/AppIcon.appiconset (1024 px, randlos und ohne Transparenz –
+#     die abgerundete Form legt iOS selbst darüber)
 # Start:  python3 tool/make_icon.py   (braucht Pillow und numpy: pip3 install pillow numpy)
 import io
 import struct
@@ -98,8 +100,9 @@ def bbox(points, scale, offset):
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def render(px, mac=False):
-    """Symbol mit [px] Kantenlänge. [mac]: nach Apples Raster mit Rand und Schatten."""
+def render(px, mac=False, ios=False):
+    """Symbol mit [px] Kantenlänge. [mac]: nach Apples Raster mit Rand und Schatten.
+    [ios]: die ganze Fläche ohne eigene Form und ohne Transparenz."""
     s = px * SS
     area = s * 824 / 1024 if mac else s
     off = (s - area) / 2
@@ -114,8 +117,8 @@ def render(px, mac=False):
         img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(s * 0.014)))
 
     # Dunkler Grund (Verlauf von oben nach unten).
-    bg_mask = mask(s, squircle, k, off)
-    bg = linear(s, bbox(squircle, k, off), (0, 0), (0, 1), [(0, BG_TOP), (1, BG_BOTTOM)])
+    bg_mask = Image.new('L', (s, s), 255) if ios else mask(s, squircle, k, off)
+    bg = linear(s, (0, 0, s, s) if ios else bbox(squircle, k, off), (0, 0), (0, 1), [(0, BG_TOP), (1, BG_BOTTOM)])
     img.paste(bg, (0, 0), bg_mask)
     layer = Image.new('RGBA', (s, s), (0, 0, 0, 0))
 
@@ -159,7 +162,8 @@ def render(px, mac=False):
     clipped = Image.new('RGBA', (s, s), (0, 0, 0, 0))
     clipped.paste(layer, (0, 0), Image.fromarray(np.minimum(np.array(layer.getchannel('A')), np.array(bg_mask))))
     img.alpha_composite(clipped)
-    return img.resize((px, px), Image.LANCZOS)
+    img = img.resize((px, px), Image.LANCZOS)
+    return img.convert('RGB') if ios else img
 
 
 def write_ico(path, sizes):
@@ -180,6 +184,19 @@ def write_ico(path, sizes):
     path.write_bytes(out.getvalue())
 
 
+def write_ios_icon():
+    """Ein Symbol in 1024 px – Xcode erzeugt daraus alle Größen."""
+    ios = ROOT / 'ios' / 'Runner' / 'Assets.xcassets' / 'AppIcon.appiconset'
+    for old in ios.glob('*.png'):
+        old.unlink()
+    render(1024, ios=True).save(ios / 'app_icon_1024.png')
+    (ios / 'Contents.json').write_text(
+        '{\n  "images" : [\n    {\n      "filename" : "app_icon_1024.png",\n      "idiom" : "universal",\n'
+        '      "platform" : "ios",\n      "size" : "1024x1024"\n    }\n  ],\n'
+        '  "info" : {\n    "author" : "xcode",\n    "version" : 1\n  }\n}\n'
+    )
+
+
 if __name__ == '__main__':
     ico_sizes = [16, 24, 32, 48, 64, 128, 256]
     write_ico(ROOT / 'windows' / 'runner' / 'resources' / 'app_icon.ico', ico_sizes)
@@ -188,4 +205,5 @@ if __name__ == '__main__':
     mac = ROOT / 'macos' / 'Runner' / 'Assets.xcassets' / 'AppIcon.appiconset'
     for size in (16, 32, 64, 128, 256, 512, 1024):
         render(size, mac=True).save(mac / f'app_icon_{size}.png')
-    print('Symbole geschrieben: Windows (.ico), assets/icon.png, macOS (AppIcon.appiconset)')
+    write_ios_icon()
+    print('Symbole geschrieben: Windows (.ico), assets/icon.png, macOS und iOS (AppIcon.appiconset)')

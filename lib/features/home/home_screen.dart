@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/app_shell.dart';
 import '../../core/home_rows.dart';
+import '../../widgets/rating_badges.dart';
+import '../../core/format.dart';
+import '../../core/platform/device.dart';
 import '../../core/images.dart';
 import '../../core/lists.dart';
 import '../../core/settings.dart';
@@ -21,8 +26,12 @@ import 'home_headers.dart';
 import 'home_nav.dart';
 import '../../core/layouts.dart';
 import 'home_providers.dart';
+import '../../widgets/focus_navigation.dart';
 import '../../widgets/focusable.dart';
 import '../../l10n/strings.dart';
+import '../genre/genre_screen.dart';
+
+part 'tv_home.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -40,6 +49,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
+  /// Reihen in der eingestellten Reihenfolge; Empfehlungen, Sammlungen und Genres erscheinen,
+  /// sobald sie geladen sind. [tv]: die erste Karte bekommt den Fokus.
+  List<Widget> _rows(HomeData data, HomeSection? seasonal, {bool tv = false}) {
+    final all = [...data.sections, ?seasonal, ...ref.watch(discoverProvider).value ?? const <HomeSection>[]];
+    final rows = <Widget>[
+      for (final row in HomeRows.parse(ref.watch(settingsProvider.select((s) => s.homeRows))))
+        if (row.visible)
+          ...switch (row.id) {
+            'libraries' => [if (data.libraries.isNotEmpty) _LibrariesRow(libraries: data.libraries)],
+            'watchlist' => [
+              if (ref.watch(watchlistProvider).value case final items? when items.isNotEmpty)
+                _SectionRow(section: HomeSection(tr.watchlist, items, SectionStyle.poster, group: 'watchlist')),
+            ],
+            final id => [for (final section in all.where((s) => s.group == id)) _SectionRow(section: section)],
+          },
+    ];
+    if (tv) {
+      final first = rows.indexWhere((r) => r is _SectionRow);
+      if (first >= 0) rows[first] = _SectionRow(section: (rows[first] as _SectionRow).section, autofocusFirst: true);
+    }
+    return rows;
+  }
+
   @override
   Widget build(BuildContext context) {
     final home = ref.watch(homeProvider);
@@ -47,6 +79,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.listen(homeProvider, (_, next) {
       final session = ref.read(sessionProvider).value;
       if (session == null || !next.hasValue || next.isLoading) return;
+      // Genre-Kacheln der Suche schon im Hintergrund auswählen (einmal je Start) – die Suche
+      // zeigt sie dann sofort. Kurz warten, damit es der Startseite nicht in die Quere kommt.
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) ref.read(genreArtProvider.future).ignore();
+      });
       final container = ProviderScope.containerOf(context, listen: false);
       AppShell.updateJumpList(
         ref.read(apiProvider),
@@ -56,17 +93,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
     final season = ref.watch(activeSeasonProvider);
     final seasonal = ref.watch(seasonalSectionProvider).value;
+    // Fernseher: eigene Startseite – oben Bild und Infos des fokussierten Titels, darunter die Reihen.
+    if (isTv) {
+      return _TvHome(
+        rows: home.when(
+          data: (data) => _rows(data, seasonal, tv: true),
+          loading: () => const [RowsSkeleton()],
+          error: (e, _) => [ErrorView(message: tr.homeCouldNotLoad(e), onRetry: () => ref.invalidate(homeProvider))],
+        ),
+      );
+    }
     final screenHeight = MediaQuery.sizeOf(context).height;
     final layout = appLayout;
     // Mindesthöhe: Titel und Knöpfe dürfen nie unter die Navigation rutschen.
     final minHero = layout.nav == NavStyle.tabs ? 580.0 : 520.0;
-    final heroHeight = (screenHeight * layout.heroHeight).clamp(minHero, 920.0);
     // Kopf je nach Layout: großes Banner, Titelgeschichte oder nur eine Begrüßung.
+    final phone = isPhone(context);
+    // iPhone: gut die Hälfte des Bildschirms – darunter sollen schon die ersten Reihen zu sehen sein.
+    final heroHeight = phone
+        ? (screenHeight * 0.6).clamp(440.0, 560.0)
+        : (screenHeight * layout.heroHeight).clamp(minHero, 920.0);
     final Widget header = switch (layout.hero) {
       HeroStyle.banner => HeroBanner(height: heroHeight),
+      // Die geteilte Titelgeschichte braucht Breite – auf dem iPhone das große Banner.
+      HeroStyle.split when phone => HeroBanner(height: heroHeight),
       HeroStyle.split => MagazineHero(height: heroHeight),
       HeroStyle.none => GreetingHeader(
-        top: layout.nav == NavStyle.sidebar ? kTitleBarHeight + 28 : kTitleBarHeight + 96,
+        top: switch (layout.nav) {
+          _ when phone => topInset(context) + 64,
+          NavStyle.sidebar => topInset(context) + 28,
+          _ => topInset(context) + 96,
+        },
       ),
     };
 
@@ -92,29 +149,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 ...home.when(
                   data: (data) {
-                    // Reihen in der eingestellten Reihenfolge; Empfehlungen, Sammlungen
-                    // und Genres erscheinen, sobald sie geladen sind.
-                    final all = [
-                      ...data.sections,
-                      ?seasonal,
-                      ...ref.watch(discoverProvider).value ?? const <HomeSection>[],
-                    ];
-                    final rows = <Widget>[
-                      for (final row in HomeRows.parse(ref.watch(settingsProvider.select((s) => s.homeRows))))
-                        if (row.visible)
-                          ...switch (row.id) {
-                            'libraries' => [if (data.libraries.isNotEmpty) _LibrariesRow(libraries: data.libraries)],
-                            'watchlist' => [
-                              if (ref.watch(watchlistProvider).value case final items? when items.isNotEmpty)
-                                _SectionRow(
-                                  section: HomeSection(tr.watchlist, items, SectionStyle.poster, group: 'watchlist'),
-                                ),
-                            ],
-                            final id => [
-                              for (final section in all.where((s) => s.group == id)) _SectionRow(section: section),
-                            ],
-                          },
-                    ];
+                    final rows = _rows(data, seasonal);
                     return [
                       SliverList.separated(
                         itemCount: rows.length,
@@ -141,6 +176,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
           switch (layout.nav) {
+            // iPhone: schlanke Leiste, die Ziele stehen in der Tab-Leiste unten.
+            _ when phone => TopNav(scroll: _scroll),
             NavStyle.top => TopNav(scroll: _scroll),
             NavStyle.minimal => TopNav(scroll: _scroll, minimal: true),
             NavStyle.tabs => TabsNav(scroll: _scroll),
@@ -154,9 +191,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 }
 
 class _SectionRow extends StatelessWidget {
-  const _SectionRow({required this.section});
+  const _SectionRow({required this.section, this.autofocusFirst = false});
 
   final HomeSection section;
+
+  /// Fernseher: die erste Karte hat beim Start den Fokus.
+  final bool autofocusFirst;
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +207,8 @@ class _SectionRow extends StatelessWidget {
       height: landscape ? kLandscapeWidth * 9 / 16 + kCardTextHeight : kPosterWidth * 1.5 + kCardTextHeight,
       itemBuilder: (context, i) {
         final item = section.items[i];
-        return landscape ? LandscapeCard(item: item) : PosterCard(item: item);
+        final focus = autofocusFirst && i == 0;
+        return landscape ? LandscapeCard(item: item, autofocus: focus) : PosterCard(item: item, autofocus: focus);
       },
     );
   }

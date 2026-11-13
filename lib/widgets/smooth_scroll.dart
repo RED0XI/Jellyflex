@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../core/platform/device.dart';
+
 /// Flüssiges Mausrad-Scrollen.
 ///
 /// Flutter springt unter Windows pro Mausrad-Raste hart um ~100 px.
@@ -99,12 +101,18 @@ class _SmoothScrollState extends State<SmoothScroll> with SingleTickerProviderSt
     final velocity = -tracker.getVelocity().pixelsPerSecond.dy;
     if (velocity.abs() < kMinFlingVelocity) return;
     // Gleiche Reibung wie das Ausrollen unter macOS/iOS (BouncingScrollSimulation).
-    _fling = FrictionSimulation(0.135, controller.position.pixels, velocity.clamp(-kMaxFlingVelocity, kMaxFlingVelocity));
+    _fling = FrictionSimulation(
+      0.135,
+      controller.position.pixels,
+      velocity.clamp(-kMaxFlingVelocity, kMaxFlingVelocity),
+    );
     _flingTicker.start();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Touch (iPhone/iPad): das gewohnte Scrollen des Systems mit Nachfedern.
+    if (isMobile) return widget.builder(context, const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()));
     return Listener(
       onPointerSignal: _onPointerSignal,
       onPointerPanZoomStart: _onPanZoomStart,

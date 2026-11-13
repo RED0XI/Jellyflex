@@ -31,12 +31,27 @@ class SecureStore {
 
   File get _file => _fileOverride ?? File(AppPaths.join(AppPaths.appData.path, 'secure.bin'));
 
-  Future<Map<String, String>> _load() async {
-    if (_cache != null) return _cache!;
+  /// Laufendes Laden – zwei gleichzeitige erste Zugriffe teilen sich ein Ergebnis (sonst
+  /// entstünden zwei Listen, und ein Schreibvorgang in die erste ginge verloren).
+  Future<Map<String, String>?>? _loading;
+
+  /// Inhalt des Speichers. `null`: Es gibt eine Datei, aber der Schlüssel ist gerade nicht
+  /// erreichbar (Schlüsselbund gesperrt, Abfrage abgelehnt …). Das ist nicht "leer": Wer dann eine
+  /// leere Liste annähme und speicherte, überschriebe alle Konten und PINs.
+  Future<Map<String, String>?> _load() {
+    final cache = _cache;
+    if (cache != null) return Future.value(cache);
+    return _loading ??= _read().whenComplete(() => _loading = null);
+  }
+
+  Future<Map<String, String>?> _read() async {
+    final test = _fileOverride != null;
     try {
       final file = _file;
       if (await file.exists()) {
-        final plain = await _Cipher.unprotect(await file.readAsBytes());
+        // Nicht merken – beim nächsten Zugriff neu versuchen.
+        if (!await _Cipher.available(test: test)) return null;
+        final plain = await _Cipher.unprotect(await file.readAsBytes(), test: test);
         if (plain != null) {
           final decoded = jsonDecode(utf8.decode(plain)) as Map<String, dynamic>;
           return _cache = decoded.map((k, v) => MapEntry(k, v as String));
@@ -54,7 +69,10 @@ class SecureStore {
     final run = _pending.catchError((_) {}).then((_) async {
       final file = _file;
       await file.parent.create(recursive: true);
-      final encrypted = await _Cipher.protect(Uint8List.fromList(utf8.encode(jsonEncode(_cache ?? {}))));
+      final encrypted = await _Cipher.protect(
+        Uint8List.fromList(utf8.encode(jsonEncode(_cache ?? {}))),
+        test: _fileOverride != null,
+      );
       if (encrypted == null) throw FileSystemException(tr.encryptionFailed);
       final tmp = File('${file.path}.tmp');
       await tmp.writeAsBytes(encrypted, flush: true);
@@ -64,25 +82,36 @@ class SecureStore {
     return run;
   }
 
-  Future<String?> read({required String key}) async => (await _load())[key];
+  Future<String?> read({required String key}) async => (await _load())?[key];
 
   Future<void> write({required String key, required String value}) async {
-    (await _load())[key] = value;
+    (await _unlocked())[key] = value;
     await _save();
   }
 
   Future<void> delete({required String key}) async {
-    if ((await _load()).remove(key) != null) await _save();
+    if ((await _unlocked()).remove(key) != null) await _save();
   }
+
+  /// Inhalt zum Ändern – nie eine leere Liste anstelle eines Speichers, der sich gerade nicht
+  /// entschlüsseln lässt (siehe [_load]).
+  Future<Map<String, String>> _unlocked() async =>
+      await _load() ?? (throw FileSystemException(tr.encryptionFailed, _file.path));
 }
 
 /// Verschlüsselung je Betriebssystem. `null` = nicht möglich (dann wird nichts gespeichert).
+/// [test]: Speicher eines Tests ([SecureStore.forFile]) – auf macOS/iOS mit einem Schlüssel nur im
+/// Arbeitsspeicher statt dem echten Schlüsselbund (App-Tests laufen im echten Runner).
 abstract final class _Cipher {
-  static Future<Uint8List?> protect(Uint8List data) async =>
-      Platform.isWindows ? _Dpapi.protect(data) : _KeychainAes.protect(data);
+  static Future<Uint8List?> protect(Uint8List data, {bool test = false}) async =>
+      Platform.isWindows ? _Dpapi.protect(data) : _KeychainAes.protect(data, test: test);
 
-  static Future<Uint8List?> unprotect(Uint8List data) async =>
-      Platform.isWindows ? _Dpapi.unprotect(data) : _KeychainAes.unprotect(data);
+  static Future<Uint8List?> unprotect(Uint8List data, {bool test = false}) async =>
+      Platform.isWindows ? _Dpapi.unprotect(data) : _KeychainAes.unprotect(data, test: test);
+
+  /// Lässt sich gerade überhaupt ver- und entschlüsseln (Schlüssel erreichbar)?
+  static Future<bool> available({bool test = false}) async =>
+      Platform.isWindows || await _KeychainAes.available(test: test);
 }
 
 // --- macOS: AES-256-GCM, Schlüssel im Schlüsselbund ------------------------------
@@ -111,26 +140,32 @@ abstract final class _KeychainAes {
     }
   }
 
-  static Future<SecretKey?> _secretKey() async {
+  /// Schlüssel für Test-Speicher – nie im Schlüsselbund.
+  static final Future<SecretKey> _testKey = _algorithm.newSecretKey();
+
+  static Future<SecretKey?> _secretKey({bool test = false}) async {
+    if (test) return _testKey;
     final key = await (_key ??= _loadKey());
     // Fehlschlag nicht merken – beim nächsten Mal neu versuchen.
     if (key == null) _key = null;
     return key;
   }
 
-  static Future<Uint8List?> protect(Uint8List data) async {
-    final key = await _secretKey();
+  static Future<bool> available({bool test = false}) async => await _secretKey(test: test) != null;
+
+  static Future<Uint8List?> protect(Uint8List data, {bool test = false}) async {
+    final key = await _secretKey(test: test);
     if (key == null) return null;
     final box = await _algorithm.encrypt(data, secretKey: key);
     return Uint8List.fromList([..._magic, ...box.concatenation()]);
   }
 
-  static Future<Uint8List?> unprotect(Uint8List data) async {
+  static Future<Uint8List?> unprotect(Uint8List data, {bool test = false}) async {
     if (data.length < _magic.length + 12 + 16) return null;
     for (var i = 0; i < _magic.length; i++) {
       if (data[i] != _magic[i]) return null;
     }
-    final key = await _secretKey();
+    final key = await _secretKey(test: test);
     if (key == null) return null;
     try {
       final box = SecretBox.fromConcatenation(

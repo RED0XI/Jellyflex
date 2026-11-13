@@ -29,6 +29,7 @@ bool FlutterWindow::OnCreate() {
   media_session_ = std::make_unique<MediaSession>(
       flutter_controller_->engine()->messenger(), GetHandle());
   app_shell_ = std::make_unique<AppShell>(flutter_controller_->engine()->messenger());
+  power_ = std::make_unique<Power>(flutter_controller_->engine()->messenger(), GetHandle());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -46,6 +47,7 @@ bool FlutterWindow::OnCreate() {
 void FlutterWindow::OnDestroy() {
   media_session_ = nullptr;
   app_shell_ = nullptr;
+  power_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -83,6 +85,11 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   if (message == MediaSession::kButtonMessage && media_session_) {
     media_session_->DispatchButton(wparam);
     return 0;
+  }
+
+  // Netzteil an/ab, Energiesparmodus: an Dart weitergeben; Windows bekommt die Nachricht trotzdem.
+  if (message == WM_POWERBROADCAST && power_) {
+    power_->HandlePowerBroadcast(wparam, lparam);
   }
 
   switch (message) {

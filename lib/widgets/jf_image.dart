@@ -3,9 +3,13 @@ import 'package:flutter_blurhash/flutter_blurhash.dart';
 
 import '../theme.dart';
 import '../core/image_cache.dart';
+import '../core/power.dart';
 
 /// Breite für bildschirmfüllende Bilder in festen Stufen (für den Server-Cache).
 int screenImageWidth(BuildContext context) {
+  // Energiesparen (immer auf dem Fernseher): 1280 px reichen unter den Verläufen – größere Bilder
+  // dekodieren und hochladen kostet auf schwachen Chips beim Öffnen einer Seite sichtbar Zeit.
+  if (Power.energySaving.value) return 1280;
   final px = MediaQuery.sizeOf(context).width * MediaQuery.devicePixelRatioOf(context);
   for (final size in const [1280, 1920, 2560]) {
     if (px <= size) return size;

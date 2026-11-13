@@ -11,6 +11,7 @@ add_executable(${BINARY_NAME} WIN32
   "flutter_window.cpp"
   "media_session.cpp"
   "main.cpp"
+  "power.cpp"
   "utils.cpp"
   "win32_window.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"

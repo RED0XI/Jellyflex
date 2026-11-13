@@ -112,7 +112,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       if (next != null)
                         SliverToBoxAdapter(
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 28),
+                            padding: EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 28),
                             child: _NextHero(episode: next, today: today),
                           ),
                         ),
@@ -349,7 +349,7 @@ class _DayStrip extends StatelessWidget {
       height: 96,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
+        padding: EdgeInsets.symmetric(horizontal: kPageGutter),
         itemCount: _stripDays,
         separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
@@ -450,7 +450,7 @@ class _DaySection extends StatelessWidget {
     final relative = _daysBetween(today, day).abs() <= 1 ? _dayLabel(day, today) : null;
     final color = isToday ? AppColors.accent : AppColors.textPrimary;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(kPageGutter, 30, kPageGutter, 0),
+      padding: EdgeInsets.fromLTRB(kPageGutter, 30, kPageGutter, 0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -40,6 +40,18 @@ abstract final class AppShell {
   @visibleForTesting
   static void debugOpen(String commandLine) => _handleOpen(commandLine);
 
+  /// iPhone/iPad: [path] (ein Ordner) nicht in iCloud- und Rechner-Sicherungen aufnehmen – etwa
+  /// die Downloads: Sie lassen sich jederzeit neu laden und füllten sonst den iCloud-Speicher.
+  static Future<void> excludeFromBackup(String path) async {
+    try {
+      await _channel.invokeMethod<bool>('excludeFromBackup', path);
+    } on MissingPluginException {
+      // Nur unter iOS vorhanden.
+    } catch (e) {
+      debugPrint('Ordner nicht von der Sicherung ausgenommen: $e');
+    }
+  }
+
   /// Sprungliste "Weiterschauen" setzen (leer = entfernen, z. B. beim Abmelden).
   static Future<void> setJumpList(String category, List<({String id, String title})> items) async {
     try {

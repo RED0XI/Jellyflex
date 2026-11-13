@@ -45,6 +45,7 @@ class _LayoutTile extends StatelessWidget {
     final p = palette;
     final name = tr.layoutName(layout.id, layout.name, layout.nameDe);
     return Focusable(
+      tvRing: false,
       onTap: onTap,
       semanticLabel: name,
       builder: (context, hovered) => SizedBox(

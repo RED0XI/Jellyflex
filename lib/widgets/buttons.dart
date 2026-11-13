@@ -5,9 +5,27 @@ import 'focusable.dart';
 
 /// Großer Haupt-Button (z. B. "Abspielen") in der Knopffarbe des Themes.
 class PrimaryButton extends StatefulWidget {
-  const PrimaryButton({super.key, required this.label, required this.onPressed, this.icon, this.loading = false});
+  const PrimaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.loading = false,
+    this.autofocus = false,
+    this.scrollAlignment = 0.5,
+    this.focusNode,
+  });
+
+  /// Eigener Fokus-Knoten (z. B. um den Knopf gezielt zu fokussieren).
+  final FocusNode? focusNode;
+
+  /// Wohin die Seite beim Fokussieren scrollt (siehe [Focusable.scrollAlignment]).
+  final double scrollAlignment;
 
   final String label;
+
+  /// Fokus beim Öffnen der Seite (Fernseher: OK spielt dann gleich ab).
+  final bool autofocus;
   final IconData? icon;
   final VoidCallback? onPressed;
   final bool loading;
@@ -17,11 +35,43 @@ class PrimaryButton extends StatefulWidget {
 }
 
 class _PrimaryButtonState extends State<PrimaryButton> {
+  FocusNode? _ownNode;
+  FocusNode get _node => widget.focusNode ?? (_ownNode ??= FocusNode());
+
+  bool get _enabled => widget.onPressed != null && !widget.loading;
+
+  /// Autofokus steht noch aus: Der Knopf wurde gesperrt aufgebaut (lädt noch) – ein gesperrter
+  /// Knopf nimmt keinen Fokus an, und Flutter versucht den Autofokus nur einmal.
+  late bool _autofocusPending = widget.autofocus && !_enabled;
+
+  @override
+  void didUpdateWidget(PrimaryButton old) {
+    super.didUpdateWidget(old);
+    if (!_autofocusPending || !_enabled) return;
+    _autofocusPending = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Nur, wenn inzwischen nichts anderes gewählt wurde.
+      final current = FocusManager.instance.primaryFocus;
+      if (current == null || current is FocusScopeNode) _node.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ownNode?.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final enabled = widget.onPressed != null && !widget.loading;
+    final enabled = _enabled;
     return Focusable(
+      tvRing: false,
       onTap: enabled ? widget.onPressed : null,
+      autofocus: widget.autofocus,
+      focusNode: _node,
+      scrollAlignment: widget.scrollAlignment,
       builder: (context, hovered) => AnimatedScale(
         scale: hovered && enabled ? 1.04 : 1,
         duration: const Duration(milliseconds: 180),
@@ -52,12 +102,17 @@ class _PrimaryButtonState extends State<PrimaryButton> {
               else if (widget.icon != null)
                 Icon(widget.icon, color: AppColors.onButton, size: 26),
               if (widget.icon != null || widget.loading) const SizedBox(width: 10),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  color: enabled ? AppColors.onButton : AppColors.textMuted,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+              // Lange Beschriftung (z. B. "Abspielen · Titel" am Handy): kürzen statt überlaufen.
+              Flexible(
+                child: Text(
+                  widget.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: enabled ? AppColors.onButton : AppColors.textMuted,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -70,9 +125,22 @@ class _PrimaryButtonState extends State<PrimaryButton> {
 
 /// Halbtransparenter Button mit Glas-Look (z. B. "Mehr Infos").
 class GlassButton extends StatefulWidget {
-  const GlassButton({super.key, required this.label, required this.onPressed, this.icon});
+  const GlassButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.scrollAlignment = 0.5,
+    this.focusNode,
+  });
+
+  /// Eigener Fokus-Knoten (z. B. um den Knopf gezielt zu fokussieren).
+  final FocusNode? focusNode;
 
   final String label;
+
+  /// Wohin die Seite beim Fokussieren scrollt (siehe [Focusable.scrollAlignment]).
+  final double scrollAlignment;
   final IconData? icon;
   final VoidCallback? onPressed;
 
@@ -84,7 +152,9 @@ class _GlassButtonState extends State<GlassButton> {
   @override
   Widget build(BuildContext context) {
     return Focusable(
+      scrollAlignment: widget.scrollAlignment,
       onTap: widget.onPressed,
+      focusNode: widget.focusNode,
       builder: (context, hovered) => AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         height: 52,
@@ -101,7 +171,14 @@ class _GlassButtonState extends State<GlassButton> {
               Icon(widget.icon, size: 22, color: AppColors.textPrimary),
               const SizedBox(width: 10),
             ],
-            Text(widget.label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            Flexible(
+              child: Text(
+                widget.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
           ],
         ),
       ),

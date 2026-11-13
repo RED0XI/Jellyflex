@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/image_cache.dart';
 import '../../core/layouts.dart';
 import '../../core/models.dart';
+import '../../core/platform/device.dart';
 import '../../core/seasons.dart';
 import '../../core/session.dart';
 import '../../l10n/strings.dart';
@@ -14,6 +15,7 @@ import '../../theme.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/focusable.dart';
 import 'home_providers.dart';
+import '../../core/power.dart';
 
 /// Ein Ziel der Navigation (Startseite, Bibliothek, Downloads …).
 class NavEntry {
@@ -190,6 +192,7 @@ class TopNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (isPhone(context)) return _buildPhone(context, ref);
     final entries = navEntries(() => GoRouter.of(context), ref);
     return Positioned(
       top: 0,
@@ -197,7 +200,7 @@ class TopNav extends ConsumerWidget {
       right: 0,
       child: _FrostedBar(
         scroll: scroll,
-        height: kTitleBarHeight + 60,
+        height: topInset(context) + 60,
         child: Row(
           children: [
             BrandLogo(size: minimal ? 20 : 26),
@@ -242,6 +245,32 @@ class TopNav extends ConsumerWidget {
   }
 }
 
+/// iPhone: nur Logo und Profil – Suche, Listen und Downloads stehen in der Tab-Leiste unten,
+/// "Demnächst" und "Überrasch mich" im Profilmenü, die Bibliotheken als Reihe auf der Seite.
+extension on TopNav {
+  Widget _buildPhone(BuildContext context, WidgetRef ref) => Positioned(
+    top: 0,
+    left: 0,
+    right: 0,
+    child: _FrostedBar(
+      scroll: scroll,
+      height: topInset(context) + 52,
+      child: Row(
+        children: [
+          const BrandLogo(size: 22),
+          if (ref.watch(activeSeasonProvider) case final season?)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Text(seasonInfo[season]!.emoji, style: const TextStyle(fontSize: 18)),
+            ),
+          const Spacer(),
+          const ProfileMenuButton(size: 34, extraActions: true),
+        ],
+      ),
+    ),
+  );
+}
+
 /// Große Reiter in der Mitte – gut lesbar vom Sofa, mit Controller leicht zu treffen.
 class TabsNav extends ConsumerWidget {
   const TabsNav({super.key, required this.scroll});
@@ -257,7 +286,7 @@ class TabsNav extends ConsumerWidget {
       right: 0,
       child: _FrostedBar(
         scroll: scroll,
-        height: kTitleBarHeight + 76,
+        height: topInset(context) + 76,
         child: Row(
           children: [
             const BrandLogo(size: 24),
@@ -361,7 +390,7 @@ class SideNav extends ConsumerWidget {
         color: AppColors.surface,
         border: Border(right: BorderSide(color: AppColors.border)),
       ),
-      padding: const EdgeInsets.fromLTRB(14, kTitleBarHeight + 10, 14, 16),
+      padding: EdgeInsets.fromLTRB(14, topInset(context) + 10, 14, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -515,9 +544,12 @@ class _FrostedBar extends StatelessWidget {
       builder: (context, child) {
         final offset = scroll.hasClients ? scroll.offset : 0.0;
         final t = (offset / 240).clamp(0.0, 1.0);
-        final solid = AppColors.background.withValues(alpha: 0.72);
+        // Energiesparen (auch immer auf dem Fernseher): kein Weichzeichner – er rechnet bei jedem
+        // Scroll-Bild die ganze Leiste neu; dafür ist die Leiste fast deckend.
+        final blur = !Power.energySaving.value;
+        final solid = AppColors.background.withValues(alpha: blur ? 0.72 : 0.94);
         final bar = Container(
-          padding: const EdgeInsets.only(top: kTitleBarHeight - 4, left: kPageGutter, right: kPageGutter + 4),
+          padding: EdgeInsets.only(top: topInset(context) - 4, left: kPageGutter, right: kPageGutter + 4),
           height: height,
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -534,7 +566,7 @@ class _FrostedBar extends StatelessWidget {
           ),
           child: child,
         );
-        if (t == 0) return bar;
+        if (t == 0 || !blur) return bar;
         return ClipRect(
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 24 * t, sigmaY: 24 * t),
@@ -575,6 +607,167 @@ class _NavLink extends StatelessWidget {
             decorationThickness: 2,
           ),
           child: Text(minimal ? label.toUpperCase() : label),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fernseher: Menüleiste links (wie Disney+, Netflix, Google TV). Eingeklappt nur Symbole, mit
+/// Fokus klappt sie über die abgedunkelte Seite auf: oben das Profil, darunter große Einträge,
+/// die aktuelle Seite in der Themenfarbe.
+class TvNavRail extends ConsumerWidget {
+  const TvNavRail({super.key, required this.router, required this.path, required this.expanded, this.activeNode});
+
+  /// Breite eingeklappt – so viel Platz bekommt die Seite daneben nicht.
+  static const collapsedWidth = 88.0;
+  static const expandedWidth = 320.0;
+
+  final GoRouter router;
+  final String path;
+  final bool expanded;
+
+  /// Fokus-Knoten des Eintrags der aktuellen Seite – "links" in die Leiste landet dort.
+  final FocusNode? activeNode;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionProvider).value;
+    final entries = [
+      NavEntry(icon: Icons.search_rounded, label: tr.search, path: '/search', onTap: () => router.go('/search')),
+      ...navEntries(() => router, ref, replace: true),
+      NavEntry(icon: Icons.bookmarks_rounded, label: tr.myLists, path: '/lists', onTap: () => router.go('/lists')),
+      NavEntry(
+        icon: Icons.calendar_month_rounded,
+        label: tr.upcoming,
+        path: '/calendar',
+        onTap: () => router.go('/calendar'),
+      ),
+    ];
+    final settings = NavEntry(
+      icon: Icons.settings_rounded,
+      label: tr.settings,
+      path: '/settings',
+      onTap: () => router.go('/settings'),
+    );
+    bool isActive(NavEntry e) => e.path == '/' ? path == '/' : path.startsWith(e.path);
+    final active = [...entries, settings].where(isActive).firstOrNull;
+    Widget link(NavEntry e) => _TvRailLink(
+      entry: e,
+      active: isActive(e),
+      expanded: expanded,
+      focusNode: identical(e, active) ? activeNode : null,
+    );
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+      width: expanded ? expandedWidth : collapsedWidth,
+      decoration: BoxDecoration(
+        color: expanded ? AppColors.surface : Colors.transparent,
+        gradient: expanded
+            ? null
+            : LinearGradient(
+                colors: [AppColors.background.withValues(alpha: 0.9), AppColors.background.withValues(alpha: 0)],
+              ),
+        boxShadow: [if (expanded) const BoxShadow(color: Color(0x99000000), blurRadius: 40, offset: Offset(8, 0))],
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 36, 16, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Profil oben: Bild, mit Fokus auch der Name.
+          Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: ProfileMenuButton(router: router, size: 44, extraActions: true),
+              ),
+              // Abstand im dehnbaren Teil: Solange die Leiste noch aufklappt, ist sie schmaler als
+              // Bild + Abstand – ein fester Abstand liefe in diesen Bildern über.
+              if (expanded && session != null)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 14),
+                    child: Text(
+                      session.userName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const Spacer(),
+          for (final e in entries) link(e),
+          const Spacer(),
+          link(settings),
+        ],
+      ),
+    );
+  }
+}
+
+class _TvRailLink extends StatelessWidget {
+  const _TvRailLink({required this.entry, required this.active, required this.expanded, this.focusNode});
+
+  final NavEntry entry;
+  final bool active;
+  final bool expanded;
+  final FocusNode? focusNode;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Focusable(
+        tvRing: false,
+        onTap: entry.onTap,
+        focusNode: focusNode,
+        semanticLabel: entry.label,
+        builder: (context, focused) => AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          height: 52,
+          width: expanded ? TvNavRail.expandedWidth - 32 : 56,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: focused
+                ? Colors.white
+                : active
+                ? AppColors.accent.withValues(alpha: 0.16)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(26),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                entry.icon,
+                size: 24,
+                color: focused
+                    ? Colors.black
+                    : active
+                    ? AppColors.accent
+                    : AppColors.textSecondary,
+              ),
+              // Abstand im dehnbaren Teil (siehe Profilzeile): läuft beim Aufklappen nicht über.
+              if (expanded)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 18),
+                    child: Text(
+                      entry.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: active || focused ? FontWeight.w700 : FontWeight.w500,
+                        color: focused ? Colors.black : (active ? AppColors.textPrimary : AppColors.textSecondary),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

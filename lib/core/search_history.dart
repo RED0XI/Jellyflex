@@ -55,9 +55,9 @@ class SearchHistory extends Notifier<List<String>> {
     final key = _key;
     if (key == null) return;
     if (list.isEmpty) {
-      SecureStore.instance.delete(key: key);
+      SecureStore.instance.delete(key: key).ignore();
     } else {
-      SecureStore.instance.write(key: key, value: jsonEncode(list));
+      SecureStore.instance.write(key: key, value: jsonEncode(list)).ignore();
     }
   }
 }

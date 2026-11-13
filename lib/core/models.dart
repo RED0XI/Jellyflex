@@ -247,6 +247,17 @@ class MediaStream {
   String? get channelLayout => raw['ChannelLayout'] as String?;
   int? get sampleRate => (raw['SampleRate'] as num?)?.toInt();
 
+  /// Text-Untertitel (SRT, ASS, WebVTT …) – der Server kann sie als eigene Datei liefern.
+  /// Bild-Untertitel (PGS, VobSub, DVB) gehen nur eingebettet oder eingebrannt.
+  bool get isTextSubtitle {
+    final flag = raw['IsTextSubtitleStream'];
+    if (flag is bool) return flag;
+    return switch (codec?.toLowerCase()) {
+      'srt' || 'subrip' || 'ass' || 'ssa' || 'vtt' || 'webvtt' || 'mov_text' || 'text' => true,
+      _ => false,
+    };
+  }
+
   /// "External", "Encode" (eingebrannt) … – nur bei umgerechneter Wiedergabe.
   String? get deliveryMethod => raw['DeliveryMethod'] as String?;
   String? get deliveryUrl => raw['DeliveryUrl'] as String?;

@@ -2,11 +2,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../core/power.dart';
 import '../core/seasons.dart';
 
 /// Dezente Effekte zur Saison über dem Banner: Halloween mit Nebel, Glut und Herbstlaub,
 /// Weihnachten mit Schnee in drei Tiefen, Silvester mit goldenen Lichtern, Valentinstag
-/// mit weichen Herzen. Läuft endlos, reagiert nicht auf Klicks.
+/// mit weichen Herzen. Läuft endlos, reagiert nicht auf Klicks. Beim Energiesparen und
+/// solange eine andere App vorne ist, bleibt das Bild stehen.
 class SeasonalParticles extends StatefulWidget {
   const SeasonalParticles({super.key, required this.season});
 
@@ -18,10 +20,20 @@ class SeasonalParticles extends StatefulWidget {
 
 class _SeasonalParticlesState extends State<SeasonalParticles> with SingleTickerProviderStateMixin {
   // Eine lange Schleife; jedes Teilchen hat eigene Geschwindigkeit und Phase.
-  late final _loop = AnimationController(vsync: this, duration: const Duration(seconds: 120))..repeat();
+  late final _loop = AnimationController(vsync: this, duration: const Duration(seconds: 120));
+  late final VoidCallback _stopWatching;
+
+  @override
+  void initState() {
+    super.initState();
+    // Ein Standbild mitten im Lauf statt leerer Fläche, falls es gar nicht erst losgeht.
+    _loop.value = 0.3;
+    _stopWatching = Power.whileAmbient(_loop, _loop.repeat);
+  }
 
   @override
   void dispose() {
+    _stopWatching();
     _loop.dispose();
     super.dispose();
   }

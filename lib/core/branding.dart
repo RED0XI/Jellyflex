@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'settings.dart';
 import 'platform/app_paths.dart';
+import 'platform/device.dart';
 
 /// Eigener App-Name und eigenes Logo – überall dort, wo sonst "Jellyflex" steht
 /// (Titelleiste, Fenstertitel, Taskleisten-Symbol, Anmeldung, Start).
@@ -25,7 +26,12 @@ File? customLogo(AppSettings s) {
   final path = s.logoPath;
   if (path == null) return null;
   final file = File(path);
-  return file.existsSync() ? file : null;
+  if (file.existsSync()) return file;
+  // iOS verlegt den Container der App bei jedem Update – die Datei liegt dann unter demselben
+  // Namen im aktuellen App-Datenordner (dorthin kopiert sie importLogo).
+  final name = path.substring(path.lastIndexOf(RegExp(r'[/\\]')) + 1);
+  final moved = File(AppPaths.join(appDataDir.path, name));
+  return name.isNotEmpty && moved.existsSync() ? moved : null;
 }
 
 /// Taskleisten-Symbol (.ico) zum Logo.
@@ -126,6 +132,7 @@ Future<Uint8List> _icoFrom(ui.Image image) async {
 /// (macOS: nur der Titel – das Dock-Symbol bleibt das signierte App-Symbol.)
 Future<void> applyWindowBranding(AppSettings s) async {
   try {
+    if (!isDesktop) return;
     await windowManager.setTitle(appDisplayName(s));
     if (!Platform.isWindows) return;
     final logo = customLogo(s);

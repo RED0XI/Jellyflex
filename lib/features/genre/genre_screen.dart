@@ -30,18 +30,72 @@ final genreRowsProvider = FutureProvider.autoDispose.family<GenreRows, String>((
   return (topRated: topRated, newest: newest, unwatched: unwatched, series: series);
 });
 
-/// Je Genre ein passendes Hintergrundbild für die Kacheln – aus einer einzigen Anfrage
-/// (zufällige Titel mit Hintergrundbild), damit die Suche schnell bleibt.
-final genreArtProvider = FutureProvider.autoDispose<Map<String, BaseItem>>((ref) async {
-  final items = await ref.watch(apiProvider).getRandomWithBackdrops();
-  final art = <String, BaseItem>{};
-  for (final item in items) {
-    for (final g in item.genres) {
-      art.putIfAbsent(g, () => item);
-    }
+/// Alle Genres der Bibliotheken – einmal je App-Start (bzw. Konto) geholt und behalten.
+final genresProvider = FutureProvider<List<String>>((ref) => ref.watch(apiProvider).getGenres(null));
+
+/// Je Genre ein passendes Hintergrundbild für die Kacheln – jedes Bild nur einmal. Erst aus einer
+/// Anfrage (zufällige Titel mit Hintergrundbild); Genres, für die dort nichts Eigenes übrig ist,
+/// holen sich gezielt eigene Titel.
+///
+/// Einmal je App-Start ausgewählt und behalten (die Startseite stößt es kurz nach dem Laden im
+/// Hintergrund an) – die Suche zeigt die Kacheln dann sofort; beim nächsten Start neu gemischt.
+final genreArtProvider = FutureProvider<Map<String, BaseItem>>((ref) async {
+  final api = ref.watch(apiProvider);
+  final (genres, pool) = await (ref.watch(genresProvider.future), api.getRandomWithBackdrops()).wait;
+  final art = assignGenreArt(genres, pool);
+  final missing = [
+    for (final g in genres)
+      if (!art.containsKey(g)) g,
+  ];
+  if (missing.isEmpty) return art;
+  final used = {for (final item in art.values) item.id};
+  final extra = await Future.wait([
+    for (final g in missing) api.getGenreItems(g, limit: 12).catchError((Object _) => const <BaseItem>[]),
+  ]);
+  for (final (i, g) in missing.indexed) {
+    final pick = extra[i].where((item) => item.backdropImageTags.isNotEmpty && !used.contains(item.id)).firstOrNull;
+    if (pick == null) continue;
+    used.add(pick.id);
+    art[g] = pick;
   }
   return art;
 });
+
+/// Ordnet jedem Genre einen anderen Titel aus [pool] zu (keiner doppelt) – so vielen Genres wie
+/// möglich (größte Paarung, Kuhn-Algorithmus). Titel ohne Hintergrundbild zählen nicht.
+@visibleForTesting
+Map<String, BaseItem> assignGenreArt(List<String> genres, List<BaseItem> pool) {
+  final items = pool.where((i) => i.backdropImageTags.isNotEmpty).toList();
+  final candidates = [
+    for (final g in genres)
+      [
+        for (var j = 0; j < items.length; j++)
+          if (items[j].genres.contains(g)) j,
+      ],
+  ];
+  final owner = List<int?>.filled(items.length, null); // Titel → Genre
+  bool place(int genre, Set<int> seen) {
+    for (final j in candidates[genre]) {
+      if (!seen.add(j)) continue;
+      if (owner[j] == null || place(owner[j]!, seen)) {
+        owner[j] = genre;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Genres mit wenigen passenden Titeln zuerst – sie haben die wenigsten Ausweichmöglichkeiten.
+  final order = [for (var g = 0; g < genres.length; g++) g]
+    ..sort((a, b) => candidates[a].length.compareTo(candidates[b].length));
+  for (final g in order) {
+    place(g, <int>{});
+  }
+  return {
+    for (var j = 0; j < items.length; j++)
+      if (owner[j] != null) genres[owner[j]!]: items[j],
+  };
+}
 
 /// Eigene Seite für ein Genre: großes Bild, "Zufällig abspielen", dann Reihen.
 class GenreScreen extends ConsumerStatefulWidget {
@@ -271,6 +325,7 @@ class _GenreTile extends ConsumerWidget {
         .withHue((HSLColor.fromColor(AppColors.accent).hue + colorSeed * 37) % 360)
         .toColor();
     return Focusable(
+      tvRing: false,
       semanticLabel: genre,
       onTap: () => context.push('/genre/${Uri.encodeComponent(genre)}'),
       builder: (context, hovered) => AnimatedScale(

@@ -7,6 +7,7 @@ import '../downloads/download_flow.dart';
 import '../downloads/downloads_screen.dart';
 import '../../core/format.dart';
 import '../../core/images.dart';
+import '../../core/item_library.dart';
 import '../../core/media_info.dart';
 import '../../core/models.dart';
 import '../../core/series_tracks.dart';
@@ -32,6 +33,8 @@ import 'subtitle_search_dialog.dart';
 import 'theme_music.dart';
 import '../lists/list_actions.dart';
 import '../../l10n/strings.dart';
+import '../../core/platform/device.dart';
+import '../../widgets/after_transition.dart';
 
 final itemProvider = FutureProvider.autoDispose.family<BaseItem, String>((ref, id) async {
   try {
@@ -98,9 +101,12 @@ void refreshItemDataIn(ProviderContainer container, BaseItem item) {
 }
 
 class DetailsScreen extends ConsumerStatefulWidget {
-  const DetailsScreen({super.key, required this.itemId});
+  const DetailsScreen({super.key, required this.itemId, this.initialSeasonId});
 
   final String itemId;
+
+  /// Serie: diese Staffel vorwählen (z. B. von einer Staffel aus der Suche oder "Alle Staffeln").
+  final String? initialSeasonId;
 
   @override
   ConsumerState<DetailsScreen> createState() => _DetailsScreenState();
@@ -151,7 +157,16 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) =>
             ErrorView(message: tr.contentCouldNotLoad(e), onRetry: () => ref.invalidate(itemProvider(widget.itemId))),
-        data: (item) => _buildContent(context, item),
+        data: (item) {
+          // Eine Staffel für sich hat keine eigene Seite: zur Serie, mit dieser Staffel vorgewählt.
+          if (item.isSeason && item.seriesId != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) context.replace('/item/${item.seriesId}?season=${item.id}');
+            });
+            return const Center(child: CircularProgressIndicator());
+          }
+          return _buildContent(context, item);
+        },
       ),
     );
   }
@@ -243,31 +258,45 @@ class _DetailsScreenState extends ConsumerState<DetailsScreen> {
                   ),
                 ),
               ),
-              if (item.isSeries) SliverToBoxAdapter(child: _SeasonsSection(series: item)),
+              if (item.isSeries)
+                SliverToBoxAdapter(
+                  child: _SeasonsSection(seriesId: item.id, initialSeasonId: widget.initialSeasonId),
+                ),
               if (item.isCollection) SliverToBoxAdapter(child: _CollectionRow(collectionId: item.id)),
+              // Folge: alle Staffeln der Serie, die eigene vorgewählt – so geht es jederzeit in
+              // andere Staffeln, ohne erst zurück zur Serie zu müssen.
               if (item.isEpisode && item.seriesId != null && item.seasonId != null)
                 SliverToBoxAdapter(
-                  child: _EpisodesRow(
+                  child: _SeasonsSection(
                     seriesId: item.seriesId!,
-                    seasonId: item.seasonId!,
-                    title: item.seasonName ?? tr.moreEpisodes,
+                    initialSeasonId: item.seasonId,
                     highlightId: item.id,
                   ),
                 ),
               if (!item.isSeries && !item.isCollection && item.chapters.length > 1)
                 SliverToBoxAdapter(
-                  child: _ScenesRow(
-                    item: item,
-                    mediaSourceId: _sourceId,
-                    audioIndex: _audioIndex,
-                    subtitleIndex: _subtitleIndex,
+                  child: AfterTransition(
+                    height: 260,
+                    child: _ScenesRow(
+                      item: item,
+                      mediaSourceId: _sourceId,
+                      audioIndex: _audioIndex,
+                      subtitleIndex: _subtitleIndex,
+                    ),
                   ),
                 ),
+              // Weiter unten: erst nach dem Einblenden der Seite aufbauen (Energiesparen/Fernseher).
               if (people.isNotEmpty)
                 SliverToBoxAdapter(
-                  child: PeopleRow(title: tr.cast, people: people),
+                  child: AfterTransition(
+                    height: 300,
+                    child: PeopleRow(title: tr.cast, people: people),
+                  ),
                 ),
-              if (similarId != null) SliverToBoxAdapter(child: _SimilarRow(itemId: similarId)),
+              if (similarId != null)
+                SliverToBoxAdapter(
+                  child: AfterTransition(height: 300, child: _SimilarRow(itemId: similarId)),
+                ),
               const SliverToBoxAdapter(child: SizedBox(height: 72)),
             ],
           ),
@@ -331,7 +360,7 @@ class _Header extends ConsumerWidget {
               MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: GestureDetector(
-                  onTap: item.seriesId == null ? null : () => context.push('/item/${item.seriesId}'),
+                  onTap: item.seriesId == null ? null : () => _openSeries(context, item),
                   child: TitleLogo(
                     logoUrl: api.imageUrlOrNull(Images.logo(item), maxWidth: 800),
                     title: item.seriesName ?? '',
@@ -526,9 +555,14 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
     final remembered = item.isEpisode && item.seriesId != null && account != null
         ? SeriesTracks.instance.get(account, item.seriesId!)
         : null;
+    final library = ref.watch(itemLibraryProvider((itemId: item.id, seriesId: item.seriesId))).value;
     return (
       audio: preferredAudioIndex(source, remembered: remembered?.audio, setting: settings.audioLanguage),
-      subtitle: preferredSubtitleIndex(source, remembered: remembered?.subtitle, setting: settings.subtitleLanguage),
+      subtitle: preferredSubtitleIndex(
+        source,
+        remembered: remembered?.subtitle,
+        setting: settings.subtitleLanguageFor(library),
+      ),
     );
   }
 
@@ -673,6 +707,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
       playButtons = PrimaryButton(
         label: next == null ? tr.play : '${tr.play}  ·  ${next.name}',
         icon: Icons.play_arrow_rounded,
+        autofocus: isTv,
         onPressed: next == null || next.isSeries ? null : () => playItem(context, next),
       );
     } else if (item.isSeries) {
@@ -684,17 +719,22 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
             ? tr.play
             : '${resuming ? tr.resume : tr.play}  ·  ${episode.episodeLabel ?? episode.name}',
         icon: Icons.play_arrow_rounded,
+        autofocus: isTv,
         loading: nextUp.isLoading,
         onPressed: episode == null ? null : () => playItem(context, episode),
       );
     } else {
       final resuming = item.userData.hasResumePosition;
-      playButtons = Row(
-        mainAxisSize: MainAxisSize.min,
+      // Wrap: Auf schmalen Bildschirmen (iPhone) rutscht "Von vorn" in die nächste Zeile.
+      playButtons = Wrap(
+        spacing: 12,
+        runSpacing: 12,
         children: [
           PrimaryButton(
             label: resuming ? '${tr.resume}  ·  ${remainingLabel(item) ?? ''}' : tr.play,
             icon: Icons.play_arrow_rounded,
+            // Fernseher: OK spielt gleich ab.
+            autofocus: isTv,
             onPressed: () => playItem(
               context,
               item,
@@ -703,8 +743,7 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
               subtitleIndex: widget.subtitleIndex,
             ),
           ),
-          if (resuming) ...[
-            const SizedBox(width: 12),
+          if (resuming)
             GlassButton(
               label: tr.fromStart,
               icon: Icons.replay_rounded,
@@ -717,7 +756,6 @@ class _ActionButtonsState extends ConsumerState<_ActionButtons> {
                 subtitleIndex: widget.subtitleIndex,
               ),
             ),
-          ],
         ],
       );
     }
@@ -840,9 +878,15 @@ class _DownloadButton extends ConsumerWidget {
 }
 
 class _SeasonsSection extends ConsumerStatefulWidget {
-  const _SeasonsSection({required this.series});
+  const _SeasonsSection({required this.seriesId, this.initialSeasonId, this.highlightId});
 
-  final BaseItem series;
+  final String seriesId;
+
+  /// Vorgewählte Staffel (sonst die der nächsten Folge).
+  final String? initialSeasonId;
+
+  /// Diese Folge hervorheben ("Diese Folge").
+  final String? highlightId;
 
   @override
   ConsumerState<_SeasonsSection> createState() => _SeasonsSectionState();
@@ -853,35 +897,48 @@ class _SeasonsSectionState extends ConsumerState<_SeasonsSection> {
 
   @override
   Widget build(BuildContext context) {
-    final seasons = ref.watch(seasonsProvider(widget.series.id)).value ?? const <BaseItem>[];
+    final seriesId = widget.seriesId;
+    final seasons = ref.watch(seasonsProvider(seriesId)).value ?? const <BaseItem>[];
     if (seasons.isEmpty) return const SizedBox(height: 200);
 
-    // Standardmäßig die Staffel der nächsten Folge zeigen.
-    final nextUpSeason = ref.watch(seriesNextUpProvider(widget.series.id)).value?.seasonId;
-    final selected = _selectedSeasonId ?? (seasons.any((s) => s.id == nextUpSeason) ? nextUpSeason! : seasons.first.id);
+    // Vorgewählt: die übergebene Staffel, sonst die der nächsten Folge.
+    final nextUpSeason = ref.watch(seriesNextUpProvider(seriesId)).value?.seasonId;
+    String? known(String? id) => seasons.any((s) => s.id == id) ? id : null;
+    final selected = _selectedSeasonId ?? known(widget.initialSeasonId) ?? known(nextUpSeason) ?? seasons.first.id;
+    final chips = [
+      for (final season in seasons)
+        _SeasonChip(
+          label: season.name,
+          watched: season.userData.played,
+          selected: season.id == selected,
+          onTap: () => setState(() => _selectedSeasonId = season.id),
+        ),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Viele Staffeln brechen in die nächste Zeile um, statt rechts aus dem Fenster zu laufen.
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              for (final season in seasons)
-                _SeasonChip(
-                  label: season.name,
-                  watched: season.userData.played,
-                  selected: season.id == selected,
-                  onTap: () => setState(() => _selectedSeasonId = season.id),
-                ),
-            ],
+        if (isPhone(context))
+          // iPhone: Staffeln in einer Zeile zum Wischen – spart Höhe für die Folgen.
+          HorizontalSwipe(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: kPageGutter),
+              child: Row(
+                children: [
+                  for (final (i, chip) in chips.indexed) ...[if (i > 0) const SizedBox(width: 8), chip],
+                ],
+              ),
+            ),
+          )
+        else
+          // Viele Staffeln brechen in die nächste Zeile um, statt rechts aus dem Fenster zu laufen.
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: kPageGutter),
+            child: Wrap(spacing: 10, runSpacing: 10, children: chips),
           ),
-        ),
         _SeasonTools(
-          series: widget.series,
+          seriesId: seriesId,
           season: seasons.firstWhere((s) => s.id == selected, orElse: () => seasons.first),
           // Nach "als gesehen markieren" springt "Als Nächstes" in die nächste Staffel –
           // die gewählte Staffel bleibt trotzdem stehen.
@@ -889,10 +946,29 @@ class _SeasonsSectionState extends ConsumerState<_SeasonsSection> {
         ),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
-          child: _EpisodesRow(key: ValueKey(selected), seriesId: widget.series.id, seasonId: selected),
+          child: _EpisodesRow(
+            key: ValueKey(selected),
+            seriesId: seriesId,
+            seasonId: selected,
+            highlightId: widget.highlightId,
+          ),
         ),
       ],
     );
+  }
+}
+
+/// Zur Serie mit der Staffel dieser Folge vorgewählt. Kam man von der Serie, geht es dorthin zurück
+/// (statt einen weiteren Stapel Seiten aufzubauen).
+void _openSeries(BuildContext context, BaseItem episode) {
+  final router = GoRouter.of(context);
+  final previous = router.routerDelegate.currentConfiguration.matches;
+  final cameFromSeries =
+      previous.length >= 2 && previous[previous.length - 2].matchedLocation == '/item/${episode.seriesId}';
+  if (cameFromSeries) {
+    context.pop();
+  } else {
+    context.push('/item/${episode.seriesId}?season=${episode.seasonId ?? ''}');
   }
 }
 
@@ -968,9 +1044,9 @@ class _SeasonChipState extends State<_SeasonChip> {
 /// Werkzeuge für die gewählte Staffel: Fortschritt, ganz als gesehen/ungesehen
 /// markieren, herunterladen – mit Fortschritt der Downloads dieser Staffel.
 class _SeasonTools extends ConsumerWidget {
-  const _SeasonTools({required this.series, required this.season, required this.onAction});
+  const _SeasonTools({required this.seriesId, required this.season, required this.onAction});
 
-  final BaseItem series;
+  final String seriesId;
   final BaseItem season;
 
   /// Vor jeder Aktion: Auswahl der Staffel festhalten.
@@ -978,7 +1054,7 @@ class _SeasonTools extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final episodes = ref.watch(episodesProvider((series.id, season.id))).value ?? const <BaseItem>[];
+    final episodes = ref.watch(episodesProvider((seriesId, season.id))).value ?? const <BaseItem>[];
     final watched = episodes.where((e) => e.userData.played).length;
     final allWatched = episodes.isNotEmpty && watched == episodes.length;
     final ids = {for (final e in episodes) e.id};
@@ -998,9 +1074,9 @@ class _SeasonTools extends ConsumerWidget {
       try {
         // Jellyfin markiert mit der Staffel alle ihre Folgen.
         await ref.read(apiProvider).setPlayed(season.id, played);
-        ref.invalidate(episodesProvider((series.id, season.id)));
-        ref.invalidate(seasonsProvider(series.id));
-        ref.invalidate(seriesNextUpProvider(series.id));
+        ref.invalidate(episodesProvider((seriesId, season.id)));
+        ref.invalidate(seasonsProvider(seriesId));
+        ref.invalidate(seriesNextUpProvider(seriesId));
         ref.invalidate(homeProvider);
         snack(played ? tr.seasonMarkedWatched(season.name) : tr.seasonMarkedUnwatched(season.name));
       } catch (_) {
@@ -1009,7 +1085,7 @@ class _SeasonTools extends ConsumerWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 0),
+      padding: EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 0),
       child: Wrap(
         spacing: 8,
         runSpacing: 6,
@@ -1098,11 +1174,10 @@ Future<bool> _confirmMarkSeason(BuildContext context, String season, int count) 
 }
 
 class _EpisodesRow extends ConsumerWidget {
-  const _EpisodesRow({super.key, required this.seriesId, required this.seasonId, this.title, this.highlightId});
+  const _EpisodesRow({super.key, required this.seriesId, required this.seasonId, this.highlightId});
 
   final String seriesId;
   final String seasonId;
-  final String? title;
   final String? highlightId;
 
   static const _width = 340.0;
@@ -1112,13 +1187,25 @@ class _EpisodesRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final episodes = ref.watch(episodesProvider((seriesId, seasonId))).value;
     final height = _width * 9 / 16 + kCardTextHeight + _overviewHeight;
-    if (episodes == null) {
-      return SizedBox(height: height + 28 + (title != null ? 30 : 0));
+    if (episodes == null) return SizedBox(height: height + 28);
+    // iPhone: Folgen untereinander als kompakte Zeilen statt einer Reihe großer Karten.
+    if (isPhone(context)) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(kPageGutter - 8, 4, kPageGutter - 8, 24),
+        child: Column(
+          children: [
+            for (final ep in episodes)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: EpisodeListTile(item: ep, highlighted: ep.id == highlightId),
+              ),
+          ],
+        ),
+      );
     }
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: MediaRow(
-        title: title,
         itemCount: episodes.length,
         height: height,
         itemBuilder: (context, i) {

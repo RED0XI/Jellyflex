@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/power.dart';
 import '../theme.dart';
 import 'buttons.dart';
 import '../l10n/strings.dart';
@@ -17,11 +18,18 @@ class Skeleton extends StatefulWidget {
 }
 
 class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin {
-  late final _anim = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))
-    ..repeat(reverse: true);
+  late final _anim = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
+  late final VoidCallback _stopWatching;
+
+  @override
+  void initState() {
+    super.initState();
+    _stopWatching = Power.whileAmbient(_anim, () => _anim.repeat(reverse: true));
+  }
 
   @override
   void dispose() {
+    _stopWatching();
     _anim.dispose();
     super.dispose();
   }
@@ -48,7 +56,7 @@ class RowsSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
+      padding: EdgeInsets.symmetric(horizontal: kPageGutter),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -7,8 +7,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jellyflex/core/session.dart';
 
-/// Adresse des Demo-Servers (dart run tool/mock_server.dart).
-const demoServer = 'http://localhost:8097';
+/// Adresse des Demo-Servers (dart run tool/mock_server.dart). Auf dem iPhone/Fernseher:
+/// Server mit `--lan` starten und `--dart-define=DEMO_SERVER=http://<IP des Rechners>:8097`.
+const demoServer = String.fromEnvironment('DEMO_SERVER', defaultValue: 'http://localhost:8097');
 
 /// Angemeldet am Demo-Server (beliebige Zugangsdaten).
 class DemoSession extends SessionController {

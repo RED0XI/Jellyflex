@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/format.dart';
 import '../../core/images.dart';
 import '../../core/models.dart';
+import '../../core/platform/device.dart';
 import '../../core/session.dart';
 import '../../theme.dart';
 import '../../widgets/backdrop_slideshow.dart';
@@ -136,7 +137,7 @@ class _PersonScreenState extends ConsumerState<PersonScreen> {
             slivers: [
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 64, kPageGutter, 36),
+                  padding: EdgeInsets.fromLTRB(kPageGutter, topInset(context) + 64, kPageGutter, 36),
                   child: _Header(person: person, movieCount: movies.length, seriesCount: series.length),
                 ),
               ),
@@ -157,11 +158,18 @@ class _PersonScreenState extends ConsumerState<PersonScreen> {
               if (items.isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 20),
-                    child: Row(
+                    padding: EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 20),
+                    // Wrap statt Row: Auf schmalen Bildschirmen (iPhone) rutschen die Filter unter
+                    // die Überschrift, statt rechts aus dem Bild zu laufen.
+                    child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 10,
+                      runSpacing: 10,
                       children: [
-                        Text(tr.onYourServer, style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
-                        const SizedBox(width: 24),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 14),
+                          child: Text(tr.onYourServer, style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
+                        ),
                         // Filter nur, wenn es beides gibt.
                         if (movies.isNotEmpty && series.isNotEmpty)
                           for (final (f, label) in [
@@ -169,20 +177,13 @@ class _PersonScreenState extends ConsumerState<PersonScreen> {
                             (_Filter.movies, tr.moviesCount(movies.length)),
                             (_Filter.series, tr.showsCount(series.length)),
                           ])
-                            Padding(
-                              padding: const EdgeInsets.only(right: 10),
-                              child: _FilterChip(
-                                label: label,
-                                selected: _filter == f,
-                                onTap: () => setState(() => _filter = f),
-                              ),
-                            ),
+                            _FilterChip(label: label, selected: _filter == f, onTap: () => setState(() => _filter = f)),
                       ],
                     ),
                   ),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: kPageGutter),
+                  padding: EdgeInsets.symmetric(horizontal: kPageGutter),
                   // Spalten aus dem verfügbaren Platz berechnen (wie in der Bibliothek).
                   sliver: SliverLayoutBuilder(
                     builder: (context, constraints) {
@@ -262,26 +263,110 @@ class _HeaderState extends ConsumerState<_Header> {
       if (widget.seriesCount > 0) tr.showCount(widget.seriesCount),
     ];
 
+    // iPhone: Bild klein neben Name und Daten, die Biografie darunter über die ganze Breite –
+    // neben dem großen Bild blieben für den Text sonst nur ein paar Buchstaben je Zeile.
+    final phone = isPhone(context);
+    final photoBox = Container(
+      width: phone ? 112 : 240,
+      height: phone ? 168 : 360,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 30, offset: Offset(0, 14))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: JfImage(
+          url: api.imageUrlOrNull(photo, fillWidth: 480, fillHeight: 720),
+          blurHash: photo?.blurHash,
+          alignment: Alignment.topCenter,
+          fallback: Icon(Icons.person_rounded, size: 96, color: AppColors.textMuted),
+        ),
+      ),
+    );
+    final head = <Widget>[
+      Text(
+        person.name,
+        style: TextStyle(
+          fontSize: phone ? 28 : 52,
+          fontWeight: FontWeight.w800,
+          letterSpacing: phone ? -0.5 : -1,
+          height: 1.1,
+        ),
+      ),
+      const SizedBox(height: 14),
+      for (final fact in facts)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Text(fact, style: const TextStyle(fontSize: 15.5, color: Color(0xFFDADCE5))),
+        ),
+      if (counts.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(tr.onYourServerCounts(counts.join(' · ')), style: TextStyle(color: AppColors.textSecondary)),
+        ),
+    ];
+    final Widget? bioBox = bio == null || bio.isEmpty
+        ? null
+        : LayoutBuilder(
+            builder: (context, constraints) {
+              const style = TextStyle(fontSize: 15.5, height: 1.6, color: Color(0xFFD5D7E0));
+              // Mit derselben Schrift messen, die auch angezeigt wird.
+              final painter = TextPainter(
+                text: TextSpan(text: bio, style: DefaultTextStyle.of(context).style.merge(style)),
+                maxLines: 6,
+                textDirection: TextDirection.ltr,
+                textScaler: MediaQuery.textScalerOf(context),
+              )..layout(maxWidth: constraints.maxWidth);
+              final long = painter.didExceedMaxLines;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topLeft,
+                    child: Text(
+                      bio,
+                      maxLines: _expanded ? null : 6,
+                      overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                      style: style,
+                    ),
+                  ),
+                  if (long)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: TextButton.icon(
+                        onPressed: () => setState(() => _expanded = !_expanded),
+                        icon: Icon(_expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+                        label: Text(_expanded ? tr.showLess : tr.showMore),
+                      ),
+                    ),
+                ],
+              );
+            },
+          );
+    if (phone) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              photoBox,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: head),
+              ),
+            ],
+          ),
+          if (bioBox != null) ...[const SizedBox(height: 18), bioBox],
+        ],
+      );
+    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 240,
-          height: 360,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 30, offset: Offset(0, 14))],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: JfImage(
-              url: api.imageUrlOrNull(photo, fillWidth: 480, fillHeight: 720),
-              blurHash: photo?.blurHash,
-              alignment: Alignment.topCenter,
-              fallback: Icon(Icons.person_rounded, size: 96, color: AppColors.textMuted),
-            ),
-          ),
-        ),
+        photoBox,
         const SizedBox(width: 44),
         Expanded(
           child: ConstrainedBox(
@@ -290,66 +375,8 @@ class _HeaderState extends ConsumerState<_Header> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 8),
-                Text(
-                  person.name,
-                  style: const TextStyle(fontSize: 52, fontWeight: FontWeight.w800, letterSpacing: -1, height: 1.1),
-                ),
-                const SizedBox(height: 14),
-                for (final fact in facts)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(fact, style: const TextStyle(fontSize: 15.5, color: Color(0xFFDADCE5))),
-                  ),
-                if (counts.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      tr.onYourServerCounts(counts.join(' · ')),
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                  ),
-                if (bio != null && bio.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  // Kurze Texte ganz zeigen, lange auf- und zuklappbar.
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      const style = TextStyle(fontSize: 15.5, height: 1.6, color: Color(0xFFD5D7E0));
-                      // Mit derselben Schrift messen, die auch angezeigt wird.
-                      final painter = TextPainter(
-                        text: TextSpan(text: bio, style: DefaultTextStyle.of(context).style.merge(style)),
-                        maxLines: 6,
-                        textDirection: TextDirection.ltr,
-                        textScaler: MediaQuery.textScalerOf(context),
-                      )..layout(maxWidth: constraints.maxWidth);
-                      final long = painter.didExceedMaxLines;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 250),
-                            curve: Curves.easeOutCubic,
-                            alignment: Alignment.topLeft,
-                            child: Text(
-                              bio,
-                              maxLines: _expanded ? null : 6,
-                              overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                              style: style,
-                            ),
-                          ),
-                          if (long)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: TextButton.icon(
-                                onPressed: () => setState(() => _expanded = !_expanded),
-                                icon: Icon(_expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded),
-                                label: Text(_expanded ? tr.showLess : tr.showMore),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                ],
+                ...head,
+                if (bioBox != null) ...[const SizedBox(height: 20), bioBox],
               ],
             ),
           ),
@@ -374,14 +401,20 @@ class _FilterChip extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         height: 38,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: selected ? Colors.white : Colors.white.withValues(alpha: hovered ? 0.16 : 0.08),
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(
-          label,
-          style: TextStyle(fontWeight: FontWeight.w600, color: selected ? AppColors.background : AppColors.textPrimary),
+        // So breit wie der Text (im Wrap würde ein ausgerichteter Container die ganze Zeile füllen).
+        child: Center(
+          widthFactor: 1,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: selected ? AppColors.background : AppColors.textPrimary,
+            ),
+          ),
         ),
       ),
     );

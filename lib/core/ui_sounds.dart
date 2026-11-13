@@ -5,11 +5,14 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// Kleine Oberflächen-Klänge (Glücksrad). Die WAV-Dateien erzeugt
+import 'platform/device.dart';
+
+/// Kleine Oberflächen-Klänge (Glücksrad, Intro). Die WAV-Dateien erzeugt
 /// `tool/generate_sounds.dart`.
 enum UiSound {
   tick('tick'),
-  win('win');
+  win('win'),
+  intro('intro');
 
   const UiSound(this.file);
 
@@ -37,10 +40,20 @@ abstract final class UiSounds {
   static _PlaySoundDart? _playSound;
   static bool _initialized = false;
 
+  static Future<void>? _preloading;
+
+  /// Fertig geladen (das Intro wartet kurz darauf, damit sein Klang von Anfang an da ist).
+  static Future<void> get ready => _preloading ?? Future.value();
+
   /// Klänge vorab laden (einmal beim Start), damit der erste Klick nicht hängt.
-  static Future<void> preload() async {
+  static Future<void> preload() => _preloading ??= _preload();
+
+  /// Über den Kanal `jellyflex/shell`: macOS/iOS (AppShell.swift) und Android (MainActivity.kt).
+  static bool get _viaShell => isApple || Platform.isAndroid;
+
+  static Future<void> _preload() async {
     if (_initialized) return;
-    if (Platform.isMacOS) return _preloadMac();
+    if (_viaShell) return _preloadMac();
     if (!Platform.isWindows) return;
     _initialized = true;
     try {
@@ -71,16 +84,17 @@ abstract final class UiSounds {
         if (ok == true) _macLoaded.add(sound);
       }
     } on MissingPluginException {
-      // Ohne macOS-Runner (z. B. in Tests) keine Klänge.
+      // Ohne macOS-/iOS-Runner (z. B. in Tests) keine Klänge.
     } catch (e) {
       debugPrint('Klänge nicht verfügbar: $e');
     }
   }
 
-  /// Spielt [sound]; `true`, wenn das System den Klang angenommen hat.
-  static bool play(UiSound sound) {
-    if (!enabled) return false;
-    if (Platform.isMacOS) {
+  /// Spielt [sound]; `true`, wenn das System den Klang angenommen hat. [always]: auch wenn
+  /// "Klänge" aus ist (das Intro hat einen eigenen Schalter).
+  static bool play(UiSound sound, {bool always = false}) {
+    if (!enabled && !always) return false;
+    if (_viaShell) {
       if (!_macLoaded.contains(sound)) return false;
       _shell.invokeMethod<void>('playSound', sound.file).catchError((_) {});
       return true;
@@ -93,5 +107,5 @@ abstract final class UiSounds {
 
   /// Für Tests: wie viele Klänge geladen sind.
   @visibleForTesting
-  static int get loadedCount => Platform.isMacOS ? _macLoaded.length : _loaded.length;
+  static int get loadedCount => _viaShell ? _macLoaded.length : _loaded.length;
 }

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/platform/device.dart';
 import '../../core/settings.dart';
 import '../../l10n/strings.dart';
 import '../../theme.dart';
 import '../../widgets/ambient_background.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/buttons.dart';
+import '../../widgets/focus_navigation.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/layout_picker.dart';
 import '../../widgets/theme_picker.dart';
@@ -26,7 +28,20 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
 
   void _finish() => ref.read(settingsProvider.notifier).update((s) => s.copyWith(setupDone: true));
 
-  void _next() => _step == _steps - 1 ? _finish() : setState(() => _step++);
+  void _next() => _step == _steps - 1 ? _finish() : _goTo(_step + 1);
+
+  /// Schritt wechseln. Fernseher: Der fokussierte Knopf gehört zum alten Schritt und verschwindet
+  /// mit ihm – danach bekommt das erste Element des neuen Schritts den Fokus.
+  void _goTo(int step) {
+    setState(() => _step = step);
+    if (!isTv) return;
+    Future<void>.delayed(const Duration(milliseconds: 320), () {
+      if (!mounted) return;
+      final current = FocusManager.instance.primaryFocus;
+      if (current != null && current is! FocusScopeNode && current.context != null && current.parent != null) return;
+      focusFirstUnder(FocusScope.of(context));
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,19 +114,25 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
           children: [
             if (_step > 0)
               TextButton.icon(
-                onPressed: () => setState(() => _step--),
+                onPressed: () => _goTo(_step - 1),
                 icon: const Icon(Icons.arrow_back_rounded, size: 18),
                 label: Text(tr.back),
               )
             else
               TextButton(onPressed: _finish, child: Text(tr.setupLater)),
-            const Spacer(),
-            SizedBox(
-              width: 200,
-              child: PrimaryButton(
-                label: last ? tr.setupFinish : tr.next,
-                icon: last ? Icons.check_rounded : Icons.arrow_forward_rounded,
-                onPressed: _next,
+            const SizedBox(width: 12),
+            // Rechtsbündig, höchstens 200 breit – auf schmalen Bildschirmen (iPhone) entsprechend schmaler.
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: 200,
+                  child: PrimaryButton(
+                    label: last ? tr.setupFinish : tr.next,
+                    icon: last ? Icons.check_rounded : Icons.arrow_forward_rounded,
+                    onPressed: _next,
+                  ),
+                ),
               ),
             ),
           ],
@@ -197,12 +218,14 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
             value: s.soundEffects,
             onChanged: (v) => ctrl.update((s) => s.copyWith(soundEffects: v)),
           ),
-          _Option(
-            title: tr.updateCheck,
-            hint: tr.updateCheckHint,
-            value: s.updateCheck,
-            onChanged: (v) => ctrl.update((s) => s.copyWith(updateCheck: v)),
-          ),
+          // iPhone/iPad bekommen Updates über den App Store.
+          if (isDesktop)
+            _Option(
+              title: tr.updateCheck,
+              hint: tr.updateCheckHint,
+              value: s.updateCheck,
+              onChanged: (v) => ctrl.update((s) => s.copyWith(updateCheck: v)),
+            ),
         ],
       ),
     ),

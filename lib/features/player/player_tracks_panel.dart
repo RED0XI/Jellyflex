@@ -17,6 +17,8 @@ class _TracksPanel extends StatefulWidget {
     required this.onAudio,
     required this.onSubtitle,
     required this.onClose,
+    required this.onStyle,
+    required this.maxHeight,
   });
 
   final Player player;
@@ -27,6 +29,10 @@ class _TracksPanel extends StatefulWidget {
   final ValueChanged<String> onAudio;
   final ValueChanged<String> onSubtitle;
   final VoidCallback onClose;
+
+  /// Öffnet "Untertitel anpassen".
+  final VoidCallback onStyle;
+  final double maxHeight;
 
   @override
   State<_TracksPanel> createState() => _TracksPanelState();
@@ -53,10 +59,10 @@ class _TracksPanelState extends State<_TracksPanel> {
 
   @override
   Widget build(BuildContext context) {
-    // So hoch wie die längere Spalte (höchstens 380), der Trennstrich reicht durch.
+    // So hoch wie die längere Spalte (begrenzt), der Trennstrich reicht durch.
     return Container(
       width: 640,
-      constraints: const BoxConstraints(maxHeight: 380),
+      constraints: BoxConstraints(maxHeight: math.min(380, widget.maxHeight)),
       padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
       decoration: BoxDecoration(
         color: const Color(0xF2101219),
@@ -85,6 +91,11 @@ class _TracksPanelState extends State<_TracksPanel> {
                 selectedId: widget.selectedSubtitle(),
                 emptyText: tr.noSubtitles,
                 onSelect: widget.onSubtitle,
+                trailing: _PlayerIconButton(
+                  icon: Icons.format_size_rounded,
+                  tooltip: tr.subtitleAppearance,
+                  onPressed: widget.onStyle,
+                ),
               ),
             ),
           ],
@@ -101,8 +112,11 @@ class _TrackColumn extends StatelessWidget {
     required this.selectedId,
     required this.emptyText,
     required this.onSelect,
+    this.trailing,
   });
 
+  /// Knopf rechts neben der Überschrift.
+  final Widget? trailing;
   final String title;
   final List<_TrackEntry> entries;
   final String? selectedId;
@@ -116,8 +130,15 @@ class _TrackColumn extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-          child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          padding: EdgeInsets.fromLTRB(16, 4, trailing == null ? 16 : 4, trailing == null ? 10 : 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              ),
+              ?trailing,
+            ],
+          ),
         ),
         // "Aus" und "Untertitel suchen …" zählen nicht als Spur.
         if (!entries.any((e) => e.id != 'no' && e.id != 'search'))

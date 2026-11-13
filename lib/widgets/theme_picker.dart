@@ -41,6 +41,7 @@ class _ThemeTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = palette;
     return Focusable(
+      tvRing: false,
       onTap: onTap,
       builder: (context, hovered) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,

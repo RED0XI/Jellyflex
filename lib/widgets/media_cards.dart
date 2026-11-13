@@ -6,6 +6,7 @@ import '../core/format.dart';
 import '../core/images.dart';
 import '../core/layouts.dart';
 import '../core/models.dart';
+import '../core/platform/device.dart';
 import '../core/play_queue.dart';
 import '../core/session.dart';
 import '../core/settings.dart';
@@ -16,12 +17,18 @@ import 'focusable.dart';
 import 'hover_preview.dart';
 import 'jf_image.dart';
 
-/// Kartengrößen – abhängig vom Layout (siehe [AppLayout.cardScale]).
-double get kPosterWidth => 168 * appLayout.cardScale;
-double get kLandscapeWidth => 320 * appLayout.cardScale;
+/// Kartengrößen – abhängig vom Layout (siehe [AppLayout.cardScale]). Auf dem iPhone fest und kleiner:
+/// gut drei Poster bzw. anderthalb Querformat-Karten nebeneinander, wie bei Streaming-Apps üblich.
+double get _cardScale => isPhoneDevice ? 0.67 : appLayout.cardScale;
+double get kPosterWidth => 168 * _cardScale;
+double get kLandscapeWidth => 320 * _cardScale;
 
 /// Platz für Titel unter den Karten (0, wenn das Layout sie im Bild zeigt).
 double get kCardTextHeight => appLayout.cardTitles ? 52 : 0;
+
+/// Fernseher: der Titel, dessen Karte gerade den Fokus hat (die Startseite zeigt oben sein Bild und
+/// seine Infos).
+final tvFocusedItem = ValueNotifier<BaseItem?>(null);
 
 /// Öffnet die Detailseite eines Eintrags – sie wächst aus der angeklickten Karte heraus.
 void openItem(BuildContext context, BaseItem item) {
@@ -98,7 +105,18 @@ Future<void> playShuffled(
 
 /// Gemeinsame Hover-Logik: leicht vergrößern, Schatten, Rahmen.
 class _HoverCard extends StatefulWidget {
-  const _HoverCard({required this.builder, required this.onTap, this.onContextMenu, this.label});
+  const _HoverCard({
+    required this.builder,
+    required this.onTap,
+    this.onContextMenu,
+    this.label,
+    this.item,
+    this.autofocus = false,
+  });
+
+  /// Titel der Karte – am Fernseher wird er beim Fokussieren zu [tvFocusedItem].
+  final BaseItem? item;
+  final bool autofocus;
 
   /// Name für Bildschirmleser (in Layouts, die den Titel nur beim Auswählen zeigen).
   final String? label;
@@ -116,9 +134,13 @@ class _HoverCard extends StatefulWidget {
 class _HoverCardState extends State<_HoverCard> {
   @override
   Widget build(BuildContext context) {
+    final item = widget.item;
     return Focusable(
+      tvRing: false,
       onTap: widget.onTap,
       onSecondaryTap: widget.onContextMenu,
+      autofocus: widget.autofocus,
+      onFocusChange: isTv && item != null ? (focused) => focused ? tvFocusedItem.value = item : null : null,
       semanticLabel: appLayout.cardTitles ? null : widget.label,
       builder: (context, highlighted) => widget.builder(highlighted),
     );
@@ -379,9 +401,10 @@ class _Badge extends StatelessWidget {
 
 /// Hochformat-Karte (Poster).
 class PosterCard extends ConsumerWidget {
-  const PosterCard({super.key, required this.item, this.width});
+  const PosterCard({super.key, required this.item, this.width, this.autofocus = false});
 
   final BaseItem item;
+  final bool autofocus;
 
   /// Breite (Standard: Größe des Layouts).
   final double? width;
@@ -396,6 +419,8 @@ class PosterCard extends ConsumerWidget {
     return SizedBox(
       width: width,
       child: _HoverCard(
+        item: item,
+        autofocus: autofocus,
         label: [cardTitle(item), ?cardSubtitle(item)].join(', '),
         onTap: () => openItem(context, item),
         onContextMenu: (pos) => showItemContextMenu(context, item, pos),
@@ -431,9 +456,18 @@ class PosterCard extends ConsumerWidget {
 
 /// Querformat-Karte (Weiterschauen, Episoden). Beim Hover erscheint ein Play-Knopf.
 class LandscapeCard extends ConsumerWidget {
-  const LandscapeCard({super.key, required this.item, this.width, this.onTap, this.title, this.subtitle});
+  const LandscapeCard({
+    super.key,
+    required this.item,
+    this.width,
+    this.onTap,
+    this.title,
+    this.subtitle,
+    this.autofocus = false,
+  });
 
   final BaseItem item;
+  final bool autofocus;
 
   /// Breite (Standard: Größe des Layouts).
   final double? width;
@@ -451,6 +485,8 @@ class LandscapeCard extends ConsumerWidget {
     return SizedBox(
       width: width,
       child: _HoverCard(
+        item: item,
+        autofocus: autofocus,
         label: [title ?? cardTitle(item), ?(subtitle ?? cardSubtitle(item))].join(', '),
         onTap: onTap ?? () => openItem(context, item),
         onContextMenu: (pos) => showItemContextMenu(context, item, pos),
@@ -472,13 +508,17 @@ class LandscapeCard extends ConsumerWidget {
                     fallback: _TitleFallback(cardTitle(item)),
                   ),
                   HoverPreview(item: item, active: hovered),
-                  AnimatedOpacity(
-                    opacity: hovered ? 1 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: Container(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      alignment: Alignment.center,
-                      child: _PlayCircle(onTap: () => playItem(context, item)),
+                  // Unsichtbar nicht antippbar – sonst startet ein Fingertipp aufs Bild sofort das Video.
+                  IgnorePointer(
+                    ignoring: !hovered,
+                    child: AnimatedOpacity(
+                      opacity: hovered ? 1 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        alignment: Alignment.center,
+                        child: _PlayCircle(onTap: () => playItem(context, item)),
+                      ),
                     ),
                   ),
                   _Badge(item),
@@ -566,4 +606,117 @@ int _bucket(double px) {
     if (px <= size) return size;
   }
   return 1600;
+}
+
+/// Folge als kompakte Zeile (iPhone): kleines Standbild links, Titel, Länge und Inhalt rechts –
+/// so passen fünf, sechs Folgen auf den Bildschirm statt einer. Tippen spielt ab, lange drücken
+/// öffnet das Menü.
+class EpisodeListTile extends ConsumerWidget {
+  const EpisodeListTile({super.key, required this.item, this.highlighted = false});
+
+  final BaseItem item;
+
+  /// Die Folge, von deren Seite man kommt ("Diese Folge").
+  final bool highlighted;
+
+  static const _imageWidth = 136.0;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final api = ref.watch(apiProvider);
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final image = Images.landscape(item);
+    final w = _bucket(_imageWidth * dpr);
+    final number = item.indexNumber;
+    final meta = [if (item.runtime != null) formatRuntime(item.runtime!), if (highlighted) tr.thisEpisode].join(' · ');
+    return Focusable(
+      onTap: () => playItem(context, item),
+      onSecondaryTap: (pos) => showItemContextMenu(context, item, pos),
+      semanticLabel: '${number != null ? '$number. ' : ''}${item.name}',
+      builder: (context, hovered) => GestureDetector(
+        onLongPressStart: (d) => showItemContextMenu(context, item, d.globalPosition),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: highlighted || hovered ? Colors.white.withValues(alpha: 0.07) : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: highlighted ? AppColors.accent.withValues(alpha: 0.6) : Colors.transparent,
+              width: 1.2,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: _imageWidth,
+                  height: _imageWidth * 9 / 16,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      JfImage(
+                        url: api.imageUrlOrNull(image, fillWidth: w, fillHeight: (w * 9 / 16).round()),
+                        blurHash: image?.blurHash,
+                        fallback: _TitleFallback(item.name),
+                      ),
+                      Center(
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.black.withValues(alpha: 0.45),
+                          ),
+                          child: const Icon(Icons.play_arrow_rounded, size: 20, color: Colors.white),
+                        ),
+                      ),
+                      _Badge(item),
+                      if (progressOf(item) case final p?) _ProgressBar(p),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${number != null ? '$number. ' : ''}${item.name}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, height: 1.25),
+                    ),
+                    if (meta.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        meta,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: highlighted ? AppColors.accent : AppColors.textSecondary,
+                          fontWeight: highlighted ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                    if (item.overview case final overview? when overview.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        overview,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, height: 1.35, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -232,4 +232,43 @@ void main() {
     expect(DownloadFolder.freeBytes(Directory.systemTemp.path), greaterThan(0));
     expect(DownloadFolder.defaultPath, '$home/Movies/Jellyflex');
   });
+  test('Umgezogener Download-Ordner (iOS nach App-Update): Einträge zeigen wieder auf die Dateien', () async {
+    final sep = Platform.pathSeparator;
+    // So lag der Download vor dem Update: in einem Ordner, den es nicht mehr gibt.
+    final oldRoot = '${Directory.systemTemp.path}${sep}jellyflex_alter_container_${root.hashCode}';
+    final name = folderName('abc123');
+    File('${root.path}${sep}downloads.json').writeAsStringSync(
+      jsonEncode({
+        'entries': [
+          {
+            'itemId': 'abc123',
+            'serverUrl': _parent.serverUrl,
+            'userId': _parent.userId,
+            'name': 'Film',
+            'type': 'Movie',
+            'folder': '$oldRoot$sep$name',
+            'status': 'done',
+            'received': 5,
+            'total': 5,
+            'mediaFile': '$oldRoot$sep$name${sep}video.mkv',
+          },
+        ],
+        'roots': [oldRoot],
+      }),
+    );
+    // Die Dateien sind mit dem Container umgezogen: gleicher Name im aktuellen Download-Ordner.
+    Directory('${root.path}$sep$name').createSync(recursive: true);
+    File('${root.path}$sep$name${sep}video.mkv').writeAsStringSync('video');
+
+    container.dispose();
+    container = makeContainer();
+    await container.read(sessionProvider.future);
+    final entry = container.read(downloadsProvider.notifier).entryFor('abc123')!;
+    expect(entry.folder, '${root.path}$sep$name');
+    expect(File(entry.mediaFile!).existsSync(), isTrue, reason: 'spielt wieder offline');
+
+    // Löschen entfernt jetzt die echten Dateien.
+    await container.read(downloadsProvider.notifier).remove(entry.itemId);
+    expect(Directory('${root.path}$sep$name').existsSync(), isFalse);
+  });
 }

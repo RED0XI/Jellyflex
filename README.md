@@ -60,9 +60,12 @@ Applications to the Trash.
 - **Direct Play** of practically every format through mpv (HEVC, AV1, HDR, DTS/TrueHD, ASS/PGS subtitles)
 - **Pick audio and subtitles on the details page** or in the player; the language you pick is **remembered per series**
 - **Search and load subtitles through your server** (e.g. the OpenSubtitles plugin) – sharp, clean subtitle rendering
+- **Subtitles your way**: font, colour, edge, size and height in the picture – also per library
+  (e.g. anime large and yellow), right from the player via "Aa"
 - **Skip intro/recap** (Media Segments, e.g. from the Intro Skipper plugin), **next episode** countdown
 - **Trickplay** previews while seeking, **chapters** with pictures (`C`) and a **Scenes** row on the details page
 - Quality limit (the server converts on the fly), playback speed, audio/subtitle delay
+- **Your own skip steps** (5 to 60 seconds back and forward); **hold the picture to play faster**
 - Volume is remembered (up to 150 % and with the mouse wheel); resuming starts a few seconds earlier;
   **"Still watching?"** after several episodes in a row; **shuffle play** for series, seasons and libraries
 - Progress is reported to the server continuously
@@ -73,7 +76,8 @@ Applications to the Trash.
 - Home with rotating banner, Continue watching, Next up, New in …, Favorites – rows can be
   reordered and hidden
 - Details pages with backdrop slideshow, logo, **IMDb/TMDB and Rotten Tomatoes ratings**, seasons & episodes, cast, similar titles
-- **Upcoming** calendar with the next episodes of your shows; **browse by genre** with a page per genre
+- Every episode page shows **all seasons** – switch seasons without going back to the series
+- **Upcoming** calendar with the next episodes of your shows; **browse by genre** with a picture per genre and a page for each
 - **People pages**: photo, biography and everything with that person on your server
 - **Versions**: if a movie exists twice (e.g. 4K and 1080p), pick the version; badges show 4K, HDR/Dolby Vision, Atmos
 - Library grid with sorting and filters, **multi-select**, smart search (titles, episodes, people)
@@ -95,6 +99,12 @@ Applications to the Trash.
 - Languages: English, German, French, Spanish, Turkish
 - Settings in clear sections with a search field
 - Extras: "Surprise me" slot machine, screensaver, seasonal touches, year in review, theme music
+- A short **intro** at start (animated logo with its own sound) – both can be switched off separately
+- **Energy saving**: on battery Jellyflex runs calmer (no trailers in the banner, no Ambilight,
+  lighter video scaling) – automatically, always or never
+
+**In the works:** Jellyflex for iPhone/iPad and Android TV/Fire TV. The groundwork is in this
+repository (`ios/`, `android/`), but there are no downloads for them yet.
 
 ### Privacy & security
 
@@ -124,7 +134,8 @@ On macOS, use `⌘` instead of `Ctrl` (`⌘F` search, `⌘,` settings), `⌃⌘F
 | Everywhere | `Ctrl+,` | Settings |
 | Cards | Right-click | Play, mark watched, add to list, download … |
 | Player | `Space` / `K` | Play / pause |
-| Player | `←` / `→` (`J` / `L`) | 10 s back / forward |
+| Player | `←` / `→` (`J` / `L`) | Back / forward (10 s, adjustable in the settings) |
+| Player | Hold the mouse button on the picture | Play faster while held (2×, adjustable) |
 | Player | `↑` / `↓` / mouse wheel | Volume (up to 150 %) |
 | Player | `F` / double-click | Fullscreen |
 | Player | `M` | Mute |
@@ -141,7 +152,7 @@ Without a mouse, the arrow keys move the selection like on a TV, Enter opens, an
 
 | Controller (Xbox, PlayStation …) | Outside the player | In the player |
 |---|---|---|
-| D-pad / left stick | Move selection | ←/→ seek 10 s |
+| D-pad / left stick | Move selection | ←/→ seek |
 | A | Select | Play / pause |
 | B | Back | Close player |
 | X | Context menu | Audio & subtitles |
@@ -238,8 +249,10 @@ lib/
   features/    Screens: login, home, details, library, search, player, downloads, settings …
   widgets/     Building blocks: cards, rows, buttons, title bar, images, scrolling
   l10n/        All UI texts (English/German in strings.dart, others in strings_fr/es/tr.dart)
-windows/       Windows runner (native taskbar, media overlay, network checks)
-macos/         macOS runner (Dock menu, Now Playing, Keychain, network checks)
+windows/       Windows runner (native taskbar, media overlay, network checks, power status)
+macos/         macOS runner (Dock menu, Now Playing, Keychain, network checks, power status)
+ios/           iPhone/iPad runner (in the works)
+android/       Android TV/Fire TV runner (in the works)
 tool/          Demo server, installer/DMG build, update signing, icons
 test/          Fast tests · integration_test/  App tests in a real window
 ```

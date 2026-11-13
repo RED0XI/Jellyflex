@@ -16,6 +16,7 @@ import '../../theme.dart';
 import '../live_handler.dart';
 import 'performance_dialog.dart';
 import '../../core/platform/app_paths.dart';
+import '../../core/platform/device.dart';
 
 void _notice(String text, {required String action, required VoidCallback onAction}) {
   appMessengerKey.currentState?.showSnackBar(
@@ -214,25 +215,27 @@ Future<void> showErrorReport(BuildContext context, WidgetRef ref) {
             icon: const Icon(Icons.copy_rounded, size: 18),
             label: Text(tr.copy),
           ),
-          FilledButton.icon(
-            onPressed: () async {
-              final stamp = DateTime.now().toIso8601String().substring(0, 16).replaceAll(RegExp('[-:T]'), '');
-              final location = await getSaveLocation(
-                suggestedName: 'jellyflex-bericht-$stamp.txt',
-                acceptedTypeGroups: const [
-                  XTypeGroup(label: 'Text', extensions: ['txt']),
-                ],
-              );
-              if (location == null) return;
-              final file = File(location.path);
-              await file.writeAsString(report);
-              if (context.mounted) Navigator.pop(context);
-              // Im Explorer bzw. Finder zeigen.
-              await AppPaths.reveal(file.path);
-            },
-            icon: const Icon(Icons.save_alt_rounded, size: 18),
-            label: Text(tr.saveAs),
-          ),
+          // "Speichern unter" gibt es nur am Desktop (sonst bleibt Kopieren).
+          if (isDesktop)
+            FilledButton.icon(
+              onPressed: () async {
+                final stamp = DateTime.now().toIso8601String().substring(0, 16).replaceAll(RegExp('[-:T]'), '');
+                final location = await getSaveLocation(
+                  suggestedName: 'jellyflex-bericht-$stamp.txt',
+                  acceptedTypeGroups: const [
+                    XTypeGroup(label: 'Text', extensions: ['txt']),
+                  ],
+                );
+                if (location == null) return;
+                final file = File(location.path);
+                await file.writeAsString(report);
+                if (context.mounted) Navigator.pop(context);
+                // Im Explorer bzw. Finder zeigen.
+                await AppPaths.reveal(file.path);
+              },
+              icon: const Icon(Icons.save_alt_rounded, size: 18),
+              label: Text(tr.saveAs),
+            ),
         ],
       );
     },
@@ -260,22 +263,24 @@ class AboutRows extends ConsumerWidget {
             style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
           ),
         ),
-        row(
-          title: tr.updateCheck,
-          subtitle: tr.updateCheckHint,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextButton(onPressed: () => checkForUpdateNow(context), child: Text(tr.checkNow)),
-              const SizedBox(width: 6),
-              toggle(
-                value: s.updateCheck,
-                onChanged: (v) => ctrl.update((s) => s.copyWith(updateCheck: v)),
-              ),
-            ],
+        // iPhone/iPad bekommen Updates über den App Store.
+        if (isDesktop)
+          row(
+            title: tr.updateCheck,
+            subtitle: tr.updateCheckHint,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(onPressed: () => checkForUpdateNow(context), child: Text(tr.checkNow)),
+                const SizedBox(width: 6),
+                toggle(
+                  value: s.updateCheck,
+                  onChanged: (v) => ctrl.update((s) => s.copyWith(updateCheck: v)),
+                ),
+              ],
+            ),
           ),
-        ),
-        if (s.updateCheck)
+        if (isDesktop && s.updateCheck)
           row(
             title: tr.autoUpdate,
             subtitle: tr.autoUpdateHint,

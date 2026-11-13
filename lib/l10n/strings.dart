@@ -244,11 +244,57 @@ class S {
       _t('Off: only the “Skip intro” button appears.', 'Aus: Es erscheint nur der Knopf „Intro überspringen“.');
   String get autoplayNext => _t('Play next episode automatically', 'Nächste Folge automatisch abspielen');
   String get autoplayNextHint => _t('With a countdown at the end of an episode.', 'Mit Countdown am Ende einer Folge.');
+  String get seekBack => _t('Skip back', 'Zurückspulen');
+  String get seekForward => _t('Skip forward', 'Vorspulen');
+  String get seekStepHint => _t(
+    'Buttons, arrow keys, double tap and remote jump this far.',
+    'So weit springen Knöpfe, Pfeiltasten, Doppeltipp und Fernbedienung.',
+  );
+  String get holdSpeed => _t('Hold for faster playback', 'Halten für schnelleres Abspielen');
+  String get holdSpeedHint => _t(
+    'Press and hold the picture (finger, mouse or OK on the remote) – plays faster while held.',
+    'Bild gedrückt halten (Finger, Maus oder OK auf der Fernbedienung) – spielt schneller, solange du hältst.',
+  );
+  String speedTimes(double speed) =>
+      '${speed.toString().replaceAll(RegExp(r'\.0$'), '').replaceAll('.', _de ? ',' : '.')}×';
   String get subtitleAppearance => _t('Subtitle appearance', 'Untertitel-Darstellung');
   String get size => _t('Size', 'Größe');
-  String get background => _t('Background', 'Hintergrund');
-  String get subtitleBackgroundHint =>
-      _t('Semi-transparent box behind the text.', 'Halbtransparenter Kasten hinter dem Text.');
+  String get subtitleFont => _t('Font', 'Schrift');
+  String get subtitleFontStandard => _t('Standard', 'Standard');
+  String get subtitleFontClear => _t('Clear', 'Klar');
+  String get subtitleFontSerif => _t('Serif', 'Serifen');
+  String get subtitleFontMono => _t('Monospace', 'Schreibmaschine');
+  String get subtitleFontRounded => _t('Rounded', 'Rund');
+  String get subtitleColor => _t('Colour', 'Farbe');
+  String get subtitleColorWhite => _t('White', 'Weiß');
+  String get subtitleColorYellow => _t('Yellow', 'Gelb');
+  String get subtitleColorCyan => _t('Cyan', 'Cyan');
+  String get subtitleColorGreen => _t('Green', 'Grün');
+  String get subtitleColorPink => _t('Pink', 'Rosa');
+  String get subtitleEdge => _t('Edge', 'Rand');
+  String get subtitleEdgeOutline => _t('Outline', 'Kontur');
+  String get subtitleEdgeThick => _t('Thick outline', 'Kräftige Kontur');
+  String get subtitleEdgeShadow => _t('Shadow', 'Schatten');
+  String get subtitleEdgeBox => _t('Box', 'Kasten');
+  String get subtitleEdgeNone => _t('None', 'Keiner');
+  String get subtitleBoxOpacity => _t('Box opacity', 'Deckkraft des Kastens');
+  String get subtitlePosition => _t('Height in the picture', 'Höhe im Bild');
+  String get subtitlePositionBottom => _t('Bottom', 'Unten');
+  String get subtitleBold => _t('Bold', 'Fett');
+  String get subtitleForceStyle => _t('Also for styled subtitles (ASS)', 'Auch für gestaltete Untertitel (ASS)');
+  String get subtitleForceStyleHint => _t(
+    'Replaces their own look – signs and effects can shift. Image subtitles (PGS) can only be resized and moved.',
+    'Ersetzt deren eigenes Aussehen – Schilder und Effekte können verrutschen. Bild-Untertitel (PGS) lassen sich nur vergrößern und verschieben.',
+  );
+  String get subtitlesByLibrary => _t('Subtitles per library', 'Untertitel je Bibliothek');
+  String get subtitlesByLibraryHint => _t(
+    'Give a library its own language and look, e.g. large yellow subtitles for anime.',
+    'Gib einer Bibliothek eine eigene Sprache und ein eigenes Aussehen, z. B. große gelbe Untertitel für Anime.',
+  );
+  String get subtitleSameAsGeneral => _t('As in general', 'Wie allgemein');
+  String get subtitleOwnStyle => _t('Own look', 'Eigenes Aussehen');
+  String get subtitleScopeAll => _t('Everywhere', 'Überall');
+  String get subtitleUseGeneral => _t('Use the general look', 'Allgemeines Aussehen nutzen');
   String get subtitlePreview => _t('This is how your subtitles look.', 'So sehen deine Untertitel aus.');
   String get home => _t('Home', 'Startseite');
   String get search => _t('Search', 'Suchen');
@@ -286,6 +332,7 @@ class S {
   };
   String get watchlist => _t('Watchlist', 'Merkliste');
   String get myLists => _t('My lists', 'Meine Listen');
+  String get listsTab => _t('Lists', 'Listen');
   String get searchSubtitles => _t('Search subtitles …', 'Untertitel suchen …');
   String get searchSubtitlesHint =>
       _t('Via your server, e.g. the OpenSubtitles plugin', 'Über deinen Server, z. B. mit dem OpenSubtitles-Plugin');
@@ -493,6 +540,25 @@ class S {
   );
   String get sounds => _t('Sounds', 'Klänge');
   String get soundsHint => _t('Ticks and a jingle in “Surprise me”.', 'Ticken und Melodie bei „Überrasch mich“.');
+  String get energySaver => _t('Energy saving', 'Energiesparen');
+  String get energySaverHint => _t(
+    'Saves battery: no trailers in the banner, no Ambilight or scene previews, calm backgrounds and lighter video scaling.',
+    'Schont den Akku: keine Trailer im Banner, kein Ambilight und keine Szenen-Vorschau, ruhige Hintergründe und sparsamere Bildskalierung.',
+  );
+  String get energySaverOnBattery => _t('On battery', 'Im Akkubetrieb');
+  String get energySaverLowPower => _t('In Low Power Mode', 'Im Stromsparmodus');
+  String get energySaverOnTv => _t('On the TV', 'Auf dem Fernseher');
+  String get introSetting => _t('Intro at start', 'Intro beim Start');
+  String get introSettingHint => _t(
+    'A short animated logo when Jellyflex starts. Any key skips it.',
+    'Kurzes animiertes Logo beim Start. Jede Taste überspringt es.',
+  );
+  String get introSoundSetting => _t('Intro sound', 'Intro-Klang');
+  String get introSoundSettingHint => _t(
+    'Plays with the intro – independent of the other sounds.',
+    'Spielt zum Intro – unabhängig von den anderen Klängen.',
+  );
+  String get energySaverActive => _t('Active right now.', 'Gerade aktiv.');
   String get theme => _t('Theme', 'Theme');
   String get themeHint => _t('Colours of the whole app – changes instantly.', 'Farben der ganzen App – wirkt sofort.');
 
@@ -642,6 +708,8 @@ class S {
   String get quickConnectFailed =>
       _t('Quick Connect couldn’t be started.', 'Quick Connect konnte nicht gestartet werden.');
   String get tagline => _t('Your cinema. On your desktop.', 'Dein Kino. Auf dem Desktop.');
+  String get taglineMobile => _t('Your cinema. Wherever you are.', 'Dein Kino. Überall dabei.');
+  String get taglineTv => _t('Your cinema. On the big screen.', 'Dein Kino. Auf der großen Leinwand.');
   String get whoIsWatching => _t('Who’s watching?', 'Wer schaut?');
   String get addAccount => _t('Add account', 'Konto hinzufügen');
   String get toProfileSelection => _t('Back to profiles', 'Zur Profilauswahl');
@@ -853,9 +921,19 @@ class S {
   String get rewind10 => _t('Back 10 s (←)', '10 s zurück (←)');
   String get forward10 => _t('Forward 10 s (→)', '10 s vor (→)');
   String get audioAndSubtitles => _t('Audio & subtitles', 'Audio & Untertitel');
+  String get optionsShort => _t('Options', 'Optionen');
+  String get nextEpisodeShort => _t('Next episode', 'Nächste Folge');
   String get playbackOptions =>
       _t('Playback: speed, quality, sync', 'Wiedergabe: Geschwindigkeit, Qualität, Synchronisation');
   String get miniPlayer => _t('Mini player (P)', 'Mini-Player (P)');
+  String get pictureInPicture => _t('Picture in Picture', 'Bild-in-Bild');
+  String get airPlay => _t('AirPlay', 'AirPlay');
+  String get appleHandoffFailed => _t(
+    'Couldn’t hand the video over – it keeps playing here.',
+    'Übergabe hat nicht geklappt – das Video läuft hier weiter.',
+  );
+  String get appleHandoffStreamingOnly =>
+      _t('Only while streaming – downloads play in Jellyflex.', 'Nur beim Streamen – Downloads laufen in Jellyflex.');
   String get exitFullscreen => _t('Exit fullscreen (F)', 'Vollbild beenden (F)');
   String get fullscreen => _t('Fullscreen (F)', 'Vollbild (F)');
   String get mute => _t('Mute (M)', 'Stumm (M)');

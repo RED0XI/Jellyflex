@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.3.7+10
+version: 0.3.8+11
 
 environment:
   sdk: ^3.13.5
@@ -82,6 +82,9 @@ flutter:
     - assets/sounds/
     # Lizenztext von libmpv/FFmpeg für die Lizenzseite der App.
     - LICENSES/LGPL-3.0.txt
+    - LICENSES/MPL-2.0.txt
+    # iPhone/iPad: Stammzertifikate für den Video-Player (siehe lib/core/system_certs.dart).
+    - assets/certs/cacert.pem
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../core/layouts.dart';
@@ -82,11 +83,18 @@ class _MediaRowState extends State<MediaRow> {
         children: [
           if (widget.title != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 0),
+              padding: EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 0),
               child: Row(
                 children: [
-                  Text(appLayout.heading(widget.title!), style: appLayout.headingStyle()),
-                  const Spacer(),
+                  // Lange Titel ("Weil du … angesehen hast") auf schmalen Bildschirmen mit "…" kürzen.
+                  Expanded(
+                    child: Text(
+                      appLayout.heading(widget.title!),
+                      style: appLayout.headingStyle(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                   ?widget.trailing,
                 ],
               ),
@@ -100,14 +108,16 @@ class _MediaRowState extends State<MediaRow> {
                     _updateArrows();
                     return false;
                   },
-                  child: ListView.separated(
-                    controller: _controller,
-                    scrollDirection: Axis.horizontal,
-                    clipBehavior: Clip.none,
-                    padding: const EdgeInsets.symmetric(horizontal: kPageGutter, vertical: _vPad),
-                    itemCount: widget.itemCount,
-                    separatorBuilder: (_, _) => SizedBox(width: widget.spacing ?? appLayout.cardGap),
-                    itemBuilder: widget.itemBuilder,
+                  child: HorizontalSwipe(
+                    child: ListView.separated(
+                      controller: _controller,
+                      scrollDirection: Axis.horizontal,
+                      clipBehavior: Clip.none,
+                      padding: EdgeInsets.symmetric(horizontal: kPageGutter, vertical: _vPad),
+                      itemCount: widget.itemCount,
+                      separatorBuilder: (_, _) => SizedBox(width: widget.spacing ?? appLayout.cardGap),
+                      itemBuilder: widget.itemBuilder,
+                    ),
                   ),
                 ),
                 _Arrow(
@@ -180,6 +190,26 @@ class _Arrow extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Waagerechte Reihe in einer senkrecht scrollenden Seite: Wischen auf dem Touchscreen gehört
+/// schon bei schräger Bewegung der Reihe. Sonst entscheidet, welche Richtung zuerst die
+/// Wisch-Schwelle erreicht – schräg gewischt rutschte dann oft die ganze Seite hoch oder runter.
+class HorizontalSwipe extends StatelessWidget {
+  const HorizontalSwipe({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    // Halb so viel Weg wie die Seite (Gerätewert, sonst Flutters 18 px). Antippen bleibt wie es ist.
+    final slop = (media.gestureSettings.touchSlop ?? kTouchSlop) / 2;
+    return MediaQuery(
+      data: media.copyWith(gestureSettings: DeviceGestureSettings(touchSlop: slop)),
+      child: child,
     );
   }
 }

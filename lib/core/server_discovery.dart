@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 /// Ein Jellyfin-Server, der sich im Heimnetz gemeldet hat.
 class DiscoveredServer {
@@ -45,8 +46,10 @@ abstract final class ServerDiscovery {
   /// Steuerzeichen und Richtungswechsel (z. B. U+202E, das Text rückwärts zeigt) – fliegen aus Namen.
   static final _unsafeChars = RegExp(r'[\x00-\x1F\x7F\u200E\u200F\u202A-\u202E\u2066-\u2069]');
 
+  static final _broadcast = InternetAddress('255.255.255.255');
+
   /// Ziel der Rundfrage (Tests: localhost).
-  static InternetAddress target = InternetAddress('255.255.255.255');
+  static InternetAddress target = _broadcast;
   static int port = 7359;
 
   /// Fragt im Heimnetz und sammelt die Antworten, die innerhalb von [timeout] eintreffen.
@@ -60,20 +63,72 @@ abstract final class ServerDiscovery {
       final server = datagram == null ? null : parse(datagram.data, responder: datagram.address.address);
       if (server != null && found.length < 20) found.putIfAbsent(server.id, () => server);
     });
+    // iPhone/iPad: Rundfragen (Broadcast) blockiert iOS ohne Apples Multicast-Freigabe. Dieselbe
+    // Frage geht deshalb einzeln an jede Adresse im eigenen WLAN – dafür genügt die normale
+    // Heimnetz-Erlaubnis (Abfrage beim ersten Mal).
+    final sweep = Platform.isIOS && target == _broadcast ? await sweepTargets() : const <InternetAddress>[];
+    final question = utf8.encode(_question);
+    void ask() {
+      try {
+        socket.send(question, target, port);
+      } on SocketException {
+        // iOS ohne Multicast-Freigabe: "No route to host" – die Einzelfragen reichen.
+      }
+      for (final address in sweep) {
+        try {
+          socket.send(question, address, port);
+        } on SocketException {
+          // Erste Suche: iOS fragt gerade nach der Heimnetz-Erlaubnis – gleich noch einmal.
+        }
+      }
+    }
+
     try {
-      final question = utf8.encode(_question);
-      socket.send(question, target, port);
-      // Kurz darauf noch einmal – UDP-Pakete gehen manchmal verloren.
-      const resend = Duration(milliseconds: 400);
-      await Future<void>.delayed(resend);
-      socket.send(question, target, port);
-      await Future<void>.delayed(timeout - resend);
+      ask();
+      // Kurz darauf noch einmal – UDP-Pakete gehen manchmal verloren (und auf iOS kommt die erste
+      // Runde oft nicht durch, solange die Erlaubnis-Abfrage offen ist).
+      const resend = [Duration(milliseconds: 400), Duration(milliseconds: 1500)];
+      var waited = Duration.zero;
+      for (final at in resend) {
+        if (at >= timeout) break;
+        await Future<void>.delayed(at - waited);
+        waited = at;
+        ask();
+      }
+      await Future<void>.delayed(timeout - waited);
     } finally {
       await sub.cancel();
       socket.close();
     }
     return found.values.toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
+
+  /// Alle anderen Adressen im /24-Netz der WLAN-/LAN-Verbindungen dieses Geräts (private
+  /// IPv4-Adressen; keine Mobilfunk-Verbindung). Höchstens zwei Netze, also ≤ 508 Fragen.
+  static Future<List<InternetAddress>> sweepTargets() async {
+    final out = <InternetAddress>[];
+    var nets = 0;
+    try {
+      for (final nic in await NetworkInterface.list(type: InternetAddressType.IPv4)) {
+        // iOS: "en0" = WLAN, "en1…" = LAN-Adapter; "pdp_ip…" = Mobilfunk.
+        if (!nic.name.startsWith('en')) continue;
+        for (final own in nic.addresses) {
+          final b = own.rawAddress;
+          if (own.isLoopback || own.isLinkLocal || !isPrivateIPv4(b) || nets >= 2) continue;
+          nets++;
+          for (var host = 1; host < 255; host++) {
+            if (host != b[3]) out.add(InternetAddress.fromRawAddress(Uint8List.fromList([b[0], b[1], b[2], host])));
+          }
+        }
+      }
+    } catch (_) {
+      // Keine Netzwerkdaten – dann nur die Rundfrage.
+    }
+    return out;
+  }
+
+  static bool isPrivateIPv4(List<int> b) =>
+      b.length == 4 && (b[0] == 10 || (b[0] == 172 && b[1] >= 16 && b[1] <= 31) || (b[0] == 192 && b[1] == 168));
 
   /// Antwort eines Servers lesen; alles Unerwartete wird verworfen.
   static DiscoveredServer? parse(List<int> data, {String responder = ''}) {

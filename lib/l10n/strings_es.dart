@@ -211,13 +211,84 @@ final class _Es extends S {
   @override
   String get autoplayNextHint => 'Con una cuenta atrás al final del episodio.';
   @override
+  String get seekBack => 'Retroceder';
+  @override
+  String get seekForward => 'Avanzar';
+  @override
+  String get seekStepHint => 'Lo que saltan los botones, las flechas, el doble toque y el mando.';
+  @override
+  String get holdSpeed => 'Mantener para acelerar';
+  @override
+  String get holdSpeedHint =>
+      'Mantén pulsada la imagen (dedo, ratón u OK del mando): se reproduce más rápido mientras la mantengas.';
+  @override
+  String speedTimes(double speed) => '${speed.toString().replaceAll(RegExp(r'\.0$'), '').replaceAll('.', ',')}×';
+  @override
   String get subtitleAppearance => 'Aspecto de los subtítulos';
   @override
   String get size => 'Tamaño';
   @override
-  String get background => 'Fondo';
+  String get subtitleFont => 'Fuente';
   @override
-  String get subtitleBackgroundHint => 'Recuadro semitransparente detrás del texto.';
+  String get subtitleFontStandard => 'Estándar';
+  @override
+  String get subtitleFontClear => 'Legible';
+  @override
+  String get subtitleFontSerif => 'Serif';
+  @override
+  String get subtitleFontMono => 'Máquina de escribir';
+  @override
+  String get subtitleFontRounded => 'Redondeada';
+  @override
+  String get subtitleColor => 'Color';
+  @override
+  String get subtitleColorWhite => 'Blanco';
+  @override
+  String get subtitleColorYellow => 'Amarillo';
+  @override
+  String get subtitleColorCyan => 'Cian';
+  @override
+  String get subtitleColorGreen => 'Verde';
+  @override
+  String get subtitleColorPink => 'Rosa';
+  @override
+  String get subtitleEdge => 'Borde';
+  @override
+  String get subtitleEdgeOutline => 'Contorno';
+  @override
+  String get subtitleEdgeThick => 'Contorno grueso';
+  @override
+  String get subtitleEdgeShadow => 'Sombra';
+  @override
+  String get subtitleEdgeBox => 'Recuadro';
+  @override
+  String get subtitleEdgeNone => 'Ninguno';
+  @override
+  String get subtitleBoxOpacity => 'Opacidad del recuadro';
+  @override
+  String get subtitlePosition => 'Altura en la imagen';
+  @override
+  String get subtitlePositionBottom => 'Abajo';
+  @override
+  String get subtitleBold => 'Negrita';
+  @override
+  String get subtitleForceStyle => 'También para subtítulos con estilo (ASS)';
+  @override
+  String get subtitleForceStyleHint =>
+      'Sustituye su aspecto: los carteles y efectos pueden moverse. Los subtítulos de imagen (PGS) solo se pueden ampliar y mover.';
+  @override
+  String get subtitlesByLibrary => 'Subtítulos por biblioteca';
+  @override
+  String get subtitlesByLibraryHint =>
+      'Da a una biblioteca su propio idioma y aspecto, p. ej. subtítulos grandes y amarillos para anime.';
+  @override
+  String get subtitleSameAsGeneral => 'Como en general';
+  @override
+  String get subtitleOwnStyle => 'Aspecto propio';
+  @override
+  String get subtitleScopeAll => 'En todas partes';
+  @override
+  String get subtitleUseGeneral => 'Usar el aspecto general';
   @override
   String get subtitlePreview => 'Así se ven tus subtítulos.';
   @override
@@ -432,6 +503,27 @@ final class _Es extends S {
   @override
   String get soundsHint => 'Tics y melodía en «Sorpréndeme».';
   @override
+  String get energySaver => 'Ahorro de energía';
+  @override
+  String get energySaverHint =>
+      'Cuida la batería: sin tráileres en el banner, sin Ambilight ni vista previa de escenas, fondos tranquilos y escalado de vídeo más ligero.';
+  @override
+  String get energySaverOnBattery => 'Con batería';
+  @override
+  String get energySaverLowPower => 'En modo de bajo consumo';
+  @override
+  String get energySaverOnTv => 'En el televisor';
+  @override
+  String get introSetting => 'Intro al iniciar';
+  @override
+  String get introSettingHint => 'Un breve logotipo animado al iniciar. Cualquier tecla lo salta.';
+  @override
+  String get introSoundSetting => 'Sonido de la intro';
+  @override
+  String get introSoundSettingHint => 'Suena con la intro, independiente de los demás sonidos.';
+  @override
+  String get energySaverActive => 'Activo ahora mismo.';
+  @override
   String get theme => 'Tema';
   @override
   String get themeHint => 'Colores de toda la app – cambia al instante.';
@@ -637,6 +729,10 @@ final class _Es extends S {
   String get quickConnectFailed => 'No se pudo iniciar Quick Connect.';
   @override
   String get tagline => 'Tu cine. En tu escritorio.';
+  @override
+  String get taglineMobile => 'Tu cine. Donde estés.';
+  @override
+  String get taglineTv => 'Tu cine. En la pantalla grande.';
   @override
   String get whoIsWatching => '¿Quién está viendo?';
   @override
@@ -947,9 +1043,21 @@ final class _Es extends S {
   @override
   String get audioAndSubtitles => 'Audio y subtítulos';
   @override
+  String get optionsShort => 'Opciones';
+  @override
+  String get nextEpisodeShort => 'Siguiente episodio';
+  @override
   String get playbackOptions => 'Reproducción: velocidad, calidad, sincronía';
   @override
   String get miniPlayer => 'Minirreproductor (P)';
+  @override
+  String get pictureInPicture => 'Imagen en imagen';
+  @override
+  String get airPlay => 'AirPlay';
+  @override
+  String get appleHandoffFailed => 'No se pudo transferir – el vídeo sigue aquí.';
+  @override
+  String get appleHandoffStreamingOnly => 'Solo en streaming – las descargas se reproducen en Jellyflex.';
   @override
   String get exitFullscreen => 'Salir de pantalla completa (F)';
   @override
@@ -1032,6 +1140,8 @@ final class _Es extends S {
   String get watchlist => 'Mi lista';
   @override
   String get myLists => 'Mis listas';
+  @override
+  String get listsTab => 'Listas';
   @override
   String get searchSubtitles => 'Buscar subtítulos …';
   @override

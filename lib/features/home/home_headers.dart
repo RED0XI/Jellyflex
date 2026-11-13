@@ -7,6 +7,7 @@ import '../../core/format.dart';
 import '../../core/images.dart';
 import '../../core/layouts.dart';
 import '../../core/models.dart';
+import '../../core/power.dart';
 import '../../core/session.dart';
 import '../../l10n/strings.dart';
 import '../../theme.dart';
@@ -15,6 +16,7 @@ import '../../widgets/jf_image.dart';
 import '../../widgets/media_cards.dart';
 import 'hero_banner.dart';
 import 'home_providers.dart';
+import '../../core/platform/device.dart';
 
 /// Kopf ohne Banner (Layouts "Bibliothek" und "Minimal"): Begrüßung nach Tageszeit.
 class GreetingHeader extends ConsumerWidget {
@@ -68,7 +70,8 @@ class _MagazineHeroState extends ConsumerState<MagazineHero> {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 12), (_) {
       final count = ref.read(featuredProvider).value?.length ?? 0;
-      if (count > 1 && mounted) setState(() => _index = (_index + 1) % count);
+      // Im Hintergrund schaut niemand zu.
+      if (count > 1 && mounted && Power.appActive.value) setState(() => _index = (_index + 1) % count);
     });
   }
 
@@ -96,7 +99,7 @@ class _MagazineHeroState extends ConsumerState<MagazineHero> {
     return SizedBox(
       height: widget.height,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 92, kPageGutter, 28),
+        padding: EdgeInsets.fromLTRB(kPageGutter, topInset(context) + 92, kPageGutter, 28),
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 600),
           child: Row(
@@ -175,12 +178,14 @@ class _MagazineHeroState extends ConsumerState<MagazineHero> {
                                   PrimaryButton(
                                     label: item.userData.hasResumePosition ? tr.resume : tr.play,
                                     icon: Icons.play_arrow_rounded,
+                                    autofocus: isTv,
                                     onPressed: () => playItem(context, item),
                                   )
                                 else
                                   PrimaryButton(
                                     label: tr.watch,
                                     icon: Icons.play_arrow_rounded,
+                                    autofocus: isTv,
                                     onPressed: () => openItem(context, item),
                                   ),
                                 const SizedBox(width: 12),

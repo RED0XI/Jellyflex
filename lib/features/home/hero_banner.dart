@@ -9,6 +9,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../core/format.dart';
 import '../../core/images.dart';
 import '../../core/models.dart';
+import '../../core/power.dart';
 import '../../core/session.dart';
 import '../../core/settings.dart';
 import '../../core/route_observer.dart';
@@ -21,6 +22,7 @@ import 'home_providers.dart';
 import '../../l10n/strings.dart';
 import '../../core/system_certs.dart';
 import '../../core/image_cache.dart';
+import '../../core/platform/device.dart';
 
 /// Großes Banner oben auf der Startseite. Wechselt alle paar Sekunden
 /// mit Überblendung und langsamem Zoom ("Ken-Burns-Effekt").
@@ -43,6 +45,13 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
 
   int _index = 0;
   bool _hovered = false;
+
+  /// Fokus (Fernbedienung, Tastatur) auf Knöpfen oder Punkten: anhalten wie bei der Maus –
+  /// sonst baut der nächste Titel die Knöpfe neu und der Fokus ist weg.
+  int _focusInside = 0;
+
+  /// Beim Energiesparen: füllt den Fortschritt im Sekundentakt statt mit [_cycle.forward].
+  Timer? _stepTimer;
 
   /// Zeit bis zum nächsten Titel – treibt das Weiterblättern und den Fortschritt im aktiven
   /// Punkt. Hält an, solange die Maus auf Text/Punkten steht, ein Trailer läuft oder eine
@@ -68,6 +77,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
   @override
   void initState() {
     super.initState();
+    Power.appActive.addListener(_onPowerChanged);
+    Power.energySaving.addListener(_onPowerChanged);
     _restartTimer();
   }
 
@@ -85,6 +96,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
   @override
   void dispose() {
     appRouteObserver.unsubscribe(this);
+    Power.appActive.removeListener(_onPowerChanged);
+    Power.energySaving.removeListener(_onPowerChanged);
+    _stepTimer?.cancel();
     _cycle.dispose();
     _trailerTimer?.cancel();
     _trailerLimit?.cancel();
@@ -126,13 +140,41 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
     _syncCycle();
   }
 
-  /// Weiterlaufen lassen oder anhalten – je nach Maus, Trailer und sichtbarer Seite.
+  /// Weiterlaufen lassen oder anhalten – je nach Maus, Trailer, sichtbarer Seite und ob
+  /// Jellyflex gerade vorne ist (im Hintergrund schaut niemand zu).
   void _syncCycle() {
-    if (_hovered || _trailerVisible || !_pageVisible) {
+    _stepTimer?.cancel();
+    if (_hovered || _focusInside > 0 || _trailerVisible || !_pageVisible || !Power.appActive.value) {
       _cycle.stop();
-    } else if (!_cycle.isAnimating && _cycle.value < 1) {
-      _cycle.forward();
+    } else if (_cycle.value < 1) {
+      if (Power.energySaving.value) {
+        // Eine laufende Animation zeichnet in jedem Bild neu (bis 120-mal pro Sekunde) –
+        // beim Energiesparen füllt sich der Punkt deshalb in Sekundenschritten.
+        _cycle.stop();
+        final steps = _interval.inSeconds;
+        _stepTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+          _cycle.value = math.min(1.0, ((_cycle.value * steps).round() + 1) / steps);
+        });
+      } else if (!_cycle.isAnimating) {
+        _cycle.forward();
+      }
     }
+  }
+
+  /// Stumme Trailer nur, solange jemand hinsieht und keine Energie gespart wird.
+  bool get _trailersAllowed => Power.appActive.value && !Power.energySaving.value;
+
+  /// Jellyflex in den Hintergrund/nach vorne oder Energiesparen an/aus.
+  void _onPowerChanged() {
+    if (!mounted) return;
+    // Mit Ton schaut jemand bewusst zu – der Trailer läuft dann weiter.
+    if (!_trailersAllowed && _muted) {
+      _stopTrailer();
+    } else if (_trailerItemId == null) {
+      _scheduleTrailer();
+    }
+    setState(() {}); // Ken-Burns-Zoom an/aus
+    _syncCycle();
   }
 
   void _advance(int index) {
@@ -149,17 +191,22 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
   /// Nach kurzer Zeit den Trailer des aktuellen Titels starten (falls vorhanden).
   void _scheduleTrailer() {
     _trailerTimer?.cancel();
-    if (!ref.read(settingsProvider).bannerTrailers || !_pageVisible) return;
+    if (!ref.read(settingsProvider).bannerTrailers || !_pageVisible || !_trailersAllowed) return;
     final items = ref.read(featuredProvider).value ?? const <BaseItem>[];
     if (items.isEmpty) return;
     final item = items[_index % items.length];
-    _trailerTimer = Timer(_trailerDelay, () => _startTrailer(item));
+    final run = ++_trailerRun;
+    _trailerTimer = Timer(_trailerDelay, () => _startTrailer(item, run));
   }
 
-  Future<void> _startTrailer(BaseItem item) async {
+  /// Zählt die Anläufe: Ein Start, der noch auf den Server wartet, während schon ein neuer
+  /// geplant wurde, gilt nicht mehr – sonst öffnete er den laufenden Trailer ein zweites Mal von vorn.
+  int _trailerRun = 0;
+
+  Future<void> _startTrailer(BaseItem item, int run) async {
     final api = ref.read(apiProvider);
     final trailer = await api.getTrailer(item.id);
-    if (trailer == null || !mounted || !_pageVisible) return;
+    if (trailer == null || run != _trailerRun || !mounted || !_pageVisible || !_trailersAllowed) return;
     final items = ref.read(featuredProvider).value ?? const <BaseItem>[];
     if (items.isEmpty || items[_index % items.length].id != item.id) return; // inzwischen weitergeblättert
 
@@ -187,18 +234,29 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
     _trailerDoneSub = player.stream.completed.listen((done) {
       if (done && mounted && _trailerItemId == item.id) _goTo(_index + 1);
     });
-    await player.setVolume(_muted ? 0 : 70);
-    // Zertifikate prüfen, bevor mit dem Anmelde-Token gestreamt wird.
-    await SystemCerts.secure(player);
-    final sourceId = trailer.mediaSources.firstOrNull?.id ?? trailer.id;
-    await player.open(
-      Media(
-        api.streamUrl(trailer.id, mediaSourceId: sourceId),
-        httpHeaders: {'Authorization': api.authorizationHeader},
-      ),
-    );
-    // Trailer im Hintergrund ohne Untertitel.
-    await player.setSubtitleTrack(SubtitleTrack.no());
+    // Noch derselbe Player und derselbe Trailer? Während der Wartezeiten kann eine andere Seite
+    // geöffnet worden sein – dann ist der Player schon freigegeben (didPushNext) und darf nichts
+    // mehr öffnen.
+    bool current() => mounted && _trailerPlayer == player && _trailerItemId == item.id;
+    try {
+      await player.setVolume(_muted ? 0 : 70);
+      // Zertifikate prüfen, bevor mit dem Anmelde-Token gestreamt wird.
+      await SystemCerts.secure(player);
+      if (!current()) return;
+      final sourceId = trailer.mediaSources.firstOrNull?.id ?? trailer.id;
+      await player.open(
+        Media(
+          api.streamUrl(trailer.id, mediaSourceId: sourceId),
+          httpHeaders: {'Authorization': api.authorizationHeader},
+        ),
+      );
+      if (!current()) return;
+      // Trailer im Hintergrund ohne Untertitel.
+      await player.setSubtitleTrack(SubtitleTrack.no());
+    } catch (e) {
+      // Ein Trailer ist Beiwerk – scheitert er, bleibt einfach das Bild stehen.
+      debugPrint('Trailer: $e');
+    }
   }
 
   void _stopTrailer() {
@@ -242,6 +300,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
       );
     }
 
+    final phone = isPhone(context);
     final current = _index % items.length;
     final item = items[current];
     final backdrop = Images.backdrop(item);
@@ -257,7 +316,16 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
         _hovered = false;
         _syncCycle();
       },
-      child: child,
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onFocusChange: (focused) {
+          // Zwei Bereiche (Knöpfe, Punkte) – die Reihenfolge der Meldungen ist nicht festgelegt.
+          _focusInside = math.max(0, _focusInside + (focused ? 1 : -1));
+          _syncCycle();
+        },
+        child: child,
+      ),
     );
 
     return SizedBox(
@@ -271,6 +339,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
               switchOutCurve: Curves.easeIn,
               child: _KenBurnsBackdrop(
                 key: ValueKey(item.id),
+                animate: !Power.energySaving.value,
                 url: api.imageUrlOrNull(backdrop, maxWidth: screenImageWidth(context)),
                 blurHash: backdrop?.blurHash,
               ),
@@ -333,8 +402,9 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
           ),
           Positioned(
             left: kPageGutter,
-            bottom: 84,
-            width: math.min(600, width * 0.46),
+            bottom: phone ? 56 : 84,
+            // iPhone: volle Breite – 46 % wären dort keine 190 pt (Titel abgeschnitten, Knöpfe zu breit).
+            width: phone ? width - 2 * kPageGutter : math.min(600, width * 0.46),
             child: pauseOnHover(
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 600),
@@ -352,7 +422,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
           ),
           Positioned(
             left: kPageGutter,
-            bottom: 40,
+            bottom: phone ? 24 : 40,
             child: pauseOnHover(
               Row(
                 children: [
@@ -394,7 +464,8 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
           // Ton an/aus, solange ein Trailer läuft.
           Positioned(
             right: kPageGutter,
-            bottom: 84,
+            // iPhone: neben den Punkten statt neben den Knöpfen (der Text nutzt dort die ganze Breite).
+            bottom: phone ? 12 : 84,
             child: AnimatedOpacity(
               opacity: _trailerVisible ? 1 : 0,
               duration: const Duration(milliseconds: 400),
@@ -405,7 +476,7 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
                   child: CircleIconButton(
                     icon: _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
                     tooltip: _muted ? tr.soundOn : tr.soundOff,
-                    size: 46,
+                    size: phone ? 38 : 46,
                     onPressed: _toggleMute,
                   ),
                 ),
@@ -419,13 +490,18 @@ class _HeroBannerState extends ConsumerState<HeroBanner> with RouteAware, Single
 }
 
 class _KenBurnsBackdrop extends StatelessWidget {
-  const _KenBurnsBackdrop({super.key, required this.url, required this.blurHash});
+  const _KenBurnsBackdrop({super.key, required this.url, required this.blurHash, this.animate = true});
 
   final String? url;
   final String? blurHash;
 
+  /// Langsam zoomen; beim Energiesparen nicht (das zeichnet sonst 14 s lang jedes Bild neu).
+  final bool animate;
+
   @override
   Widget build(BuildContext context) {
+    final image = JfImage(url: url, blurHash: blurHash, alignment: Alignment.topCenter);
+    if (!animate) return RepaintBoundary(child: image);
     // ClipRect: Das gezoomte Bild darf nicht über das Banner hinausragen.
     return RepaintBoundary(
       child: ClipRect(
@@ -435,7 +511,7 @@ class _KenBurnsBackdrop extends StatelessWidget {
           curve: Curves.easeOut,
           builder: (context, scale, child) =>
               Transform.scale(scale: scale, alignment: Alignment.topRight, child: child),
-          child: JfImage(url: url, blurHash: blurHash, alignment: Alignment.topCenter),
+          child: image,
         ),
       ),
     );
@@ -452,6 +528,7 @@ class _HeroInfo extends ConsumerWidget {
     final api = ref.watch(apiProvider);
     final logo = api.imageUrlOrNull(Images.logo(item), maxWidth: 800);
     const shadow = [Shadow(color: Colors.black87, blurRadius: 16)];
+    final phone = isPhone(context);
 
     final meta = <String>[
       ?yearLabel(item),
@@ -463,8 +540,8 @@ class _HeroInfo extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        TitleLogo(logoUrl: logo, title: item.name, maxHeight: 130, fontSize: 52),
-        const SizedBox(height: 18),
+        TitleLogo(logoUrl: logo, title: item.name, maxHeight: phone ? 76 : 130, fontSize: phone ? 34 : 52),
+        SizedBox(height: phone ? 12 : 18),
         DefaultTextStyle.merge(
           style: TextStyle(color: AppColors.textPrimary, fontSize: 15, shadows: shadow),
           child: Wrap(
@@ -485,27 +562,42 @@ class _HeroInfo extends ConsumerWidget {
           ),
         ],
         if (item.overview != null) ...[
-          const SizedBox(height: 16),
+          SizedBox(height: phone ? 10 : 16),
           Text(
             item.overview!,
-            maxLines: 3,
+            maxLines: phone ? 2 : 3,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 15.5, height: 1.5, color: Color(0xFFDADCE5), shadows: shadow),
+            style: TextStyle(fontSize: phone ? 14 : 15.5, height: 1.5, color: const Color(0xFFDADCE5), shadows: shadow),
           ),
         ],
-        const SizedBox(height: 26),
+        SizedBox(height: phone ? 18 : 26),
         Row(
           children: [
             if (item.isMovie)
               PrimaryButton(
                 label: item.userData.hasResumePosition ? tr.resume : tr.play,
                 icon: Icons.play_arrow_rounded,
+                // Fernseher: OK spielt gleich ab (ohne erst den Fokus suchen zu müssen).
+                autofocus: isTv,
+                // Das Banner bleibt ganz zu sehen (Fokus hier = Seite oben, nicht Knopf in der Mitte).
+                scrollAlignment: 1,
                 onPressed: () => playItem(context, item),
               )
             else
-              PrimaryButton(label: tr.watch, icon: Icons.play_arrow_rounded, onPressed: () => openItem(context, item)),
+              PrimaryButton(
+                label: tr.watch,
+                icon: Icons.play_arrow_rounded,
+                autofocus: isTv,
+                scrollAlignment: 1,
+                onPressed: () => openItem(context, item),
+              ),
             const SizedBox(width: 12),
-            GlassButton(label: tr.moreInfo, icon: Icons.info_outline_rounded, onPressed: () => openItem(context, item)),
+            GlassButton(
+              label: tr.moreInfo,
+              icon: Icons.info_outline_rounded,
+              scrollAlignment: 1,
+              onPressed: () => openItem(context, item),
+            ),
           ],
         ),
       ],

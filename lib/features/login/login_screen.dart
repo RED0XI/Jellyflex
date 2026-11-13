@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/jellyfin_api.dart';
 import '../../core/models.dart';
+import '../../core/platform/device.dart';
 import '../../core/server_discovery.dart';
 import '../../core/session.dart';
 import '../../theme.dart';
@@ -17,6 +18,7 @@ import '../../l10n/strings.dart';
 import '../../core/profile_pin.dart';
 import '../../widgets/pin_dialog.dart';
 import '../../core/image_cache.dart';
+import '../../widgets/tv_text_input.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -215,7 +217,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   const BrandLogo(size: 42),
                   const SizedBox(height: 8),
-                  Text(tr.tagline, style: TextStyle(color: AppColors.textSecondary)),
+                  Text(
+                    isTv ? tr.taglineTv : (isMobile ? tr.taglineMobile : tr.tagline),
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
                   const SizedBox(height: 36),
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
@@ -337,15 +342,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         const SizedBox(height: 6),
         Text(tr.enterServerAddress, style: TextStyle(color: AppColors.textSecondary)),
         const SizedBox(height: 24),
-        TextField(
-          controller: _serverCtrl,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: tr.serverAddress,
-            hintText: 'https://jellyfin.example.com',
-            prefixIcon: Icon(Icons.dns_rounded),
+        TvTextInput(
+          builder: (context, readOnly, done) => TextField(
+            controller: _serverCtrl,
+            readOnly: readOnly,
+            // Fernseher: Fokus gleich hier, die Tastatur kommt aber erst auf OK (TvTextInput).
+            autofocus: true,
+            // Bildschirmtastatur (iPhone/iPad): Adress-Tastatur, nichts automatisch "verbessern".
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            enableSuggestions: false,
+            textInputAction: TextInputAction.go,
+            decoration: InputDecoration(
+              labelText: tr.serverAddress,
+              hintText: 'https://jellyfin.example.com',
+              prefixIcon: Icon(Icons.dns_rounded),
+            ),
+            onSubmitted: (_) {
+              done();
+              _connect();
+            },
           ),
-          onSubmitted: (_) => _connect(),
         ),
         _ErrorText(_error),
         const SizedBox(height: 24),
@@ -551,19 +568,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ],
         const SizedBox(height: 24),
-        TextField(
-          controller: _userCtrl,
-          focusNode: _userFocus,
-          decoration: InputDecoration(labelText: tr.username, prefixIcon: Icon(Icons.person_rounded)),
-          textInputAction: TextInputAction.next,
+        TvTextInput(
+          builder: (context, readOnly, done) => TextField(
+            controller: _userCtrl,
+            focusNode: _userFocus,
+            readOnly: readOnly,
+            autocorrect: false,
+            enableSuggestions: false,
+            autofillHints: const [AutofillHints.username],
+            decoration: InputDecoration(labelText: tr.username, prefixIcon: Icon(Icons.person_rounded)),
+            textInputAction: TextInputAction.next,
+          ),
         ),
         const SizedBox(height: 14),
-        TextField(
-          controller: _passCtrl,
-          focusNode: _passFocus,
-          obscureText: true,
-          decoration: InputDecoration(labelText: tr.password, prefixIcon: Icon(Icons.lock_rounded)),
-          onSubmitted: (_) => _login(),
+        TvTextInput(
+          builder: (context, readOnly, done) => TextField(
+            controller: _passCtrl,
+            focusNode: _passFocus,
+            readOnly: readOnly,
+            obscureText: true,
+            autofillHints: const [AutofillHints.password],
+            decoration: InputDecoration(labelText: tr.password, prefixIcon: Icon(Icons.lock_rounded)),
+            onSubmitted: (_) {
+              done();
+              _login();
+            },
+          ),
         ),
         _ErrorText(_error),
         const SizedBox(height: 24),

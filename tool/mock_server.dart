@@ -2,6 +2,8 @@
 //
 // Start:   dart run tool/mock_server.dart
 // In der App als Server-Adresse eingeben:  http://localhost:8097
+// Fürs Handy/den Fernseher im selben WLAN:  dart run tool/mock_server.dart --lan
+//   (lauscht im ganzen Heimnetz und antwortet auf die Heimnetz-Suche mit der Adresse dieses Rechners)
 // Beliebiger Benutzername/Passwort funktioniert.
 //
 // Liefert fiktive Filme/Serien und erzeugt farbige Platzhalterbilder. Als Video
@@ -15,6 +17,7 @@
 //   GET  /debug/laststream            zuletzt angefragter Video-Stream (Fassung)
 //   GET  /debug/images?delay=150&reset=1   Bilder verzögern (langsames Netz) / Zähler
 //   POST /debug/addmovie?name=X       neuen Film hinzufügen + "LibraryChanged" senden
+//   POST /debug/report?name=X         Messergebnis eines Geräts (JSON) → build/device_reports/X.json
 
 import 'dart:async';
 import 'dart:convert';
@@ -23,6 +26,9 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 const port = 8097;
+
+/// `--lan`: im ganzen Heimnetz erreichbar statt nur auf diesem Rechner.
+var _lan = false;
 
 /// Offene Live-Verbindungen (WebSocket).
 final _sockets = <WebSocket>{};
@@ -343,7 +349,13 @@ void _seedPeople() {
                 'Drehbuch. Sie lebt mit ihrer Familie an der Ostsee und spricht fließend Englisch, Französisch '
                 'und Schwedisch. In Interviews betont sie gern, dass ihre liebsten Rollen die leisen sind. '
                 'Wenn sie nicht dreht, findet man sie meist auf dem Wasser – sie segelt seit ihrer Jugend und hat schon zweimal '
-                'die Ostsee allein überquert.'
+                'die Ostsee allein überquert.\n\n'
+                'Ihre Karriere begann 1978 am Thalia Theater, wo sie in kleinen Nebenrollen auffiel. Der Regisseur '
+                'Henrik Lund holte sie wenig später für seine erste Fernsehserie vor die Kamera – der Beginn einer '
+                'Zusammenarbeit über fünf Filme. In den Neunzigern drehte sie auch in Frankreich und Schweden, '
+                'meist in ihrer jeweiligen Landessprache. Heute unterrichtet sie zusätzlich an ihrer alten '
+                'Schauspielschule und sitzt regelmäßig in den Jurys großer Festivals. Ihr Buch über die Arbeit '
+                'vor der Kamera erschien 2019 und wurde in sieben Sprachen übersetzt.'
           : 'Bekannt aus zahlreichen Film- und Fernsehproduktionen.',
       'PremiereDate': '${1960 + i * 3}-0${1 + i % 9}-1${i % 9}T00:00:00.0000000Z',
       if (i == 7) 'EndDate': '2021-11-03T00:00:00.0000000Z',
@@ -883,6 +895,13 @@ Object? _handle(HttpRequest req) {
   if (seg.length == 3 && seg[0] == 'Items' && seg[2] == 'Similar') {
     return {'Items': movies.where((m) => m['Id'] != seg[1]).take(10).toList()};
   }
+  if (seg.length == 3 && seg[0] == 'Items' && seg[2] == 'Ancestors') {
+    final isShow = byId[seg[1]]?['Type'] != 'Movie';
+    return [
+      {'Id': isShow ? 'lib-shows' : 'lib-movies', 'Name': isShow ? 'Serien' : 'Filme', 'Type': 'CollectionFolder'},
+      {'Id': 'root', 'Name': 'Media Folders', 'Type': 'UserRootFolder'},
+    ];
+  }
   if (seg.length == 3 && seg[0] == 'Items' && seg[2] == 'PlaybackInfo') {
     final item = byId[seg[1]];
     return {'PlaySessionId': 'mock-session', 'MediaSources': item?['MediaSources'] ?? []};
@@ -925,15 +944,25 @@ Object? _handle(HttpRequest req) {
   return null;
 }
 
-/// Heimnetz-Suche wie bei Jellyfin (UDP 7359) – nur auf localhost, für die Tests.
-Future<void> _answerDiscovery() async {
+/// Erste IPv4-Adresse im Heimnetz (für `--lan`).
+Future<String?> _lanAddress() async {
+  for (final nic in await NetworkInterface.list(type: InternetAddressType.IPv4)) {
+    for (final a in nic.addresses) {
+      if (!a.isLoopback && !a.isLinkLocal) return a.address;
+    }
+  }
+  return null;
+}
+
+/// Heimnetz-Suche wie bei Jellyfin (UDP 7359) – auf localhost, mit `--lan` im ganzen Heimnetz.
+Future<void> _answerDiscovery(String host) async {
   try {
-    final socket = await RawDatagramSocket.bind(InternetAddress.loopbackIPv4, 7359);
+    final socket = await RawDatagramSocket.bind(_lan ? InternetAddress.anyIPv4 : InternetAddress.loopbackIPv4, 7359);
     socket.listen((event) {
       if (event != RawSocketEvent.read) return;
       final datagram = socket.receive();
       if (datagram == null || utf8.decode(datagram.data, allowMalformed: true) != 'who is JellyfinServer?') return;
-      final answer = {'Address': 'http://localhost:$port', 'Id': 'mock-server', 'Name': 'Demo-Server'};
+      final answer = {'Address': 'http://$host:$port', 'Id': 'mock-server', 'Name': 'Demo-Server'};
       socket.send(utf8.encode(jsonEncode(answer)), datagram.address, datagram.port);
     });
   } on SocketException catch (e) {
@@ -941,274 +970,294 @@ Future<void> _answerDiscovery() async {
   }
 }
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
+  _lan = args.contains('--lan');
   _seed();
-  final server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
-  stdout.writeln('Jellyfin-Demo-Server läuft auf http://localhost:$port');
-  await _answerDiscovery();
+  final host = _lan ? (await _lanAddress() ?? 'localhost') : 'localhost';
+  final server = await HttpServer.bind(_lan ? InternetAddress.anyIPv4 : InternetAddress.loopbackIPv4, port);
+  stdout.writeln('Jellyfin-Demo-Server läuft auf http://$host:$port');
+  await _answerDiscovery(host);
 
+  // Jede Anfrage für sich: Ein laufender Video-Stream (z. B. der Trailer im Banner) darf die
+  // anderen Anfragen nicht blockieren – sonst warteten Suche & Co., bis das Video gelesen ist.
   await for (final req in server) {
-    final res = req.response;
-    try {
-      final seg = req.uri.pathSegments;
-      // Live-Verbindung wie bei Jellyfin (/socket).
-      if (req.uri.path == '/socket' && WebSocketTransformer.isUpgradeRequest(req) && !_offline) {
-        final socket = await WebSocketTransformer.upgrade(req);
-        _sockets.add(socket);
-        socket.add(jsonEncode({'MessageType': 'ForceKeepAlive', 'Data': 60}));
-        socket.listen((_) {}, onDone: () => _sockets.remove(socket));
-        stdout.writeln('Live-Verbindung geöffnet (${_sockets.length})');
-        continue;
-      }
-      // Testschnittstelle: POST /debug/send mit {"MessageType": …, "Data": …} an alle Clients.
-      if (req.uri.path == '/debug/throttle') {
-        _throttleBps = int.tryParse(req.uri.queryParameters['bps'] ?? '') ?? 0;
-        res.write('{"bps": $_throttleBps}');
-        await res.close();
-        continue;
-      }
-      if (req.uri.path == '/debug/revoke') {
-        if (req.uri.queryParameters.containsKey('on')) {
-          _revoked = req.uri.queryParameters['on'] == '1';
-          _rejected = 0;
-        }
-        res.write('{"revoked": $_revoked, "rejected": $_rejected}');
-        await res.close();
-        continue;
-      }
-      if (_revoked && req.uri.path == '/Users/AuthenticateByName') _revoked = false;
-      const public = {'/System/Info/Public', '/System/Ping', '/Users/Public', '/QuickConnect/Enabled'};
-      if (_revoked && !public.contains(req.uri.path) && !req.uri.path.contains('/Images/')) {
-        _rejected++;
-        res.statusCode = 401;
-        await res.close();
-        continue;
-      }
-      if (req.uri.path == '/debug/offline') {
-        _offline = req.uri.queryParameters['on'] == '1';
-        if (_offline) {
-          for (final s in _sockets.toList()) {
-            await s.close();
-          }
-        }
-        res.write('{"offline": $_offline}');
-        await res.close();
-        continue;
-      }
-      if (req.uri.path == '/debug/images') {
-        final q = req.uri.queryParameters;
-        if (q['delay'] != null) _imageDelayMs = int.tryParse(q['delay']!) ?? 0;
-        if (q['reset'] == '1') _imageRequests = 0;
-        res.headers.contentType = ContentType.json;
-        res.write(jsonEncode({'delay': _imageDelayMs, 'requests': _imageRequests}));
-        await res.close();
-        continue;
-      }
-      if (req.uri.path == '/debug/laststream') {
-        res.headers.contentType = ContentType.json;
-        res.write(jsonEncode(_lastStream));
-        await res.close();
-        continue;
-      }
-      if (seg.length == 3 && seg[0] == 'debug' && seg[1] == 'userdata') {
-        // PUT: Benutzerdaten genau so wiederherstellen (Tests räumen damit auf).
-        if (req.method == 'PUT' && byId[seg[2]] != null) {
-          byId[seg[2]]!['UserData'] = jsonDecode(await utf8.decoder.bind(req).join()) as Map<String, dynamic>;
-        }
-        res.headers.contentType = ContentType.json;
-        res.write(jsonEncode(byId[seg[2]]?['UserData']));
-        await res.close();
-        continue;
-      }
-      if (_offline) {
-        res.statusCode = HttpStatus.serviceUnavailable;
-        await res.close();
-        continue;
-      }
-      // Benutzerdaten setzen (Fortschritt, gesehen, zuletzt geschaut).
-      if (seg.length == 3 && seg[0] == 'UserItems' && seg[2] == 'UserData' && req.method == 'POST') {
-        final body = jsonDecode(await utf8.decoder.bind(req).join()) as Map<String, dynamic>;
-        final data = byId[seg[1]]?['UserData'] as Map<String, dynamic>?;
-        data?.addAll(body);
-        res.headers.contentType = ContentType.json;
-        res.write(jsonEncode(data ?? {}));
-        await res.close();
-        continue;
-      }
-      if (seg.length == 6 && seg[0] == 'Videos' && seg[3] == 'Subtitles') {
-        res.headers.contentType = ContentType('application', 'x-subrip', charset: 'utf-8');
-        res.write('1\n00:00:01,000 --> 00:00:04,000\nExterner Untertitel (Demo)\n');
-        await res.close();
-        continue;
-      }
-      // Wiedergabelisten anlegen, füllen, leeren, löschen (wie Jellyfin).
-      if (req.uri.path == '/Playlists' && req.method == 'POST') {
-        final body = jsonDecode(await utf8.decoder.bind(req).join()) as Map<String, dynamic>;
-        final id = 'pl${_playlists.length + 1}x${_rand.nextInt(1 << 20)}';
-        _playlists[id] = {
-          'Id': id,
-          'Name': body['Name'],
-          'Type': 'Playlist',
-          'MediaType': 'Video',
-          'IsPublic': body['IsPublic'],
-          'UserData': _userData(),
-        };
-        _playlistEntries[id] = [
-          for (final i in (body['Ids'] as List?) ?? const []) (entry: 'e${_entryCounter++}', id: i as String),
-        ];
-        res.headers.contentType = ContentType.json;
-        res.write(jsonEncode({'Id': id}));
-        await res.close();
-        continue;
-      }
-      if (seg.length == 3 && seg[0] == 'Playlists' && seg[2] == 'Items' && req.method != 'GET') {
-        final entries = _playlistEntries[seg[1]];
-        if (entries != null && req.method == 'POST') {
-          for (final i in (req.uri.queryParameters['ids'] ?? '').split(',').where((s) => s.isNotEmpty)) {
-            entries.add((entry: 'e${_entryCounter++}', id: i));
-          }
-        }
-        if (entries != null && req.method == 'DELETE') {
-          final remove = (req.uri.queryParameters['entryIds'] ?? '').split(',').toSet();
-          entries.removeWhere((e) => remove.contains(e.entry));
-        }
-        res.statusCode = entries == null ? 404 : 204;
-        await res.close();
-        continue;
-      }
-      if (seg.length == 2 && seg[0] == 'Items' && req.method == 'DELETE' && _playlists.containsKey(seg[1])) {
-        _playlists.remove(seg[1]);
-        _playlistEntries.remove(seg[1]);
-        res.statusCode = 204;
-        await res.close();
-        continue;
-      }
-      if (req.uri.path == '/debug/playlists') {
-        res.headers.contentType = ContentType.json;
-        res.write(
-          jsonEncode([
-            for (final pl in _playlists.values) {...pl, 'Items': _playlistEntries[pl['Id']]!.map((e) => e.id).toList()},
-          ]),
-        );
-        await res.close();
-        continue;
-      }
-      // Neuen Film hinzufügen (wie nach einem Bibliotheks-Scan) und "LibraryChanged" melden.
-      if (req.uri.path == '/debug/addmovie' && req.method == 'DELETE') {
-        final id = req.uri.queryParameters['id'];
-        movies.removeWhere((m) => m['Id'] == id);
-        byId.remove(id);
-        await res.close();
-        continue;
-      }
-      if (req.uri.path == '/debug/addmovie' && req.method == 'POST') {
-        final id = 'movie${movies.length}';
-        final m = <String, dynamic>{
-          ...movies[1],
-          'Id': id,
-          'Name': req.uri.queryParameters['name'] ?? 'Neuer Film',
-          'UserData': _userData(),
-          'MediaSources': [_source(id, 'mkv', width: 1920, height: 1080)],
-        };
-        movies.add(m);
-        byId[id] = m;
-        final message = jsonEncode({
-          'MessageType': 'LibraryChanged',
-          'Data': {
-            'ItemsAdded': [id],
-          },
-        });
-        for (final s in _sockets) {
-          s.add(message);
-        }
-        res.write(jsonEncode({'id': id}));
-        await res.close();
-        continue;
-      }
-      if (req.uri.path == '/debug/send' && req.method == 'POST') {
-        final body = await utf8.decoder.bind(req).join();
-        for (final s in _sockets) {
-          s.add(body);
-        }
-        res.write('{"sent": ${_sockets.length}}');
-        await res.close();
-        continue;
-      }
-      if (seg.length == 3 && seg[0] == 'Audio' && seg[2] == 'stream') {
-        _lastThemeSong = seg[1];
-        unawaited(_serveVideo(req));
-        continue;
-      }
-      if (req.uri.path == '/debug/lasttheme') {
-        res.write(jsonEncode({'id': _lastThemeSong}));
-        await res.close();
-        continue;
-      }
-      if (seg.length == 3 && seg[0] == 'Videos' && (seg[2] == 'stream' || seg[2] == 'stream.mkv')) {
-        // Nicht abwarten: Streams laufen parallel zu anderen Anfragen.
-        _lastStream = {'itemId': seg[1], 'path': seg[2], ...req.uri.queryParameters};
-        // Umgerechnet (static=false): wie Jellyfin am Stück, ohne Größe und ohne Range.
-        unawaited(_serveVideo(req, progressive: req.uri.queryParameters['static'] == 'false'));
-        continue;
-      }
-      // Trickplay-Kachel: jedes Vorschaubild eine eigene Farbe.
-      if (seg.length == 5 && seg[0] == 'Videos' && seg[2] == 'Trickplay') {
-        final key = 'trickplay/${seg[1]}/${seg[4]}';
-        final bytes = _imageCache.putIfAbsent(key, () => _tilePng(160, 90, 10, 10, key.hashCode));
-        res.headers.contentType = ContentType('image', 'png');
-        res.add(bytes);
-        await res.close();
-        continue;
-      }
-      if (seg.length >= 4 && seg[0] == 'Items' && seg[2] == 'Images') {
-        final q = req.uri.queryParameters;
-        final type = seg[3];
-        final isLogo = type == 'Logo';
-        int? parse(String k) => int.tryParse(q[k] ?? '');
-        var w = parse('fillWidth') ?? parse('maxWidth') ?? (type == 'Primary' ? 400 : 1280);
-        var h =
-            parse('fillHeight') ??
-            parse('maxHeight') ??
-            (type == 'Primary' && !seg[1].contains('_e') && !seg[1].startsWith('lib')
-                ? (w * 1.5).round()
-                : (w * 9 / 16).round());
-        if (isLogo) {
-          w = 600;
-          h = 180;
-        }
-        // Für die Geschwindigkeit verkleinern – die App skaliert ohnehin.
-        final scale = math.min(1.0, 640 / w);
-        w = math.max(8, (w * scale).round());
-        h = math.max(8, (h * scale).round());
-        final key = '${seg.join('/')}-$w-$h';
-        final bytes = _imageCache.putIfAbsent(key, () => _png(w, h, key.hashCode, logo: isLogo));
-        _imageRequests++;
-        if (_imageDelayMs > 0) {
-          // Nicht den ganzen Server blockieren: verzögert parallel ausliefern.
-          unawaited(
-            Future<void>.delayed(Duration(milliseconds: _imageDelayMs), () async {
-              res.headers.contentType = ContentType('image', 'png');
-              res.add(bytes);
-              await res.close();
-            }),
-          );
-          continue;
-        }
-        res.headers.contentType = ContentType('image', 'png');
-        res.add(bytes);
-      } else {
-        final body = _handle(req);
-        if (body == null) {
-          res.statusCode = 404;
-        } else {
-          res.headers.contentType = ContentType.json;
-          res.write(body is String ? body : jsonEncode(body));
-        }
-      }
-    } catch (e) {
-      res.statusCode = 500;
-      res.write('$e');
-    }
-    await res.close();
+    unawaited(_serve(req));
   }
+}
+
+/// Eine Anfrage beantworten (unabhängig von den anderen, siehe main).
+Future<void> _serve(HttpRequest req) async {
+  final res = req.response;
+  try {
+    final seg = req.uri.pathSegments;
+    // Live-Verbindung wie bei Jellyfin (/socket).
+    if (req.uri.path == '/socket' && WebSocketTransformer.isUpgradeRequest(req) && !_offline) {
+      final socket = await WebSocketTransformer.upgrade(req);
+      _sockets.add(socket);
+      socket.add(jsonEncode({'MessageType': 'ForceKeepAlive', 'Data': 60}));
+      socket.listen((_) {}, onDone: () => _sockets.remove(socket));
+      stdout.writeln('Live-Verbindung geöffnet (${_sockets.length})');
+      return;
+    }
+    // Testschnittstelle: POST /debug/send mit {"MessageType": …, "Data": …} an alle Clients.
+    if (req.uri.path == '/debug/throttle') {
+      _throttleBps = int.tryParse(req.uri.queryParameters['bps'] ?? '') ?? 0;
+      res.write('{"bps": $_throttleBps}');
+      await res.close();
+      return;
+    }
+    if (req.uri.path == '/debug/revoke') {
+      if (req.uri.queryParameters.containsKey('on')) {
+        _revoked = req.uri.queryParameters['on'] == '1';
+        _rejected = 0;
+      }
+      res.write('{"revoked": $_revoked, "rejected": $_rejected}');
+      await res.close();
+      return;
+    }
+    if (_revoked && req.uri.path == '/Users/AuthenticateByName') _revoked = false;
+    const public = {'/System/Info/Public', '/System/Ping', '/Users/Public', '/QuickConnect/Enabled'};
+    if (_revoked && !public.contains(req.uri.path) && !req.uri.path.contains('/Images/')) {
+      _rejected++;
+      res.statusCode = 401;
+      await res.close();
+      return;
+    }
+    if (req.uri.path == '/debug/offline') {
+      _offline = req.uri.queryParameters['on'] == '1';
+      if (_offline) {
+        for (final s in _sockets.toList()) {
+          await s.close();
+        }
+      }
+      res.write('{"offline": $_offline}');
+      await res.close();
+      return;
+    }
+    if (req.uri.path == '/debug/images') {
+      final q = req.uri.queryParameters;
+      if (q['delay'] != null) _imageDelayMs = int.tryParse(q['delay']!) ?? 0;
+      if (q['reset'] == '1') _imageRequests = 0;
+      res.headers.contentType = ContentType.json;
+      res.write(jsonEncode({'delay': _imageDelayMs, 'requests': _imageRequests}));
+      await res.close();
+      return;
+    }
+    if (req.uri.path == '/debug/report' && req.method == 'POST') {
+      // Messungen von iPhone/Fernseher ohne Debug-Verbindung (integration_test/device_perf_test.dart).
+      final body = await utf8.decoder.bind(req).join();
+      final name = (req.uri.queryParameters['name'] ?? 'report').replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+      File('build/device_reports/$name.json')
+        ..createSync(recursive: true)
+        ..writeAsStringSync(body);
+      stdout.writeln('Messung $name: $body');
+      await res.close();
+      return;
+    }
+    if (req.uri.path == '/debug/laststream') {
+      res.headers.contentType = ContentType.json;
+      res.write(jsonEncode(_lastStream));
+      await res.close();
+      return;
+    }
+    if (seg.length == 3 && seg[0] == 'debug' && seg[1] == 'userdata') {
+      // PUT: Benutzerdaten genau so wiederherstellen (Tests räumen damit auf).
+      if (req.method == 'PUT' && byId[seg[2]] != null) {
+        byId[seg[2]]!['UserData'] = jsonDecode(await utf8.decoder.bind(req).join()) as Map<String, dynamic>;
+      }
+      res.headers.contentType = ContentType.json;
+      res.write(jsonEncode(byId[seg[2]]?['UserData']));
+      await res.close();
+      return;
+    }
+    if (_offline) {
+      res.statusCode = HttpStatus.serviceUnavailable;
+      await res.close();
+      return;
+    }
+    // Benutzerdaten setzen (Fortschritt, gesehen, zuletzt geschaut).
+    if (seg.length == 3 && seg[0] == 'UserItems' && seg[2] == 'UserData' && req.method == 'POST') {
+      final body = jsonDecode(await utf8.decoder.bind(req).join()) as Map<String, dynamic>;
+      final data = byId[seg[1]]?['UserData'] as Map<String, dynamic>?;
+      data?.addAll(body);
+      res.headers.contentType = ContentType.json;
+      res.write(jsonEncode(data ?? {}));
+      await res.close();
+      return;
+    }
+    if (seg.length == 6 && seg[0] == 'Videos' && seg[3] == 'Subtitles') {
+      res.headers.contentType = ContentType('application', 'x-subrip', charset: 'utf-8');
+      res.write('1\n00:00:01,000 --> 00:00:04,000\nExterner Untertitel (Demo)\n');
+      await res.close();
+      return;
+    }
+    // Wiedergabelisten anlegen, füllen, leeren, löschen (wie Jellyfin).
+    if (req.uri.path == '/Playlists' && req.method == 'POST') {
+      final body = jsonDecode(await utf8.decoder.bind(req).join()) as Map<String, dynamic>;
+      final id = 'pl${_playlists.length + 1}x${_rand.nextInt(1 << 20)}';
+      _playlists[id] = {
+        'Id': id,
+        'Name': body['Name'],
+        'Type': 'Playlist',
+        'MediaType': 'Video',
+        'IsPublic': body['IsPublic'],
+        'UserData': _userData(),
+      };
+      _playlistEntries[id] = [
+        for (final i in (body['Ids'] as List?) ?? const []) (entry: 'e${_entryCounter++}', id: i as String),
+      ];
+      res.headers.contentType = ContentType.json;
+      res.write(jsonEncode({'Id': id}));
+      await res.close();
+      return;
+    }
+    if (seg.length == 3 && seg[0] == 'Playlists' && seg[2] == 'Items' && req.method != 'GET') {
+      final entries = _playlistEntries[seg[1]];
+      if (entries != null && req.method == 'POST') {
+        for (final i in (req.uri.queryParameters['ids'] ?? '').split(',').where((s) => s.isNotEmpty)) {
+          entries.add((entry: 'e${_entryCounter++}', id: i));
+        }
+      }
+      if (entries != null && req.method == 'DELETE') {
+        final remove = (req.uri.queryParameters['entryIds'] ?? '').split(',').toSet();
+        entries.removeWhere((e) => remove.contains(e.entry));
+      }
+      res.statusCode = entries == null ? 404 : 204;
+      await res.close();
+      return;
+    }
+    if (seg.length == 2 && seg[0] == 'Items' && req.method == 'DELETE' && _playlists.containsKey(seg[1])) {
+      _playlists.remove(seg[1]);
+      _playlistEntries.remove(seg[1]);
+      res.statusCode = 204;
+      await res.close();
+      return;
+    }
+    if (req.uri.path == '/debug/playlists') {
+      res.headers.contentType = ContentType.json;
+      res.write(
+        jsonEncode([
+          for (final pl in _playlists.values) {...pl, 'Items': _playlistEntries[pl['Id']]!.map((e) => e.id).toList()},
+        ]),
+      );
+      await res.close();
+      return;
+    }
+    // Neuen Film hinzufügen (wie nach einem Bibliotheks-Scan) und "LibraryChanged" melden.
+    if (req.uri.path == '/debug/addmovie' && req.method == 'DELETE') {
+      final id = req.uri.queryParameters['id'];
+      movies.removeWhere((m) => m['Id'] == id);
+      byId.remove(id);
+      await res.close();
+      return;
+    }
+    if (req.uri.path == '/debug/addmovie' && req.method == 'POST') {
+      final id = 'movie${movies.length}';
+      final m = <String, dynamic>{
+        ...movies[1],
+        'Id': id,
+        'Name': req.uri.queryParameters['name'] ?? 'Neuer Film',
+        'UserData': _userData(),
+        'MediaSources': [_source(id, 'mkv', width: 1920, height: 1080)],
+      };
+      movies.add(m);
+      byId[id] = m;
+      final message = jsonEncode({
+        'MessageType': 'LibraryChanged',
+        'Data': {
+          'ItemsAdded': [id],
+        },
+      });
+      for (final s in _sockets) {
+        s.add(message);
+      }
+      res.write(jsonEncode({'id': id}));
+      await res.close();
+      return;
+    }
+    if (req.uri.path == '/debug/send' && req.method == 'POST') {
+      final body = await utf8.decoder.bind(req).join();
+      for (final s in _sockets) {
+        s.add(body);
+      }
+      res.write('{"sent": ${_sockets.length}}');
+      await res.close();
+      return;
+    }
+    if (seg.length == 3 && seg[0] == 'Audio' && seg[2] == 'stream') {
+      _lastThemeSong = seg[1];
+      unawaited(_serveVideo(req));
+      return;
+    }
+    if (req.uri.path == '/debug/lasttheme') {
+      res.write(jsonEncode({'id': _lastThemeSong}));
+      await res.close();
+      return;
+    }
+    if (seg.length == 3 && seg[0] == 'Videos' && (seg[2] == 'stream' || seg[2] == 'stream.mkv')) {
+      // Nicht abwarten: Streams laufen parallel zu anderen Anfragen.
+      _lastStream = {'itemId': seg[1], 'path': seg[2], ...req.uri.queryParameters};
+      // Umgerechnet (static=false): wie Jellyfin am Stück, ohne Größe und ohne Range.
+      unawaited(_serveVideo(req, progressive: req.uri.queryParameters['static'] == 'false'));
+      return;
+    }
+    // Trickplay-Kachel: jedes Vorschaubild eine eigene Farbe.
+    if (seg.length == 5 && seg[0] == 'Videos' && seg[2] == 'Trickplay') {
+      final key = 'trickplay/${seg[1]}/${seg[4]}';
+      final bytes = _imageCache.putIfAbsent(key, () => _tilePng(160, 90, 10, 10, key.hashCode));
+      res.headers.contentType = ContentType('image', 'png');
+      res.add(bytes);
+      await res.close();
+      return;
+    }
+    if (seg.length >= 4 && seg[0] == 'Items' && seg[2] == 'Images') {
+      final q = req.uri.queryParameters;
+      final type = seg[3];
+      final isLogo = type == 'Logo';
+      int? parse(String k) => int.tryParse(q[k] ?? '');
+      var w = parse('fillWidth') ?? parse('maxWidth') ?? (type == 'Primary' ? 400 : 1280);
+      var h =
+          parse('fillHeight') ??
+          parse('maxHeight') ??
+          (type == 'Primary' && !seg[1].contains('_e') && !seg[1].startsWith('lib')
+              ? (w * 1.5).round()
+              : (w * 9 / 16).round());
+      if (isLogo) {
+        w = 600;
+        h = 180;
+      }
+      // Für die Geschwindigkeit verkleinern – die App skaliert ohnehin.
+      final scale = math.min(1.0, 640 / w);
+      w = math.max(8, (w * scale).round());
+      h = math.max(8, (h * scale).round());
+      final key = '${seg.join('/')}-$w-$h';
+      final bytes = _imageCache.putIfAbsent(key, () => _png(w, h, key.hashCode, logo: isLogo));
+      _imageRequests++;
+      if (_imageDelayMs > 0) {
+        // Nicht den ganzen Server blockieren: verzögert parallel ausliefern.
+        unawaited(
+          Future<void>.delayed(Duration(milliseconds: _imageDelayMs), () async {
+            res.headers.contentType = ContentType('image', 'png');
+            res.add(bytes);
+            await res.close();
+          }),
+        );
+        return;
+      }
+      res.headers.contentType = ContentType('image', 'png');
+      res.add(bytes);
+    } else {
+      final body = _handle(req);
+      if (body == null) {
+        res.statusCode = 404;
+      } else {
+        res.headers.contentType = ContentType.json;
+        res.write(body is String ? body : jsonEncode(body));
+      }
+    }
+  } catch (e) {
+    res.statusCode = 500;
+    res.write('$e');
+  }
+  await res.close();
 }

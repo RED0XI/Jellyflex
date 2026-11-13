@@ -10,9 +10,11 @@ import 'package:window_manager/window_manager.dart';
 
 import '../core/app_lock.dart';
 import '../core/gamepad_input.dart';
+import '../core/platform/device.dart';
 import '../core/route_observer.dart';
 import '../core/window_memory.dart';
 import '../theme.dart';
+import 'app_intro.dart';
 import 'focus_navigation.dart';
 import 'focusable.dart';
 import 'shortcut_sheet.dart';
@@ -25,7 +27,12 @@ final windowChromeVisible = ValueNotifier<bool>(true);
 final windowFullscreen = ValueNotifier<bool>(false);
 
 Future<void> setWindowFullscreen(bool value) async {
-  await windowManager.setFullScreen(value);
+  if (isDesktop) {
+    await windowManager.setFullScreen(value);
+  } else {
+    // iPhone/iPad: Statusleiste und Home-Leiste aus- bzw. wieder einblenden.
+    await SystemChrome.setEnabledSystemUIMode(value ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge);
+  }
   windowFullscreen.value = value;
 }
 
@@ -37,7 +44,8 @@ Rect? _boundsBeforeMini;
 bool _maximizedBeforeMini = false;
 
 Future<void> setWindowMiniPlayer(bool value) async {
-  if (value == windowMiniPlayer.value) return;
+  // Ohne eigenes Fenster (iPhone/iPad) gibt es keinen Mini-Player.
+  if (value == windowMiniPlayer.value || !isDesktop) return;
   if (value) {
     if (windowFullscreen.value) await setWindowFullscreen(false);
     _maximizedBeforeMini = await windowManager.isMaximized();
@@ -118,13 +126,15 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
   @override
   void initState() {
     super.initState();
-    windowManager.addListener(this);
     widget.router.routerDelegate.addListener(_onRouteChanged);
     GamepadInput.start(_onPadAction);
     HardwareKeyboard.instance.addHandler(_onHardwareKey);
-    windowManager.isMaximized().then((v) {
-      if (mounted) setState(() => _maximized = v);
-    });
+    if (isDesktop) {
+      windowManager.addListener(this);
+      windowManager.isMaximized().then((v) {
+        if (mounted) setState(() => _maximized = v);
+      });
+    }
     if (isMacOS) _chromeVisibility.addListener(_syncMacButtons);
   }
 
@@ -144,9 +154,9 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
   @override
   void dispose() {
     if (isMacOS) _chromeVisibility.removeListener(_syncMacButtons);
-    windowManager.removeListener(this);
+    if (isDesktop) windowManager.removeListener(this);
     widget.router.routerDelegate.removeListener(_onRouteChanged);
-    GamepadInput.stop();
+    GamepadInput.stop(_onPadAction);
     HardwareKeyboard.instance.removeHandler(_onHardwareKey);
     _frameFocus.dispose();
     super.dispose();
@@ -155,6 +165,8 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
   /// Liegt der Fokus auf keinem Element (ganz oben im Fenster), erreichen Tasten
   /// die Seite nicht – Pfeiltasten hier direkt in Fokus-Navigation umsetzen.
   bool _onHardwareKey(KeyEvent event) {
+    // Intro läuft: Tasten überspringen es und lösen darunter nichts aus.
+    if (AppIntro.showing) return false;
     final primary = FocusManager.instance.primaryFocus;
     // "?" zeigt überall die Tastenkürzel – außer beim Tippen in ein Textfeld.
     // Nicht über anderen Dialogen/Menüs (z. B. der PIN-Abfrage).
@@ -255,6 +267,13 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
   @override
   void onWindowResized() => WindowMemory.scheduleSave();
 
+  /// macOS meldet "fertig" ([onWindowResized]) nur nach dem Ziehen mit der Maus – Kacheln und
+  /// Größenänderungen per Tastatur kommen nur hier an (gebündelt gespeichert).
+  @override
+  void onWindowResize() {
+    if (isMacOS) WindowMemory.scheduleSave();
+  }
+
   @override
   void onWindowMoved() => WindowMemory.scheduleSave();
 
@@ -326,7 +345,44 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
     );
   }
 
+  /// iPhone/iPad: keine Fensterleiste – nur der Zurück-Knopf, unter Statusleiste und Notch.
+  Widget _buildMobileFrame(bool showBack) {
+    final safe = MediaQuery.paddingOf(context);
+    return Stack(
+      children: [
+        Positioned.fill(child: widget.child),
+        Positioned(
+          top: safe.top,
+          left: safe.left + 4,
+          child: ListenableBuilder(
+            listenable: windowChromeVisible,
+            builder: (context, _) {
+              final visible = showBack && windowChromeVisible.value;
+              return AnimatedOpacity(
+                opacity: visible ? 1 : 0,
+                duration: const Duration(milliseconds: 250),
+                child: IgnorePointer(
+                  ignoring: !visible,
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: _TitleBarButton(
+                      icon: Icons.arrow_back_rounded,
+                      tooltip: tr.back,
+                      onPressed: () => widget.router.pop(),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildFrame(bool showBack, {required bool inPlayer}) {
+    // Fernseher: keine Titelleiste – zurück geht mit der Zurück-Taste der Fernbedienung.
+    if (!isDesktop) return isTv ? widget.child : _buildMobileFrame(showBack);
     return Stack(
       children: [
         Positioned.fill(child: widget.child),

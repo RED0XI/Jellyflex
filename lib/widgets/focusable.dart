@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/platform/device.dart';
+import 'focus_navigation.dart';
+
 /// Kontextmenü für das fokussierte Element öffnen (Menütaste, Umschalt+F10, Controller-X).
 class ShowContextMenuIntent extends Intent {
   const ShowContextMenuIntent();
@@ -21,7 +24,21 @@ class Focusable extends StatefulWidget {
     this.enabled = true,
     this.scrollAlignment = 0.5,
     this.semanticLabel,
+    this.focusNode,
+    this.onFocusChange,
+    this.tvRing = true,
   });
+
+  /// Fernseher: weiße Umrandung bei Fokus – für Elemente ohne eigene deutliche Fokus-Darstellung
+  /// (aus 3 m Entfernung reicht "etwas heller" nicht). Karten & Co. mit eigener: `false`.
+  final bool tvRing;
+
+  /// Meldet, wenn das Element den Fokus bekommt bzw. verliert (z. B. für die Infos oben auf der
+  /// Startseite am Fernseher).
+  final ValueChanged<bool>? onFocusChange;
+
+  /// Eigener Fokus-Knoten – um das Element gezielt anzuspringen (z. B. Play beim Einblenden).
+  final FocusNode? focusNode;
 
   /// Name für Bildschirmleser. Ohne Angabe gilt der sichtbare Text im Inneren
   /// (z. B. Titel und Jahr einer Karte).
@@ -50,14 +67,42 @@ class _FocusableState extends State<Focusable> {
 
   void _onFocusChange(bool focused) {
     setState(() => _focused = focused);
-    if (focused) {
-      Scrollable.ensureVisible(
-        context,
-        alignment: widget.scrollAlignment,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOutCubic,
-      );
-    }
+    widget.onFocusChange?.call(focused);
+    if (!focused) return;
+    if (isTv) return revealInScrollables(context, minimal: true);
+    Scrollable.ensureVisible(
+      context,
+      alignment: widget.scrollAlignment,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  Widget _withTvRing(Widget child, bool focused) {
+    if (!isTv || !widget.tvRing) return child;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        Positioned(
+          left: -4,
+          top: -4,
+          right: -4,
+          bottom: -4,
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: focused ? 1 : 0,
+              duration: const Duration(milliseconds: 120),
+              child: const DecoratedBox(
+                decoration: ShapeDecoration(
+                  shape: StadiumBorder(side: BorderSide(color: Colors.white, width: 2.5)),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -73,6 +118,7 @@ class _FocusableState extends State<Focusable> {
     return FocusableActionDetector(
       // Ohne Aktion nicht per Tastatur/Controller anspringbar.
       enabled: enabled,
+      focusNode: widget.focusNode,
       autofocus: widget.autofocus,
       mouseCursor: enabled ? widget.cursor : SystemMouseCursors.basic,
       onShowHoverHighlight: (v) => setState(() => _hovered = v),
@@ -99,7 +145,55 @@ class _FocusableState extends State<Focusable> {
       child: GestureDetector(
         onTap: enabled ? widget.onTap : null,
         onSecondaryTapUp: widget.onSecondaryTap == null ? null : (d) => widget.onSecondaryTap!(d.globalPosition),
-        child: widget.builder(context, enabled && (_hovered || _focused)),
+        child: _withTvRing(widget.builder(context, enabled && (_hovered || _focused)), enabled && _focused),
+      ),
+    );
+  }
+}
+
+/// Fernseher: weiße Umrandung, sobald ein Element darin den Fokus hat – für Standard-Elemente
+/// (Schalter, Auswahlmenüs), deren eigene Fokus-Anzeige aus 3 m nicht zu sehen ist. Sonst: [child].
+class TvFocusRing extends StatefulWidget {
+  const TvFocusRing({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<TvFocusRing> createState() => _TvFocusRingState();
+}
+
+class _TvFocusRingState extends State<TvFocusRing> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isTv) return widget.child;
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onFocusChange: (f) => setState(() => _focused = f),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          widget.child,
+          Positioned(
+            left: -4,
+            top: -4,
+            right: -4,
+            bottom: -4,
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: _focused ? 1 : 0,
+                duration: const Duration(milliseconds: 120),
+                child: const DecoratedBox(
+                  decoration: ShapeDecoration(
+                    shape: StadiumBorder(side: BorderSide(color: Colors.white, width: 2.5)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

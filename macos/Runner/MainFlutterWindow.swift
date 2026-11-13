@@ -21,6 +21,7 @@ class MainFlutterWindow: NSWindow {
     AppShell.shared.register(with: messenger)
     MediaSession.shared.register(with: messenger)
     Keychain.register(with: messenger)
+    Power.shared.register(with: messenger)
 
     super.awakeFromNib()
   }

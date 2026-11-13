@@ -1,7 +1,10 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
 import 'core/layouts.dart';
+import 'core/platform/device.dart';
 import 'core/themes.dart';
+import 'core/power.dart';
 
 /// Aktives Farbschema (wird aus den Einstellungen gesetzt).
 AppPalette appPalette = appPalettes.first;
@@ -31,11 +34,16 @@ abstract final class AppColors {
 const appFontFamily = 'Segoe UI Variable Text';
 const appFontFallback = ['Segoe UI', 'Arial'];
 
-/// Horizontaler Seitenabstand, den alle Screens teilen.
-const double kPageGutter = 56;
+/// Horizontaler Seitenabstand, den alle Screens teilen (iPhone/iPad: schmaler).
+final double kPageGutter = isMobile ? 20 : 56;
 
 /// Höhe der eigenen Fenster-Titelleiste.
 const double kTitleBarHeight = 36;
+
+/// Abstand vom oberen Rand bis unter die Leiste mit dem Zurück-Knopf: auf dem Desktop die
+/// Titelleiste, auf iPhone/iPad zusätzlich Statusleiste und Notch/Dynamic Island.
+double topInset(BuildContext context) =>
+    isMobile ? MediaQuery.paddingOf(context).top + kTitleBarHeight : kTitleBarHeight;
 
 /// [key] nur, damit sich das Ergebnis bei einem Theme-/Layout-Wechsel ändert.
 ThemeData buildTheme([String? key]) {
@@ -60,7 +68,19 @@ ThemeData buildTheme([String? key]) {
       .apply(fontFamily: font, fontFamilyFallback: appFontFallback)
       .apply(bodyColor: AppColors.textPrimary, displayColor: AppColors.textPrimary);
 
+  // Fernseher: Standard-Knöpfe (Text-, Symbol-, gefüllte Knöpfe) zeigen den Fokus mit weißem Rand,
+  // Menüeinträge mit deutlicher Hinterlegung – aus 3 m ist "etwas heller" nicht zu sehen.
+  final tvFocusSide = WidgetStateProperty.resolveWith<BorderSide?>(
+    (states) => states.contains(WidgetState.focused) ? const BorderSide(color: Colors.white, width: 2.5) : null,
+  );
+  final tvButtons = isTv ? ButtonStyle(side: tvFocusSide) : null;
+
   return base.copyWith(
+    focusColor: isTv ? Colors.white.withValues(alpha: 0.2) : null,
+    textButtonTheme: TextButtonThemeData(style: tvButtons),
+    filledButtonTheme: FilledButtonThemeData(style: tvButtons),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: tvButtons),
+    iconButtonTheme: IconButtonThemeData(style: tvButtons),
     textTheme: textTheme,
     splashFactory: NoSplash.splashFactory,
     highlightColor: Colors.transparent,
@@ -72,6 +92,8 @@ ThemeData buildTheme([String? key]) {
         TargetPlatform.macOS: _FadeScaleTransitionsBuilder(),
         TargetPlatform.linux: _FadeScaleTransitionsBuilder(),
         TargetPlatform.android: _FadeScaleTransitionsBuilder(),
+        // iPhone/iPad: der gewohnte Schiebe-Übergang – mit Wischen vom linken Rand zurück.
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
       },
     ),
     // "Aus" ruhig und grau, "An" in der Themenfarbe – so springt ins Auge, was eingeschaltet ist.
@@ -157,6 +179,9 @@ class _FadeScaleTransitionsBuilder extends PageTransitionsBuilder {
     }
     final origin = _routeOrigins[route];
     final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+    // Energiesparen (immer auf dem Fernseher): nur einblenden – Zoom und Ausschnitt kosten auf
+    // schwachen Chips sichtbar Bilder, gerade in dem Moment, in dem die neue Seite aufgebaut wird.
+    if (Power.energySaving.value) return FadeTransition(opacity: curved, child: child);
     if (origin == null) {
       return FadeTransition(
         opacity: curved,

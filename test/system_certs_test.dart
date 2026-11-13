@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jellyflex/core/system_certs.dart';
@@ -19,5 +20,23 @@ void main() {
     expect(SystemCerts.usesBrokenHash(base64.decode(base64.encode(_cert([...rsa, 0x04])))), isTrue, reason: 'MD5');
     expect(SystemCerts.usesBrokenHash(base64.decode(base64.encode(_cert([...rsa, 0x0B])))), isFalse, reason: 'SHA-256');
     expect(SystemCerts.usesBrokenHash(base64.decode(base64.encode(_cert([...rsa, 0x05])))), isFalse, reason: 'SHA-1');
+  });
+
+  test('Android: nur die PEM-Blöcke aus den Systemzertifikaten', () async {
+    final dir = Directory.systemTemp.createTempSync('jellyflex_cacerts_');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    const a = '-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----';
+    const b = '-----BEGIN CERTIFICATE-----\nBBBB\n-----END CERTIFICATE-----';
+    File('${dir.path}/a.0').writeAsStringSync('$a\nCertificate:\n    Data: Version 3\n');
+    File('${dir.path}/b.0').writeAsStringSync('$b\n');
+    expect(await SystemCerts.androidRootsAsPem(dir.path), '$a\n$b\n');
+  });
+
+  test('iPhone: mitgelieferte Mozilla-Stammzertifikate – nur PEM-Blöcke, keine Kommentare', () {
+    final raw = File(SystemCerts.bundledRoots).readAsStringSync();
+    final pem = SystemCerts.pemBlocks(raw);
+    expect('-----BEGIN CERTIFICATE-----'.allMatches(pem).length, greaterThan(100));
+    expect(pem, isNot(contains('##')));
+    expect(pem.trim(), endsWith('-----END CERTIFICATE-----'));
   });
 }

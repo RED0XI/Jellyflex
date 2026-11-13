@@ -16,6 +16,7 @@ import '../../widgets/states.dart';
 import '../../widgets/top_scrim.dart';
 import '../genre/genre_screen.dart';
 import '../../l10n/strings.dart';
+import '../../widgets/tv_text_input.dart';
 
 /// Was die Suche zeigt.
 enum _Filter { all, movies, shows, episodes, people }
@@ -43,17 +44,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   int _requestId = 0;
   _Filter _filter = _Filter.all;
   bool _onlyUnwatched = false;
-
-  /// Alle Genres der Bibliotheken (Kacheln zum Stöbern ohne Suchbegriff).
-  List<String> _genres = const [];
-
-  @override
-  void initState() {
-    super.initState();
-    ref.read(apiProvider).getGenres(null).then((g) {
-      if (mounted) setState(() => _genres = g);
-    }, onError: (_) {});
-  }
 
   @override
   void dispose() {
@@ -118,6 +108,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Alle Genres (Kacheln zum Stöbern ohne Suchbegriff) – einmal je App-Start geholt.
+    final genres = ref.watch(genresProvider).value ?? const <String>[];
     bool show(_Filter f) => _filter == _Filter.all || _filter == f;
     final visible = _onlyUnwatched ? _results.where((i) => !i.userData.played).toList() : _results;
     final movies = show(_Filter.movies) ? visible.where((i) => i.isMovie).toList() : const <BaseItem>[];
@@ -140,42 +132,47 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(kPageGutter, kTitleBarHeight + 28, kPageGutter, 16),
-                    child: TextField(
-                      controller: _controller,
-                      autofocus: true,
-                      onChanged: _onChanged,
-                      onSubmitted: (v) {
-                        _search(v.trim());
-                        _rememberTerm(v.trim());
-                      },
-                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(
-                        hintText: tr.searchHint,
-                        prefixIcon: const Padding(
-                          padding: EdgeInsets.only(left: 18, right: 10),
-                          child: Icon(Icons.search_rounded, size: 30),
-                        ),
-                        suffixIcon: _loading
-                            ? const Padding(
-                                padding: EdgeInsets.all(18),
-                                child: SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                    padding: EdgeInsets.fromLTRB(kPageGutter, topInset(context) + 28, kPageGutter, 16),
+                    child: TvTextInput(
+                      builder: (context, readOnly, done) => TextField(
+                        controller: _controller,
+                        readOnly: readOnly,
+                        // Fernseher: Fokus gleich hier, die Tastatur kommt aber erst auf OK (TvTextInput).
+                        autofocus: true,
+                        onChanged: _onChanged,
+                        onSubmitted: (v) {
+                          done();
+                          _search(v.trim());
+                          _rememberTerm(v.trim());
+                        },
+                        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
+                        decoration: InputDecoration(
+                          hintText: tr.searchHint,
+                          prefixIcon: const Padding(
+                            padding: EdgeInsets.only(left: 18, right: 10),
+                            child: Icon(Icons.search_rounded, size: 30),
+                          ),
+                          suffixIcon: _loading
+                              ? const Padding(
+                                  padding: EdgeInsets.all(18),
+                                  child: SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(strokeWidth: 2.4),
+                                  ),
+                                )
+                              : _controller.text.isEmpty
+                              ? null
+                              : IconButton(
+                                  icon: const Icon(Icons.close_rounded),
+                                  tooltip: tr.clear,
+                                  onPressed: () {
+                                    _controller.clear();
+                                    _search('');
+                                  },
                                 ),
-                              )
-                            : _controller.text.isEmpty
-                            ? null
-                            : IconButton(
-                                icon: const Icon(Icons.close_rounded),
-                                tooltip: tr.clear,
-                                onPressed: () {
-                                  _controller.clear();
-                                  _search('');
-                                },
-                              ),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 22),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 22),
+                        ),
                       ),
                     ),
                   ),
@@ -183,7 +180,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 if (_term.isNotEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 20),
+                      padding: EdgeInsets.fromLTRB(kPageGutter, 0, kPageGutter, 20),
                       child: Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -214,7 +211,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   )
                 else if (_term.isEmpty)
                   SliverToBoxAdapter(
-                    child: recent.isEmpty && _genres.isEmpty
+                    child: recent.isEmpty && genres.isEmpty
                         ? EmptyState(
                             icon: Icons.movie_filter_rounded,
                             title: tr.whatDoYouFeelLike,
@@ -225,7 +222,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             children: [
                               if (recent.isNotEmpty)
                                 _RecentSearches(terms: recent, onUse: _useRecent, onRemove: _forget),
-                              if (_genres.isNotEmpty)
+                              if (genres.isNotEmpty)
                                 Padding(
                                   padding: EdgeInsets.fromLTRB(kPageGutter, recent.isEmpty ? 16 : 34, kPageGutter, 48),
                                   child: Column(
@@ -238,7 +235,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                       const SizedBox(height: 4),
                                       Text(tr.browseByGenreHint, style: TextStyle(color: AppColors.textSecondary)),
                                       const SizedBox(height: 18),
-                                      GenreTiles(genres: _genres),
+                                      GenreTiles(genres: genres),
                                     ],
                                   ),
                                 ),
@@ -302,7 +299,7 @@ class _RecentSearches extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 0),
+      padding: EdgeInsets.fromLTRB(kPageGutter, 12, kPageGutter, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -27,16 +27,28 @@ void main() {
     expect(ProfilePin.isValid('12a4'), isFalse);
   });
 
-  test('Nach 5 falschen Versuchen kurz gesperrt', () {
-    const key = 'server|kind';
-    for (var i = 0; i < 4; i++) {
+  test('Nach 5 falschen Versuchen kurz gesperrt', () async {
+    // Fehlversuche werden gespeichert – in einer Temp-Datei, nie im echten Anmeldespeicher.
+    final dir = Directory.systemTemp.createTempSync('jellyflex_pinlock_');
+    final previous = SecureStore.instance;
+    SecureStore.instance = SecureStore.forFile(File('${dir.path}/secure.bin'));
+    try {
+      const key = 'server|kind';
+      for (var i = 0; i < 4; i++) {
+        ProfilePin.recordFailure(key);
+      }
+      expect(ProfilePin.lockedFor(key), Duration.zero);
       ProfilePin.recordFailure(key);
+      expect(ProfilePin.lockedFor(key).inSeconds, greaterThan(20));
+      ProfilePin.recordSuccess(key);
+      expect(ProfilePin.lockedFor(key), Duration.zero);
+      // Das Speichern läuft im Hintergrund, eins nach dem anderen – ein weiterer Schreibvorgang
+      // ist erst fertig, wenn alle davor es sind.
+      await SecureStore.instance.write(key: 'fertig', value: '1');
+    } finally {
+      SecureStore.instance = previous;
+      dir.deleteSync(recursive: true);
     }
-    expect(ProfilePin.lockedFor(key), Duration.zero);
-    ProfilePin.recordFailure(key);
-    expect(ProfilePin.lockedFor(key).inSeconds, greaterThan(20));
-    ProfilePin.recordSuccess(key);
-    expect(ProfilePin.lockedFor(key), Duration.zero);
   });
 
   test('Profil mit PIN öffnet beim Start nicht automatisch', () async {

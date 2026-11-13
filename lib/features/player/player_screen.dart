@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -17,34 +18,45 @@ import '../../core/downloads.dart';
 import '../../core/format.dart';
 import '../../core/gamepad_input.dart';
 import '../../core/images.dart';
+import '../../core/item_library.dart';
 import '../../core/jellyfin_api.dart';
 import '../../core/live_connection.dart';
 import '../../core/media_info.dart' show codecLabel, trackLabel;
 import '../../core/media_session.dart';
 import '../../core/models.dart';
 import '../../core/play_queue.dart';
+import '../../core/power.dart';
 import '../../core/session.dart';
 import '../../core/series_tracks.dart';
 import '../../core/settings.dart';
 import '../../core/sleep_timer.dart';
+import '../../core/subtitle_style.dart';
 import '../../core/track_choice.dart';
 import '../../theme.dart';
 import '../../widgets/buttons.dart';
+import '../../widgets/subtitle_style_editor.dart';
 import '../../widgets/window_frame.dart';
 import '../details/details_screen.dart';
 import '../details/subtitle_search_dialog.dart';
+import '../home/home_providers.dart';
+import 'apple_player.dart';
 import 'player_overlays.dart';
+import '../../widgets/focus_navigation.dart';
 import '../../widgets/focusable.dart';
 import '../../widgets/jf_image.dart';
 import '../live_handler.dart' show appMessengerKey;
 import '../../l10n/strings.dart';
 import '../../core/system_certs.dart';
 import '../../core/redact.dart';
+import '../../core/screen_brightness.dart';
 import '../../core/platform/app_paths.dart';
+import '../../core/platform/device.dart';
 
+part 'player_subtitle_panel.dart';
 part 'player_tracks_panel.dart';
 part 'player_extras.dart';
 part 'player_widgets.dart';
+part 'player_tv.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({
@@ -71,6 +83,9 @@ class PlayerScreen extends ConsumerStatefulWidget {
   /// So viele Folgen liefen nacheinander von selbst, ohne dass jemand etwas bedient hat.
   /// Ab [stillWatchingAfter] fragt der Player "Schaust du noch?", statt weiterzuspielen.
   static int autoPlayedInARow = 0;
+
+  /// Offene Player auf iPhone/iPad – beim Wechsel zur nächsten Folge kurz zwei zugleich.
+  static int _mobileSessions = 0;
   static const stillWatchingAfter = 3;
 
   /// Lauter als 100 % verstärkt mpv in Software (für leise Filme); gemerkt werden höchstens 100 %.
@@ -96,7 +111,9 @@ class PlayerScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
-  static const _seekStep = Duration(seconds: 10);
+  /// Sprungweiten aus den Einstellungen (Zurück/Vor).
+  Duration get _seekBack => Duration(seconds: ref.read(settingsProvider).seekBackSeconds);
+  Duration get _seekForward => Duration(seconds: ref.read(settingsProvider).seekForwardSeconds);
   static const _hideDelay = Duration(seconds: 3);
 
   late final Player _player = Player(
@@ -114,6 +131,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   /// Schon in initState gelesen – beim Schließen (dispose) ist ref nicht mehr nutzbar.
   late final SettingsController _settings = ref.read(settingsProvider.notifier);
   final _focus = FocusNode();
+
+  /// Fernseher: Play/Pause-Knopf – bekommt beim Einblenden den Fokus.
+  final _tvPlayFocus = FocusNode();
+
+  /// Fernseher: Zeitleiste (von dort führt "runter" zu Play/Pause).
+  final _tvSeekFocus = FocusNode();
   final _subscriptions = <StreamSubscription<dynamic>>[];
 
   BaseItem? _item;
@@ -152,8 +175,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _hoveringControls = false;
   bool _trackPanelOpen = false;
   bool _playbackPanelOpen = false;
+  bool _subtitleStyleOpen = false;
+
+  /// Bibliothek des Titels (für deren Untertitel-Regeln); `null` = unbekannt.
+  String? _libraryId;
+
+  /// Zuletzt an mpv gegebener Untertitel-Stil – beim Schieben der Regler nur Änderungen senden.
+  Map<String, String> _subtitleProps = const {};
   bool _chaptersOpen = false;
-  bool get _anyPanelOpen => _trackPanelOpen || _playbackPanelOpen || _chaptersOpen;
+  bool get _anyPanelOpen => _trackPanelOpen || _playbackPanelOpen || _chaptersOpen || _subtitleStyleOpen;
 
   /// Technische Infos (Taste I).
   bool _statsVisible = false;
@@ -175,6 +205,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   double _customZoom = 1;
   final _zoomOsd = ValueNotifier<String?>(null);
   Timer? _zoomOsdTimer;
+
+  /// Touch: senkrecht wischen – links Helligkeit, rechts Lautstärke (Anzeige am Rand).
+  _Swipe? _swipe;
+  double _swipeValue = 0;
+  final _levelOsd = ValueNotifier<(_Swipe, double)?>(null);
+  Timer? _levelOsdTimer;
 
   /// Kurze Lautstärke-Anzeige in der Bildmitte (Mausrad, Pfeiltasten); `null` = ausgeblendet.
   Timer? _hideTimer;
@@ -215,8 +251,195 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     RemoteControl.onGeneral = _onRemoteGeneral;
     GamepadInput.playerHandler = _onPad;
     SleepTimer.instance.addListener(_onSleepTimerChanged);
+    Power.energySaving.addListener(_applyEnergySaving);
     _sleepTick = Timer.periodic(const Duration(seconds: 1), (_) => _checkSleepTimer());
     _checkSleepTimer();
+    if (isMobile) {
+      _enterMobilePlayback();
+      Power.appVisible.addListener(_onAppVisibleChanged);
+      // Läuft noch ein Titel in Apples Player (Bild-in-Bild, AirPlay)? Der endet jetzt – sonst
+      // spielten beide zugleich.
+      if (ApplePlayer.active) ApplePlayer.stop();
+    }
+  }
+
+  // --- iPhone/iPad -------------------------------------------------------------
+
+  /// Das Bild füllt den Bildschirm: Status- und Home-Leiste aus, auf dem iPhone im Querformat.
+  void _enterMobilePlayback() {
+    PlayerScreen._mobileSessions++;
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    if (isPhoneDevice) {
+      SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
+    }
+  }
+
+  /// Zurück zur normalen Darstellung – erst, wenn kein Player mehr offen ist (beim Wechsel zur
+  /// nächsten Folge baut sich der neue auf, bevor der alte geht).
+  static void _leaveMobilePlayback() {
+    if (--PlayerScreen._mobileSessions > 0) return;
+    // Helligkeit wie vor dem Video (auf dem iPhone gilt sie sonst systemweit weiter) – bei der
+    // nächsten Folge bleibt die eingestellte erhalten.
+    ScreenBrightness.restore();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations(mobileOrientations);
+  }
+
+  /// Position des letzten Doppeltipps (Touch: links zurück, rechts vor, Mitte Pause).
+  double? _doubleTapX;
+
+  void _onDoubleTapTouch() {
+    final width = MediaQuery.sizeOf(context).width;
+    final x = _doubleTapX ?? width / 2;
+    HapticFeedback.lightImpact();
+    if (x < width / 3) {
+      _seekBy(-_seekBack);
+      _flashOsd('−${_seekBack.inSeconds} s');
+    } else if (x > width * 2 / 3) {
+      _seekBy(_seekForward);
+      _flashOsd('+${_seekForward.inSeconds} s');
+    } else {
+      _player.playOrPause();
+    }
+  }
+
+  /// iPhone/iPad: Bild-in-Bild oder AirPlay – Apples Player übernimmt an derselben Stelle
+  /// (siehe [ApplePlayer]), der Jellyflex-Player schließt sich.
+  Future<void> _handoffToApple(AppleHandoff handoff) async {
+    final item = _item;
+    final source = _source;
+    if (item == null || source == null || _closing || _handingOff) return;
+    void snack(String text) => appMessengerKey.currentState?.showSnackBar(
+      SnackBar(content: Text(text), behavior: SnackBarBehavior.floating, width: 460),
+    );
+    // Apples Player kann viele Dateien (z. B. MKV) nicht – er bekommt den Stream vom Server.
+    if (_localFile != null) return snack(tr.appleHandoffStreamingOnly);
+    _handingOff = true;
+    try {
+      await _handoff(item, source, handoff, snack);
+    } finally {
+      _handingOff = false;
+    }
+  }
+
+  /// Übergabe an Apples Player läuft (zweites Tippen zählt nicht).
+  bool _handingOff = false;
+
+  Future<void> _handoff(BaseItem item, MediaSource source, AppleHandoff handoff, void Function(String) snack) async {
+    // Bild-in-Bild: Das Video läuft hier weiter, bis das Fenster erscheint – Apples Player holt
+    // sich dann die aktuelle Stelle. AirPlay öffnet gleich Apples Vollbild, also hier anhalten.
+    final pip = handoff == AppleHandoff.pictureInPicture;
+    final wasPlaying = _player.state.playing;
+    if (!pip) await _player.pause();
+    if (!mounted) return;
+    if (pip) _flashOsd(tr.pictureInPicture);
+    var last = _player.state.position;
+    final ok = await ApplePlayer.open(
+      api: _api,
+      router: GoRouter.of(context),
+      item: item,
+      mediaSourceId: source.id,
+      position: last,
+      positionNow: () {
+        if (mounted && !_closing) last = _player.state.position;
+        return last;
+      },
+      handoff: handoff,
+      audioIndex: _audioIndex,
+      subtitleIndex: _subtitleIndex,
+      maxBitrate: _maxBitrate,
+    );
+    if (!mounted) {
+      // Der Player wurde geschlossen, während Apples Player sich vorbereitete: Dann soll auch kein
+      // Bild-in-Bild-Fenster mehr aufgehen (womöglich läuft hier längst ein anderer Titel).
+      if (ok) ApplePlayer.stop();
+      return;
+    }
+    if (!ok) {
+      snack(tr.appleHandoffFailed);
+      if (!pip && wasPlaying) await _player.play();
+      return;
+    }
+    await _player.pause();
+    await _close();
+  }
+
+  /// Wischen beginnt: Seite bestimmt, was sich ändert. Ganz oben und unten nicht – dort liegen
+  /// die Gesten des Systems (Kontrollzentrum, Home).
+  Future<void> _onSwipeStart(DragStartDetails d) async {
+    final size = MediaQuery.sizeOf(context);
+    final y = d.localPosition.dy;
+    if (y < size.height * 0.1 || y > size.height * 0.9) return;
+    final kind = d.localPosition.dx < size.width / 2 ? _Swipe.brightness : _Swipe.volume;
+    _swipe = kind;
+    _swipeValue = kind == _Swipe.volume ? (_volume / 100).clamp(0.0, 1.0) : 0.5;
+    if (kind == _Swipe.brightness) _swipeValue = await ScreenBrightness.get() ?? 0.5;
+    _showLevel();
+  }
+
+  /// Ein voller Wisch über drei Viertel der Höhe geht von 0 auf 100 %.
+  void _onSwipeUpdate(DragUpdateDetails d) {
+    final kind = _swipe;
+    if (kind == null) return;
+    final height = MediaQuery.sizeOf(context).height;
+    _swipeValue = (_swipeValue - d.delta.dy / (height * 0.75)).clamp(0.0, 1.0);
+    if (kind == _Swipe.brightness) {
+      ScreenBrightness.set(_swipeValue);
+    } else {
+      _setVolume(_swipeValue * 100);
+    }
+    _showLevel();
+  }
+
+  void _onSwipeEnd() {
+    _swipe = null;
+    _levelOsdTimer?.cancel();
+    _levelOsdTimer = Timer(const Duration(milliseconds: 700), () => _levelOsd.value = null);
+  }
+
+  void _showLevel() {
+    final kind = _swipe;
+    if (kind == null) return;
+    _levelOsdTimer?.cancel();
+    _levelOsd.value = (kind, _swipeValue);
+  }
+
+  // --- Halten für schneller --------------------------------------------------------
+
+  /// Tempo vor dem Halten – gesetzt, solange gehalten wird.
+  double? _rateBeforeHold;
+  final _holdOsd = ValueNotifier<String?>(null);
+
+  /// Fernseher: OK auf dem Bild gedrückt – kurz = Pause/Weiter, lang = schneller.
+  bool _okDown = false;
+  Timer? _okHoldTimer;
+
+  /// Bild wird gehalten (Finger, Maus, OK): schneller abspielen. `false`, wenn ausgeschaltet.
+  bool _startHold() {
+    final speed = ref.read(settingsProvider).holdSpeed;
+    if (speed <= 0 || _rateBeforeHold != null || _mini || _error != null) return false;
+    _rateBeforeHold = _player.state.rate;
+    _player.setRate(speed);
+    if (!_player.state.playing) _player.play();
+    if (isMobile) HapticFeedback.mediumImpact();
+    _holdOsd.value = tr.speedTimes(speed);
+    return true;
+  }
+
+  /// Losgelassen: zurück zum vorherigen Tempo (spielt weiter).
+  void _endHold() {
+    final before = _rateBeforeHold;
+    if (before == null) return;
+    _rateBeforeHold = null;
+    _holdOsd.value = null;
+    if (!_closing) _player.setRate(before);
+  }
+
+  /// Kurzer Hinweis in der Bildmitte (Zoom, Spulen per Doppeltipp).
+  void _flashOsd(String label) {
+    _zoomOsd.value = label;
+    _zoomOsdTimer?.cancel();
+    _zoomOsdTimer = Timer(const Duration(milliseconds: 1400), () => _zoomOsd.value = null);
   }
 
   // --- Schlaf-Timer ------------------------------------------------------------
@@ -333,9 +556,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
     switch (action) {
       case PadAction.left:
-        _seekBy(-_seekStep);
+        _seekBy(-_seekBack);
       case PadAction.right:
-        _seekBy(_seekStep);
+        _seekBy(_seekForward);
       case PadAction.select || PadAction.playPause:
         _player.playOrPause();
       case PadAction.back:
@@ -366,9 +589,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       case 'NextTrack':
         _playNext();
       case 'Rewind':
-        _seekBy(-_seekStep);
+        _seekBy(-_seekBack);
       case 'FastForward':
-        _seekBy(_seekStep);
+        _seekBy(_seekForward);
       case 'Seek':
         final ticks = (data['SeekPositionTicks'] as num?)?.toInt();
         if (ticks != null) _player.seek(ticksToDuration(ticks));
@@ -426,6 +649,41 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         _close();
       case 'next':
         _playNext();
+      case 'skipForward':
+        _seekBy(_seekForward);
+      case 'skipBackward':
+        _seekBy(-_seekBack);
+      case final seek when seek.startsWith('seek:'):
+        final seconds = double.tryParse(seek.substring(5));
+        if (seconds != null) _player.seek(Duration(milliseconds: (seconds * 1000).round()));
+    }
+  }
+
+  /// Fortschritt für Sperrbildschirm/Kontrollzentrum (zählt selbst weiter, s. [MediaSession.setProgress]).
+  void _updateMediaProgress() {
+    final s = _player.state;
+    if (s.duration == Duration.zero || _closing) return;
+    MediaSession.setProgress(position: s.position, duration: s.duration, rate: s.rate);
+  }
+
+  /// Video aus, solange die App im Hintergrund ist (iPhone/iPad): Der Ton spielt weiter,
+  /// aber niemand sieht das Bild – Dekodieren und Zeichnen würden nur Akku kosten.
+  String? _videoTrackBeforeBackground;
+
+  Future<void> _onAppVisibleChanged() async {
+    final native = _player.platform;
+    if (native is! NativePlayer || _closing) return;
+    try {
+      if (!Power.appVisible.value) {
+        if (_videoTrackBeforeBackground != null || !_player.state.playing) return;
+        _videoTrackBeforeBackground = await native.getProperty('vid');
+        await native.setProperty('vid', 'no');
+      } else if (_videoTrackBeforeBackground case final vid?) {
+        _videoTrackBeforeBackground = null;
+        await native.setProperty('vid', vid);
+      }
+    } catch (e) {
+      debugPrint('Video im Hintergrund nicht umgeschaltet: $e');
     }
   }
 
@@ -438,6 +696,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       artUrl: _api.imageUrlOrNull(Images.landscape(item), fillWidth: 480, fillHeight: 270),
       playing: _player.state.playing,
       canNext: _nextEpisode != null,
+      skipBack: _seekBack.inSeconds,
+      skipForward: _seekForward.inSeconds,
     );
   }
 
@@ -449,6 +709,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
+    _tvPlayFocus.dispose();
+    _tvSeekFocus.dispose();
+    if (isMobile) {
+      _levelOsdTimer?.cancel();
+      _leaveMobilePlayback();
+      Power.appVisible.removeListener(_onAppVisibleChanged);
+    }
+    Power.energySaving.removeListener(_applyEnergySaving);
     _hideTimer?.cancel();
     _outputSizeTimer?.cancel();
     playerPlaying.value = false;
@@ -481,10 +749,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _sleepLeft.dispose();
     _zoomOsdTimer?.cancel();
     _zoomOsd.dispose();
+    _holdOsd.dispose();
+    _okHoldTimer?.cancel();
     if (MediaSession.onButton == _onMediaButton) {
       MediaSession.onButton = null;
       // Bei "Nächste Folge" übernimmt gleich der neue Player die Anzeige.
-      if (!_switchingToNext) MediaSession.clear();
+      if (!_switchingToNext) MediaSession.clear(keepAudio: ApplePlayer.active);
     }
     if (!_closing && windowFullscreen.value != _restoreFullscreen) setWindowFullscreen(_restoreFullscreen);
     _player.dispose();
@@ -538,6 +808,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         _remembered = SeriesTracks.instance.get(account, item.seriesId!);
         _restoreZoom(SeriesTracks.instance.zoom(account, item.seriesId!));
       }
+      // Bibliothek nachsehen: Hat eine eigene Regeln, entscheiden die über die Spur – kurz darauf
+      // warten. Sonst den Start nicht aufhalten (das Panel im Player braucht sie nur für die Auswahl).
+      final library = ItemLibraries.instance.resolve(_api, itemId: item.id, seriesId: item.seriesId);
+      if (settings.subtitleLibraries.isNotEmpty) {
+        _libraryId = await library.timeout(const Duration(seconds: 2), onTimeout: () => null);
+        if (!mounted) return;
+      } else {
+        library.then((id) {
+          if (mounted) setState(() => _libraryId = id);
+        });
+      }
       var maxBitrate = settings.maxBitrate;
       // Ist die Datei ohnehin kleiner als die Grenze, lohnt Umrechnen nicht.
       if (maxBitrate != null && (source.bitrate ?? 0) > 0 && source.bitrate! <= maxBitrate) maxBitrate = null;
@@ -570,7 +851,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             chosenAudio ?? preferredAudioIndex(source, remembered: _remembered?.audio, setting: settings.audioLanguage);
         _subtitleIndex =
             chosenSubtitle ??
-            preferredSubtitleIndex(source, remembered: _remembered?.subtitle, setting: settings.subtitleLanguage);
+            preferredSubtitleIndex(
+              source,
+              remembered: _remembered?.subtitle,
+              setting: settings.subtitleLanguageFor(_libraryId),
+            );
         _chapters = item.chapters;
       });
       // Auf der Detailseite gewählt → wie eine Wahl im Player für die Serie merken.
@@ -602,6 +887,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _subscriptions
         ..add(_player.stream.tracks.listen((_) => _applyDefaultTracks()))
         ..add(_player.stream.playing.listen(_onPlayingChanged))
+        // Sprünge (auch von außen) und Tempowechsel: Anzeige auf dem Sperrbildschirm nachziehen.
+        ..add(_player.stream.duration.listen((_) => _updateMediaProgress()))
+        ..add(_player.stream.rate.listen((_) => _updateMediaProgress()))
+        ..add(_player.stream.buffering.listen((buffering) => buffering ? null : _updateMediaProgress()))
         // Erst mit der Bildgröße lässt sich "Ausfüllen" berechnen.
         // Erst mit der Bildgröße lassen sich "Ausfüllen" und die Ausgabegröße berechnen.
         ..add(_player.stream.width.listen((_) => mounted ? setState(() {}) : null))
@@ -634,6 +923,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       // Zuletzt eingestellte Lautstärke (stumm wird nicht übernommen); bis 150 % erlauben.
       final native = _player.platform;
       if (native is NativePlayer) await native.setProperty('volume-max', '${PlayerScreen.maxVolume.round()}');
+      await _applyEnergySaving();
+      await MediaSession.prepare();
       await _player.setVolume(_volumeBeforeMute);
       await _openStream(start);
 
@@ -716,6 +1007,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       } catch (_) {}
     }
     setState(change);
+    _embeddedViaServer = null;
     // Bei Direct Play wählt _applyDefaultTracks die Spuren neu aus _audioIndex/_subtitleIndex.
     _tracksApplied = _transcoding;
     try {
@@ -748,7 +1040,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _fitOutputSize(Size box, double zoom) {
     final w = _player.state.width;
     final h = _player.state.height;
-    if (w == null || h == null || w <= 0 || h <= 0 || box.isEmpty) return;
+    _fitSubtitlesToZoom(box, zoom);
+    // Android: Die Bildfläche (Surface) hat ohnehin die Größe auf dem Bildschirm – media_kit
+    // kennt dort kein setSize (würde eine Ausnahme werfen).
+    if (Platform.isAndroid || w == null || h == null || w <= 0 || h <= 0 || box.isEmpty) return;
     final aspect = w / h;
     var fit = box.width / box.height > aspect
         ? Size(box.height * aspect, box.height)
@@ -767,28 +1062,105 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     });
   }
 
-  /// Untertitel: ruhige Systemschrift, schmaler Rand mit weichem Schatten statt der groben
-  /// mpv-Vorgabe; Größe und Hintergrund aus den Einstellungen.
-  Future<void> _applySubtitleStyle() async {
+  /// Vergrößerung und sichtbarer Anteil der Bildhöhe (1 = ganz) – für die Untertitel.
+  (double, double) _subtitleZoom = (1, 1);
+
+  /// Vergrößert (Ausfüllen, Zoom), schneidet das Bild oben und unten ab – mpv zeichnet die
+  /// Untertitel aber ins Bild, unten wären sie dann halb oder ganz weg. Deshalb rücken sie in den
+  /// sichtbaren Teil und bleiben so groß wie ohne Zoom.
+  void _fitSubtitlesToZoom(Size box, double zoom) {
+    final w = _player.state.width;
+    final h = _player.state.height;
+    var visible = 1.0;
+    if (w != null && h != null && w > 0 && h > 0 && !box.isEmpty && zoom > 1) {
+      final fitHeight = box.width / box.height > w / h ? box.height : box.width * h / w;
+      visible = (box.height / (fitHeight * zoom)).clamp(0.0, 1.0);
+    }
+    final next = (zoom, (visible * 100).round() / 100);
+    if (next == _subtitleZoom) return;
+    _subtitleZoom = next;
+    // Nach dem Bauen: setzt mpv-Eigenschaften (nicht während des Layouts).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_closing) _applySubtitleStyle(onlyChanges: true);
+    });
+  }
+
+  /// Energiesparen: einfachere Skalierung wie mpvs Profil "fast" – spart in jedem Bild
+  /// GPU-Arbeit (vor allem beim Verkleinern von 4K), sichtbar höchstens bei starker Vergrößerung.
+  static const _fastScaling = {
+    'scale': 'bilinear',
+    'dscale': 'bilinear',
+    'dither': 'no',
+    'correct-downscaling': 'no',
+    'linear-downscaling': 'no',
+    'sigmoid-upscaling': 'no',
+    'hdr-compute-peak': 'no',
+  };
+
+  /// mpvs eigene Werte, solange die sparsame Skalierung gilt (sonst `null`).
+  Map<String, String>? _scalingBeforeSaving;
+
+  /// Sparsame Skalierung ein- bzw. wieder ausschalten (beim Öffnen und wenn das Energiesparen wechselt).
+  Future<void> _applyEnergySaving() async {
     final native = _player.platform;
     if (native is! NativePlayer) return;
-    final s = ref.read(settingsProvider);
-    final props = {
-      'sub-font': Platform.isMacOS ? 'Helvetica Neue' : 'Segoe UI',
-      'sub-bold': 'yes',
-      'sub-font-size': '34',
-      'sub-color': '#FFFFFFFF',
-      'sub-border-color': '#E6000000',
-      'sub-border-size': '1.6',
-      'sub-shadow-color': '#80000000',
-      'sub-shadow-offset': '1.2',
-      'sub-blur': '0.3',
-      'sub-margin-y': '36',
-      'sub-scale': s.subtitleScale.toStringAsFixed(2),
-      'sub-border-style': s.subtitleBackground ? 'background-box' : 'outline-and-shadow',
-      'sub-back-color': '#B3000000',
-    };
+    if (Power.energySaving.value) {
+      if (_scalingBeforeSaving != null) return;
+      final before = _scalingBeforeSaving = {};
+      for (final e in _fastScaling.entries) {
+        try {
+          before[e.key] = await native.getProperty(e.key);
+          await native.setProperty(e.key, e.value);
+        } catch (err) {
+          debugPrint('mpv-Eigenschaft ${e.key} nicht gesetzt: $err');
+        }
+      }
+    } else {
+      final before = _scalingBeforeSaving;
+      if (before == null) return;
+      _scalingBeforeSaving = null;
+      for (final e in before.entries) {
+        try {
+          await native.setProperty(e.key, e.value);
+        } catch (err) {
+          debugPrint('mpv-Eigenschaft ${e.key} nicht zurückgesetzt: $err');
+        }
+      }
+    }
+  }
+
+  /// Kennt dieses mpv `sub-border-style` noch nicht (vor 0.38 – media_kit unter Windows)? Einmal
+  /// je Programmlauf gefragt, siehe [SubtitleStyle.toMpv].
+  static bool? _legacySubtitleBox;
+
+  /// Untertitel-Stil an mpv geben: der der Bibliothek, sonst der allgemeine. [onlyChanges]: nur,
+  /// was sich geändert hat (beim Schieben der Regler kommt das sehr oft).
+  Future<void> _applySubtitleStyle({bool onlyChanges = false}) async {
+    final native = _player.platform;
+    if (native is! NativePlayer) return;
+    var legacyBox = _legacySubtitleBox;
+    if (legacyBox == null) {
+      try {
+        legacyBox = _legacySubtitleBox = (await native.getProperty('sub-border-style')).isEmpty;
+      } catch (_) {
+        legacyBox = false;
+      }
+      if (!mounted || _closing) return;
+    }
+    final style = ref.read(settingsProvider).subtitleStyleFor(_libraryId);
+    final props = style.toMpv(legacyBox: legacyBox);
+    final (zoom, visible) = _subtitleZoom;
+    if (zoom > 1.001) {
+      // Siehe _fitSubtitlesToZoom: in den sichtbaren Teil rücken, Größe wie ohne Zoom.
+      final cut = (1 - visible) / 2;
+      props['sub-pos'] = ((1 - cut) * 100 - style.raise * visible).round().clamp(0, 100).toString();
+      props['sub-scale'] = (style.scale / zoom).toStringAsFixed(2);
+      props['sub-margin-y'] = (36 / zoom).round().toString();
+    }
+    final before = onlyChanges ? _subtitleProps : const <String, String>{};
+    _subtitleProps = props;
     for (final e in props.entries) {
+      if (before[e.key] == e.value) continue;
       try {
         await native.setProperty(e.key, e.value);
       } catch (err) {
@@ -844,8 +1216,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _onPlayingChanged(bool playing) {
     playerPlaying.value = playing;
+    _updateMediaProgress();
     // Per Medientaste o. Ä. weitergespielt → "Gute Nacht" ausblenden.
-    if (playing && _sleeping && mounted) setState(() => _sleeping = false);
+    if (playing && _sleeping && mounted) {
+      setState(() => _sleeping = false);
+      // Fernseher: Der Fokus lag auf einem Knopf der Abfrage, die jetzt verschwindet.
+      if (isTv) _focus.requestFocus();
+    }
     _reportProgress();
     MediaSession.setPlaying(playing);
     if (playing) {
@@ -1011,13 +1388,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   void _applyZoom(_ZoomMode mode) {
     setState(() => _zoomMode = mode);
-    _zoomOsd.value = switch (mode) {
+    _flashOsd(switch (mode) {
       _ZoomMode.fit => tr.zoomFit,
       _ZoomMode.fill => tr.zoomFill,
       _ZoomMode.custom => tr.zoomPercent((_customZoom * 100).round()),
-    };
-    _zoomOsdTimer?.cancel();
-    _zoomOsdTimer = Timer(const Duration(milliseconds: 1400), () => _zoomOsd.value = null);
+    });
     // Für die nächsten Folgen dieser Serie merken.
     final item = _item;
     final account = _trackAccount;
@@ -1105,12 +1480,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
   }
 
+  void _hideControlsNow() {
+    _hideTimer?.cancel();
+    if (!_controlsVisible) return;
+    setState(() => _controlsVisible = false);
+    _syncWindowChrome();
+    // Fernseher: kein Fokus auf unsichtbaren Knöpfen (OK würde sie sonst auslösen).
+    if (isTv) _focus.requestFocus();
+  }
+
   void _scheduleHide() {
     _hideTimer?.cancel();
     _hideTimer = Timer(_hideDelay, () {
       if (!mounted || _hoveringControls || _anyPanelOpen || !_player.state.playing) return;
       setState(() => _controlsVisible = false);
       _syncWindowChrome();
+      if (isTv) _focus.requestFocus();
     });
   }
 
@@ -1169,12 +1554,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     final isDown = event is KeyDownEvent;
     final isRepeat = event is KeyRepeatEvent;
-    if (!isDown && !isRepeat) return KeyEventResult.ignored;
     final key = event.logicalKey;
+    // Fernseher: OK auf dem Bild – kurz gedrückt Pause/Weiter, gehalten schneller (s. _onTvKey).
+    if (_okDown && _tvOk.contains(key)) {
+      if (isRepeat) return KeyEventResult.handled;
+      if (event is KeyUpEvent) {
+        _okDown = false;
+        if (_okHoldTimer?.isActive ?? false) {
+          _okHoldTimer!.cancel();
+          _player.playOrPause();
+          _showTvControls();
+        } else {
+          _endHold();
+        }
+        return KeyEventResult.handled;
+      }
+    }
+    if (!isDown && !isRepeat) return KeyEventResult.ignored;
     _userActive();
 
+    // Fernseher: Dort liegt der Fokus auf einem Knopf der Abfrage, und OK wählt diesen Knopf (die
+    // Taste geht weiter an die Kürzel der App). Sonst gilt OK/Leertaste als "weiter" – egal, wo
+    // der Fokus gerade steht (etwa auf einem zuletzt angeklickten Knopf der Bedienung).
+    final onOverlayButton = isTv && !node.hasPrimaryFocus;
     if (_askingStillWatching && isDown) {
-      if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.enter) {
+      if (key == LogicalKeyboardKey.space || _tvOk.contains(key)) {
+        if (onOverlayButton) return KeyEventResult.ignored;
         _continueWatching();
         return KeyEventResult.handled;
       }
@@ -1185,10 +1590,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
 
     if (_sleeping && isDown) {
-      if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.keyK) {
+      if (key == LogicalKeyboardKey.space || _tvOk.contains(key) || key == LogicalKeyboardKey.keyK) {
+        if (onOverlayButton && key != LogicalKeyboardKey.keyK) return KeyEventResult.ignored;
         _wakeUp();
         return KeyEventResult.handled;
       }
+    }
+
+    // Fernseher, "Schaust du noch?"/"Gute Nacht": Der Fokus liegt auf den beiden Knöpfen der
+    // Abfrage (OK wählt den fokussierten selbst, links/rechts wechselt – siehe _SleepOverlay).
+    // Sonst gilt hier nichts: Der Fokus darf nicht auf die verdeckte Bedienung darunter wandern.
+    if (isTv && (_askingStillWatching || _sleeping)) {
+      if (isDown && (key == LogicalKeyboardKey.mediaPlayPause || key == LogicalKeyboardKey.mediaPlay)) {
+        _sleeping ? _wakeUp() : _continueWatching();
+      }
+      return KeyEventResult.handled;
+    }
+
+    if (isTv && isDown) {
+      final tv = _onTvKey(node, key);
+      if (tv != null) return tv;
     }
 
     // In offenen Panels bewegen die Pfeiltasten die Auswahl, Enter wählt.
@@ -1208,12 +1629,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
 
     if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.keyJ) {
-      _seekBy(-_seekStep);
+      _seekBy(-_seekBack);
     } else if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.keyL) {
-      _seekBy(_seekStep);
-    } else if (key == LogicalKeyboardKey.arrowUp) {
+      _seekBy(_seekForward);
+    } else if (key == LogicalKeyboardKey.arrowUp && !isTv) {
       _setVolume(_volume + 5, showBar: true);
-    } else if (key == LogicalKeyboardKey.arrowDown) {
+    } else if (key == LogicalKeyboardKey.arrowDown && !isTv) {
       _setVolume(_volume - 5, showBar: true);
     } else if (isRepeat) {
       return KeyEventResult.ignored;
@@ -1250,14 +1671,112 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     return KeyEventResult.handled;
   }
 
+  /// Fernseher: Tasten der Fernbedienung. `null` = wie überall sonst weiterverarbeiten.
+  ///
+  /// Bedienung ausgeblendet: OK pausiert/spielt und blendet ein, hoch/runter blenden ein (die
+  /// Lautstärke regelt der Fernseher), links/rechts spulen. Eingeblendet: das Steuerkreuz wandert
+  /// zwischen Zeitleiste und Knöpfen, ganz oben geht der Fokus zurück aufs Bild.
+  KeyEventResult? _onTvKey(FocusNode node, LogicalKeyboardKey key) {
+    final media = {
+      LogicalKeyboardKey.mediaPlayPause: () => _player.playOrPause(),
+      LogicalKeyboardKey.mediaPlay: () => _player.play(),
+      LogicalKeyboardKey.mediaPause: () => _player.pause(),
+      LogicalKeyboardKey.mediaFastForward: () => _seekBy(const Duration(seconds: 30)),
+      LogicalKeyboardKey.mediaRewind: () => _seekBy(const Duration(seconds: -30)),
+      LogicalKeyboardKey.mediaTrackNext: () => _playNext(),
+      LogicalKeyboardKey.mediaStop: () => _close(),
+    };
+    if (media[key] case final action?) {
+      action();
+      _showControls(autoHide: _player.state.playing);
+      return KeyEventResult.handled;
+    }
+    if (_anyPanelOpen) return null;
+    final ok = _tvOk;
+    final direction = switch (key) {
+      LogicalKeyboardKey.arrowUp => TraversalDirection.up,
+      LogicalKeyboardKey.arrowDown => TraversalDirection.down,
+      LogicalKeyboardKey.arrowLeft => TraversalDirection.left,
+      LogicalKeyboardKey.arrowRight => TraversalDirection.right,
+      _ => null,
+    };
+    if (node.hasPrimaryFocus) {
+      // Fokus auf dem Bild.
+      if (ok.contains(key)) {
+        if (ref.read(settingsProvider).holdSpeed > 0) {
+          // Erst beim Loslassen entscheiden: kurz = Pause/Weiter, gehalten = schneller.
+          _okDown = true;
+          _okHoldTimer?.cancel();
+          _okHoldTimer = Timer(const Duration(milliseconds: 450), () {
+            if (!mounted || !_okDown || _startHold()) return;
+            // Schneller geht gerade nicht – dann wie ein normales OK.
+            _okDown = false;
+            _player.playOrPause();
+            _showTvControls();
+          });
+          return KeyEventResult.handled;
+        }
+        _player.playOrPause();
+        _showTvControls();
+        return KeyEventResult.handled;
+      }
+      if (direction == TraversalDirection.up || direction == TraversalDirection.down) {
+        _showTvControls();
+        return KeyEventResult.handled;
+      }
+      return null; // links/rechts: spulen (unten)
+    }
+    // Fokus auf Zeitleiste oder Knopf: das Steuerkreuz wandert.
+    if (direction != null) {
+      _showControls(autoHide: _player.state.playing);
+      if (direction == TraversalDirection.down && _tvSeekFocus.hasFocus) {
+        _tvPlayFocus.requestFocus();
+        return KeyEventResult.handled;
+      }
+      // Ganz oben (über der Zeitleiste) gibt es nichts mehr: Bedienung aus.
+      if (direction == TraversalDirection.up && _tvSeekFocus.hasFocus) {
+        _hideControlsNow();
+        return KeyEventResult.handled;
+      }
+      moveFocusInDirection(direction);
+      return KeyEventResult.handled;
+    }
+    _showControls(autoHide: _player.state.playing);
+    return null; // OK: der Knopf selbst
+  }
+
+  /// OK-Tasten der Fernbedienung bzw. des Controllers.
+  static final _tvOk = {LogicalKeyboardKey.select, LogicalKeyboardKey.enter, LogicalKeyboardKey.gameButtonA};
+
+  /// Fernseher: Bedienung zeigen, Fokus auf der Zeitleiste.
+  void _showTvControls() {
+    _showControls(autoHide: _player.state.playing);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _controlsVisible && _focus.hasPrimaryFocus) _tvSeekFocus.requestFocus();
+    });
+  }
+
+  /// Fernseher, Zurück-Taste: erst Menü zu, dann Bedienung aus, dann Player schließen.
+  void _onTvBack() {
+    if (_askingStillWatching || _sleeping) {
+      _close();
+    } else if (_anyPanelOpen) {
+      _closePanels();
+    } else if (_controlsVisible) {
+      _hideControlsNow();
+    } else {
+      _close();
+    }
+  }
+
   // --- Oberfläche ------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     // Änderungen an der Untertitel-Darstellung sofort übernehmen.
     ref.listen(settingsProvider, (prev, next) {
-      if (prev?.subtitleScale != next.subtitleScale || prev?.subtitleBackground != next.subtitleBackground) {
-        _applySubtitleStyle();
+      if (prev?.subtitleStyleFor(_libraryId) != next.subtitleStyleFor(_libraryId)) {
+        _applySubtitleStyle(onlyChanges: true);
       }
     });
     final settings = ref.watch(settingsProvider);
@@ -1290,15 +1809,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             },
             child: Stack(
               children: [
+                // Fernseher: Zurück schließt erst Menü und Bedienung, dann den Player.
+                if (isTv)
+                  PopScope(
+                    canPop: false,
+                    onPopInvokedWithResult: (didPop, _) => didPop ? null : _onTvBack(),
+                    child: const SizedBox.shrink(),
+                  ),
                 // Ambilight: unscharfe, vergrößerte Kopie des Bildes hinter dem Video – leuchtet in
                 // den Balken. Platz bleibt immer bestehen (sonst verlieren Elemente den Fokus).
+                // Beim Energiesparen aus: das Weichzeichnen kostet in jedem Bild viel GPU-Arbeit.
                 Positioned.fill(
-                  child: switch (settings.ambilight) {
-                    _ when _mini => const SizedBox.shrink(),
-                    AmbilightMode.always => _Ambilight(controller: _video),
-                    AmbilightMode.window when !_fullscreen => _Ambilight(controller: _video),
-                    _ => const SizedBox.shrink(),
-                  },
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: Power.energySaving,
+                    builder: (context, saving, _) => switch (settings.ambilight) {
+                      _ when _mini || saving => const SizedBox.shrink(),
+                      AmbilightMode.always => _Ambilight(controller: _video),
+                      AmbilightMode.window when !_fullscreen => _Ambilight(controller: _video),
+                      _ => const SizedBox.shrink(),
+                    },
+                  ),
                 ),
                 Positioned.fill(
                   child: LayoutBuilder(
@@ -1316,6 +1846,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   ),
                 ),
                 Center(child: _ZoomOsd(label: _zoomOsd)),
+                // Halten für schneller: Hinweis oben, damit er das Bild nicht verdeckt.
+                Positioned(
+                  top: topInset(context) + 24,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: _ZoomOsd(label: _holdOsd, icon: Icons.fast_forward_rounded),
+                  ),
+                ),
+                if (isMobile) Positioned.fill(child: _LevelOsd(level: _levelOsd)),
                 Positioned.fill(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
@@ -1324,12 +1864,28 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       _focus.requestFocus();
                       if (_anyPanelOpen) {
                         _closePanels();
+                      } else if (isMobile) {
+                        // Touch: Tippen zeigt bzw. verbirgt die Bedienung (Pause gibt es dort).
+                        _controlsVisible ? _hideControlsNow() : _showControls(autoHide: _player.state.playing);
                       } else {
                         _player.playOrPause();
                       }
                     },
+                    onDoubleTapDown: isMobile ? (details) => _doubleTapX = details.localPosition.dx : null,
+                    // Gedrückt halten (Finger oder Maus): schneller abspielen, solange gehalten wird.
+                    onLongPressStart: (_) => _startHold(),
+                    onLongPressEnd: (_) => _endHold(),
+                    onLongPressCancel: _endHold,
+                    onVerticalDragStart: isMobile ? _onSwipeStart : null,
+                    onVerticalDragUpdate: isMobile ? _onSwipeUpdate : null,
+                    onVerticalDragEnd: isMobile ? (_) => _onSwipeEnd() : null,
+                    onVerticalDragCancel: isMobile ? _onSwipeEnd : null,
                     // Im Mini-Player holt ein Doppelklick das große Fenster zurück.
-                    onDoubleTap: () => _mini ? _toggleMini() : _toggleFullscreen(),
+                    onDoubleTap: () {
+                      _userActive();
+                      if (isMobile) return _onDoubleTapTouch();
+                      _mini ? _toggleMini() : _toggleFullscreen();
+                    },
                   ),
                 ),
                 if (_error == null)
@@ -1355,14 +1911,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     child: AnimatedOpacity(
                       opacity: _controlsVisible ? 1 : 0,
                       duration: const Duration(milliseconds: 250),
-                      child: _mini ? _buildMiniControls() : _buildControls(),
+                      child: _mini
+                          ? _buildMiniControls()
+                          : isTv
+                          ? _buildTvControls()
+                          : _buildControls(),
                     ),
                   ),
                 ),
                 if (_statsVisible && !_mini)
                   Positioned(
                     left: 24,
-                    top: kTitleBarHeight + 78,
+                    top: topInset(context) + 78,
                     child: _StatsOverlay(
                       player: _player,
                       playMethod: _localFile != null
@@ -1381,6 +1941,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         ? null
                         : _api.imageUrlOrNull(Images.landscape(_nextEpisode!), fillWidth: 760, fillHeight: 428),
                     controlsVisible: _controlsVisible,
+                    hidden: _anyPanelOpen,
                     autoSkip: settings.autoSkipIntro,
                     // Schlaf-Timer "am Ende dieser Folge": keine nächste Folge starten.
                     autoPlayNext: settings.nextEpisodeCountdown && SleepTimer.instance.mode != SleepMode.endOfItem,
@@ -1521,6 +2082,212 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     );
   }
 
+  /// Fernseher – aufgebaut wie die TV-Apps der großen Anbieter: unten links Titel und Folge,
+  /// darunter die Zeitleiste über die ganze Breite (hat beim Einblenden den Fokus: links/rechts
+  /// spult, OK pausiert), darunter eine Zeile mit Pillen. Oben rechts das Ende, bei Pause ein
+  /// großes Play-Symbol in der Mitte.
+  Widget _buildTvControls() {
+    final item = _item;
+    final title = item == null ? '' : (item.isEpisode ? (item.seriesName ?? item.name) : item.name);
+    final subtitle = item == null
+        ? null
+        : item.isEpisode
+        ? [?item.episodeLabel, item.name].join('  ·  ')
+        : yearLabel(item);
+    return Stack(
+      children: [
+        const Positioned.fill(
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  stops: [0, 0.45, 1],
+                  colors: [Color(0xEE000000), Color(0x66000000), Color(0x33000000)],
+                ),
+              ),
+            ),
+          ),
+        ),
+        // Pause: großes Symbol in der Mitte.
+        Center(
+          child: StreamBuilder<bool>(
+            stream: _player.stream.playing,
+            initialData: _player.state.playing,
+            builder: (context, snap) => AnimatedOpacity(
+              opacity: (snap.data ?? true) ? 0 : 1,
+              duration: const Duration(milliseconds: 200),
+              child: Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: 0.35)),
+                child: const Icon(Icons.play_arrow_rounded, size: 64),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 36,
+          right: 64,
+          child: StreamBuilder<Duration>(
+            stream: _player.stream.position,
+            builder: (context, _) {
+              final left = _player.state.duration - _player.state.position;
+              if (_player.state.duration <= Duration.zero) return const SizedBox.shrink();
+              return Text(
+                tr.endsAt(formatClock(DateTime.now().add(left))),
+                style: TextStyle(fontSize: 16, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+              );
+            },
+          ),
+        ),
+        Positioned(
+          left: 64,
+          right: 64,
+          bottom: 40,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, height: 1.1),
+              ),
+              if (subtitle != null && subtitle.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 18, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              const SizedBox(height: 18),
+              _TvSeekBar(
+                player: _player,
+                back: _seekBack,
+                forward: _seekForward,
+                // Solange gespult wird, bleibt die Bedienung stehen.
+                onSeek: (by) {
+                  _seekBy(by);
+                  _showControls(autoHide: _player.state.playing);
+                },
+                onToggle: _toggleTvPlayback,
+                focusNode: _tvSeekFocus,
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  StreamBuilder<bool>(
+                    stream: _player.stream.playing,
+                    initialData: _player.state.playing,
+                    builder: (context, snap) => _TvPill(
+                      focusNode: _tvPlayFocus,
+                      icon: (snap.data ?? false) ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                      tooltip: (snap.data ?? false) ? tr.pause : tr.play,
+                      onPressed: _toggleTvPlayback,
+                    ),
+                  ),
+                  _TvPill(
+                    icon: Icons.subtitles_outlined,
+                    label: tr.audioAndSubtitles,
+                    onPressed: () => _setTrackPanel(true),
+                  ),
+                  _TvPill(icon: Icons.tune_rounded, label: tr.optionsShort, onPressed: () => _setPlaybackPanel(true)),
+                  if (_nextEpisode != null)
+                    _TvPill(icon: Icons.skip_next_rounded, label: tr.nextEpisodeShort, onPressed: _playNext),
+                ],
+              ),
+            ],
+          ),
+        ),
+        _buildPanels(bottom: 150),
+      ],
+    );
+  }
+
+  /// Fernseher: Pause/Weiter; pausiert bleibt die Bedienung stehen.
+  void _toggleTvPlayback() {
+    _player.playOrPause();
+    _showControls(autoHide: !_player.state.playing);
+  }
+
+  /// Menüs über der Leiste (Ton & Untertitel, Wiedergabe, Kapitel, Untertitel-Stil) – für die
+  /// Desktop- und die Fernseher-Bedienung.
+  Widget _buildPanels({required double bottom}) {
+    return Positioned(
+      right: 32,
+      bottom: bottom,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        transitionBuilder: (child, anim) => FadeTransition(
+          opacity: anim,
+          child: ScaleTransition(
+            scale: Tween(begin: 0.96, end: 1.0).animate(anim),
+            alignment: Alignment.bottomRight,
+            child: child,
+          ),
+        ),
+        child: _trackPanelOpen
+            ? _hoverZone(
+                _TracksPanel(
+                  key: const ValueKey('tracks'),
+                  player: _player,
+                  audioEntries: _audioEntries,
+                  subtitleEntries: _subtitleEntries,
+                  selectedAudio: _selectedAudioId,
+                  selectedSubtitle: _selectedSubtitleId,
+                  onAudio: _selectAudio,
+                  onSubtitle: _selectSubtitle,
+                  onClose: () => _setTrackPanel(false),
+                  onStyle: () => _setSubtitleStylePanel(true),
+                  maxHeight: _panelMaxHeight(context),
+                ),
+              )
+            : _subtitleStyleOpen
+            ? _hoverZone(
+                _SubtitleStylePanel(
+                  key: const ValueKey('subtitle-style'),
+                  libraryId: _libraryId,
+                  maxHeight: _panelMaxHeight(context),
+                ),
+              )
+            : _chaptersOpen
+            ? _hoverZone(
+                _ChaptersPanel(
+                  key: const ValueKey('chapters'),
+                  chapters: _chapters,
+                  current: _currentChapterIndex(),
+                  imageUrl: (i) => _api.chapterImageUrl(_item!, _chapters[i], i),
+                  onSelect: (chapter) {
+                    _player.seek(chapter.start);
+                    _setChaptersPanel(false);
+                  },
+                ),
+              )
+            : _playbackPanelOpen
+            ? _hoverZone(
+                PlaybackPanel(
+                  key: const ValueKey('playback'),
+                  rate: _player.state.rate,
+                  onRate: _setRate,
+                  maxBitrate: _maxBitrate,
+                  onQuality: _setQuality,
+                  audioDelay: _audioDelay,
+                  subtitleDelay: _subtitleDelay,
+                  onAudioDelay: (v) => _setDelay(audio: v),
+                  onSubtitleDelay: (v) => _setDelay(subtitle: v),
+                ),
+              )
+            : const SizedBox.shrink(),
+      ),
+    );
+  }
+
   Widget _buildControls() {
     final item = _item;
     final title = item == null ? '' : (item.isEpisode ? (item.seriesName ?? item.name) : item.name);
@@ -1538,12 +2305,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           left: 0,
           right: 0,
           height: 180,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xB0000000), Color(0x00000000)],
+          // Nur Deko: Tippen und Wischen gehen durch zum Bild (Helligkeit/Lautstärke am Handy).
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xB0000000), Color(0x00000000)],
+                ),
               ),
             ),
           ),
@@ -1553,18 +2323,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           left: 0,
           right: 0,
           height: 260,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [Color(0xD0000000), Color(0x00000000)],
+          // Nur Deko: Tippen und Wischen gehen durch zum Bild (Helligkeit/Lautstärke am Handy).
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [Color(0xD0000000), Color(0x00000000)],
+                ),
               ),
             ),
           ),
         ),
         Positioned(
-          top: _fullscreen ? 20 : kTitleBarHeight + 8,
+          top: _fullscreen ? 20 : topInset(context) + 8,
           left: 24,
           right: 24,
           child: _hoverZone(
@@ -1618,17 +2391,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       ),
                     ),
                     _PlayerIconButton(
-                      icon: Icons.replay_10_rounded,
-                      tooltip: tr.rewind10,
-                      onPressed: () => _seekBy(-_seekStep),
+                      icon: seekIcon(_seekBack.inSeconds, forward: false),
+                      tooltip: tr.rewind10.replaceFirst('10', '${_seekBack.inSeconds}'),
+                      onPressed: () => _seekBy(-_seekBack),
                     ),
                     _PlayerIconButton(
-                      icon: Icons.forward_10_rounded,
-                      tooltip: tr.forward10,
-                      onPressed: () => _seekBy(_seekStep),
+                      icon: seekIcon(_seekForward.inSeconds, forward: true),
+                      tooltip: tr.forward10.replaceFirst('10', '${_seekForward.inSeconds}'),
+                      onPressed: () => _seekBy(_seekForward),
                     ),
-                    const SizedBox(width: 4),
-                    _VolumeControl(player: _player, onToggleMute: _toggleMute, onChanged: _setVolume),
+                    // Fernseher: Lautstärke regelt die Fernbedienung (der Fernseher selbst) – ein
+                    // Regler wäre nur ein Fokus-Ziel mehr zwischen Spulen und Leiste.
+                    if (!isTv) ...[
+                      const SizedBox(width: 4),
+                      _VolumeControl(player: _player, onToggleMute: _toggleMute, onChanged: _setVolume),
+                    ],
                     const Spacer(),
                     StreamBuilder<Duration>(
                       stream: _player.stream.position,
@@ -1720,79 +2497,39 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       tooltip: tr.zoomTooltip,
                       onPressed: _cycleZoom,
                     ),
-                    _PlayerIconButton(
-                      icon: Icons.picture_in_picture_alt_rounded,
-                      tooltip: tr.miniPlayer,
-                      onPressed: _toggleMini,
-                    ),
-                    _PlayerIconButton(
-                      icon: _fullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
-                      tooltip: _fullscreen ? tr.exitFullscreen : tr.fullscreen,
-                      onPressed: _toggleFullscreen,
-                    ),
+                    // iPhone/iPad: Bild-in-Bild und AirPlay über Apples Player (der füllt ohnehin den
+                    // Bildschirm, ein Mini-Fenster und Vollbild gibt es dort nicht).
+                    if (Platform.isIOS) ...[
+                      _PlayerIconButton(
+                        icon: Icons.airplay_rounded,
+                        tooltip: tr.airPlay,
+                        onPressed: () => _handoffToApple(AppleHandoff.airPlay),
+                      ),
+                      _PlayerIconButton(
+                        icon: Icons.picture_in_picture_alt_rounded,
+                        tooltip: tr.pictureInPicture,
+                        onPressed: () => _handoffToApple(AppleHandoff.pictureInPicture),
+                      ),
+                    ],
+                    if (isDesktop) ...[
+                      _PlayerIconButton(
+                        icon: Icons.picture_in_picture_alt_rounded,
+                        tooltip: tr.miniPlayer,
+                        onPressed: _toggleMini,
+                      ),
+                      _PlayerIconButton(
+                        icon: _fullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
+                        tooltip: _fullscreen ? tr.exitFullscreen : tr.fullscreen,
+                        onPressed: _toggleFullscreen,
+                      ),
+                    ],
                   ],
                 ),
               ],
             ),
           ),
         ),
-        Positioned(
-          right: 32,
-          bottom: 112,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            transitionBuilder: (child, anim) => FadeTransition(
-              opacity: anim,
-              child: ScaleTransition(
-                scale: Tween(begin: 0.96, end: 1.0).animate(anim),
-                alignment: Alignment.bottomRight,
-                child: child,
-              ),
-            ),
-            child: _trackPanelOpen
-                ? _hoverZone(
-                    _TracksPanel(
-                      key: const ValueKey('tracks'),
-                      player: _player,
-                      audioEntries: _audioEntries,
-                      subtitleEntries: _subtitleEntries,
-                      selectedAudio: _selectedAudioId,
-                      selectedSubtitle: _selectedSubtitleId,
-                      onAudio: _selectAudio,
-                      onSubtitle: _selectSubtitle,
-                      onClose: () => _setTrackPanel(false),
-                    ),
-                  )
-                : _chaptersOpen
-                ? _hoverZone(
-                    _ChaptersPanel(
-                      key: const ValueKey('chapters'),
-                      chapters: _chapters,
-                      current: _currentChapterIndex(),
-                      imageUrl: (i) => _api.chapterImageUrl(_item!, _chapters[i], i),
-                      onSelect: (chapter) {
-                        _player.seek(chapter.start);
-                        _setChaptersPanel(false);
-                      },
-                    ),
-                  )
-                : _playbackPanelOpen
-                ? _hoverZone(
-                    PlaybackPanel(
-                      key: const ValueKey('playback'),
-                      rate: _player.state.rate,
-                      onRate: _setRate,
-                      maxBitrate: _maxBitrate,
-                      onQuality: _setQuality,
-                      audioDelay: _audioDelay,
-                      subtitleDelay: _subtitleDelay,
-                      onAudioDelay: (v) => _setDelay(audio: v),
-                      onSubtitleDelay: (v) => _setDelay(subtitle: v),
-                    ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-        ),
+        _buildPanels(bottom: 112),
       ],
     );
   }
@@ -1828,6 +2565,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   String? _selectedSubtitleId() {
     if (_transcoding) return (_subtitleIndex ?? -1) < 0 ? 'no' : 'jf:$_subtitleIndex';
+    if (_embeddedViaServer != null) return _embeddedViaServer;
     final id = _player.state.track.subtitle.id;
     return id == 'auto' ? null : id;
   }
@@ -1894,8 +2632,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final (fresh, added) = found;
     setState(() => _source = fresh);
     _rememberSubtitle(added.index);
-    if (_transcoding) {
+    _embeddedViaServer = null;
+    if (_transcoding && _burnedIn(_subtitleIndex)) {
       await _switchStream(() => _subtitleIndex = added.index);
+    } else if (_transcoding) {
+      setState(() => _subtitleIndex = added.index);
+      await _player.setSubtitleTrack(_serverSubtitleTrack(added));
     } else {
       await _player.setSubtitleTrack(_externalTrack(added));
       _subtitleIndex = added.index;
@@ -1939,10 +2681,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _searchSubtitles();
       return;
     }
+    _embeddedViaServer = null;
     if (_transcoding) {
       final index = id == 'no' ? -1 : int.parse(id.substring(3));
       _rememberSubtitle(index);
-      if (index != _subtitleIndex) _switchStream(() => _subtitleIndex = index);
+      if (index == _subtitleIndex) return;
+      // Text-Untertitel kommen beim Umrechnen ohnehin als eigene Datei: nur austauschen, das Video
+      // läuft weiter. Neu starten muss der Stream nur, wenn ein Bild-Untertitel eingebrannt wird
+      // (oder einer wieder heraus soll).
+      if (!_burnedIn(_subtitleIndex) && !_burnedIn(index)) {
+        final stream = _subtitleStream(index);
+        setState(() => _subtitleIndex = index);
+        _player.setSubtitleTrack(stream == null ? SubtitleTrack.no() : _serverSubtitleTrack(stream));
+        return;
+      }
+      _switchStream(() => _subtitleIndex = index);
       return;
     }
     if (id == 'no') {
@@ -1960,16 +2713,85 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     }
     final t = _player.state.tracks.subtitle.where((t) => t.id == id).firstOrNull;
     if (t == null) return;
-    _player.setSubtitleTrack(t);
-    _subtitleIndex = _jellyfinStreamFor('Subtitle', id)?.index ?? _subtitleIndex;
+    final stream = _jellyfinStreamFor('Subtitle', id);
+    final overNetwork = _localFile == null && _api.baseUrl.startsWith('http');
+    if (overNetwork && stream != null && stream.isTextSubtitle && _player.state.duration > Duration.zero) {
+      // Eingebettete Text-Spur während der Wiedergabe: als eigene Datei vom Server holen. Wählt
+      // mpv sie in der Datei, liest es dafür die letzten Sekunden Video noch einmal – übers Netz
+      // stockt dabei das Bild, als würde es neu laden.
+      _embeddedViaServer = id;
+      _player.setSubtitleTrack(_serverSubtitleTrack(stream));
+      // Kommt die Datei nicht (alter Server, Fehler), doch die Spur aus dem Video nehmen.
+      Future<void>.delayed(const Duration(seconds: 8), () async {
+        if (!mounted || _closing || _embeddedViaServer != id) return;
+        if (await _externalSubtitleShown()) return; // Datei ist da
+        if (!mounted || _closing || _embeddedViaServer != id) return;
+        _embeddedViaServer = null;
+        _player.setSubtitleTrack(t);
+      });
+    } else {
+      _player.setSubtitleTrack(t);
+    }
+    _subtitleIndex = stream?.index ?? _subtitleIndex;
     _rememberSubtitle(_subtitleIndex);
+  }
+
+  /// Zeigt mpv gerade einen nachgeladenen Untertitel (eine Datei, keine Spur aus dem Video)?
+  /// mpv selbst fragen: media_kit führt für nachgeladene Dateien die Adresse als ID, keine Nummer.
+  Future<bool> _externalSubtitleShown() async {
+    final native = _player.platform;
+    if (native is! NativePlayer) return true;
+    try {
+      return await native.getProperty('current-tracks/sub/external') == 'yes';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Eingebettete Spur, die gerade als Datei vom Server läuft (mpv-ID der Spur im Video) –
+  /// im Panel bleibt sie als gewählt markiert.
+  String? _embeddedViaServer;
+
+  MediaStream? _subtitleStream(int? index) =>
+      _source?.mediaStreams.where((s) => s.type == 'Subtitle' && s.index == index).firstOrNull;
+
+  /// Beim Umrechnen eingebrannt (Bild-Untertitel)?
+  bool _burnedIn(int? index) {
+    final stream = (index ?? -1) < 0 ? null : _subtitleStream(index);
+    return stream != null && !stream.isTextSubtitle;
+  }
+
+  /// Text-Untertitel als Datei vom Server (eingebettete zieht Jellyfin dafür aus dem Video).
+  SubtitleTrack _serverSubtitleTrack(MediaStream stream) => SubtitleTrack.uri(
+    _api.subtitleUrl(
+      widget.itemId,
+      _source!.id,
+      stream,
+      format: switch (stream.codec?.toLowerCase()) {
+        'ass' || 'ssa' => 'ass',
+        _ => 'srt',
+      },
+    ),
+    title: trackLabel(stream),
+    language: stream.language,
+  );
+
+  /// Panels stehen über der Steuerleiste – auf dem iPhone im Querformat ist dort wenig Platz.
+  double _panelMaxHeight(BuildContext context) => math.min(420, MediaQuery.sizeOf(context).height - 136);
+
+  void _setSubtitleStylePanel(bool open) {
+    setState(() {
+      _subtitleStyleOpen = open;
+      if (open) _trackPanelOpen = _playbackPanelOpen = _chaptersOpen = false;
+    });
+    _showControls(autoHide: !open && _player.state.playing);
   }
 
   void _setTrackPanel(bool open) {
     if (open && _refreshTracksOnOpen) _refreshSource();
     setState(() {
       _trackPanelOpen = open;
-      if (open) _playbackPanelOpen = _chaptersOpen = false;
+      if (open) _playbackPanelOpen = _chaptersOpen = _subtitleStyleOpen = false;
     });
     _afterPanelChange();
   }
@@ -1977,7 +2799,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _setPlaybackPanel(bool open) {
     setState(() {
       _playbackPanelOpen = open;
-      if (open) _trackPanelOpen = _chaptersOpen = false;
+      if (open) _trackPanelOpen = _chaptersOpen = _subtitleStyleOpen = false;
     });
     _afterPanelChange();
   }
@@ -1985,7 +2807,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void _setChaptersPanel(bool open) {
     setState(() {
       _chaptersOpen = open;
-      if (open) _trackPanelOpen = _playbackPanelOpen = false;
+      if (open) _trackPanelOpen = _playbackPanelOpen = _subtitleStyleOpen = false;
     });
     // Fokus bleibt im Kapitel-Panel (Pfeiltasten wählen das Kapitel).
     if (open) {
@@ -2021,7 +2843,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           content: Text(tr.screenshotSaved),
           behavior: SnackBarBehavior.floating,
           width: 420,
-          action: SnackBarAction(label: tr.show, onPressed: () => AppPaths.reveal(file.path)),
+          action: isDesktop ? SnackBarAction(label: tr.show, onPressed: () => AppPaths.reveal(file.path)) : null,
         ),
       );
     } catch (e) {
@@ -2036,6 +2858,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     setState(() {
       _trackPanelOpen = false;
       _playbackPanelOpen = false;
+      _subtitleStyleOpen = false;
       _chaptersOpen = false;
     });
     _afterPanelChange();

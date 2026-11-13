@@ -48,11 +48,12 @@ abstract final class WindowMemory {
     }
   }
 
-  /// Ab jetzt speichern. Das Fenster meldet nur Ziehen mit der Maus und Maximieren –
-  /// Andocken (Windows-Taste + Pfeil) nicht. Deshalb zusätzlich alle paar Sekunden nachsehen.
+  /// Ab jetzt speichern. Unter Windows meldet das Fenster nur Ziehen mit der Maus und
+  /// Maximieren – Andocken (Windows-Taste + Pfeil) nicht. Deshalb dort zusätzlich alle paar
+  /// Sekunden nachsehen. macOS meldet jede Änderung (auch Kacheln) – dort weckt kein Timer die App.
   static void startWatching() {
     enabled = true;
-    Timer.periodic(const Duration(seconds: 3), (_) => _save());
+    if (Platform.isWindows) Timer.periodic(const Duration(seconds: 3), (_) => _save());
   }
 
   /// Nach Verschieben/Größe ändern gebündelt speichern.

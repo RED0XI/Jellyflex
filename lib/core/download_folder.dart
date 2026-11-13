@@ -1,5 +1,6 @@
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:typed_data' show Endian;
 
 import 'package:ffi/ffi.dart';
 
@@ -109,7 +110,7 @@ abstract final class DownloadFolder {
   /// Freier Speicherplatz (Bytes) auf dem Laufwerk von [path]; `null` = unbekannt.
   /// Der Ordner selbst muss nicht existieren – es zählt der nächste vorhandene darüber.
   static int? freeBytes(String path) {
-    if (!Platform.isWindows && !Platform.isMacOS) return null;
+    if (!Platform.isWindows && !Platform.isMacOS && !Platform.isIOS) return null;
     var dir = Directory(path).absolute;
     while (!dir.existsSync()) {
       final parent = dir.parent;
@@ -117,6 +118,7 @@ abstract final class DownloadFolder {
       dir = parent;
     }
     if (Platform.isMacOS) return _freeBytesPosix(dir.path);
+    if (Platform.isIOS) return _freeBytesStatfs(dir.path);
     final pathPtr = dir.path.toNativeUtf16();
     final free = calloc<Uint64>();
     try {
@@ -129,6 +131,32 @@ abstract final class DownloadFolder {
       calloc.free(free);
     }
   }
+
+  /// iOS: dort laufen keine Programme wie `df` – direkt `statfs` fragen. Der Aufbau von
+  /// `struct statfs` (64 Bit, Darwin): f_bsize (4), f_iosize (4), f_blocks (8), f_bfree (8),
+  /// f_bavail (8) … – gebraucht werden nur Blockgröße und freie Blöcke.
+  static int? _freeBytesStatfs(String path) {
+    const structSize = 2168;
+    final pathPtr = path.toNativeUtf8();
+    final buffer = calloc<Uint8>(structSize);
+    try {
+      if (_statfs(pathPtr, buffer) != 0) return null;
+      final data = buffer.asTypedList(structSize).buffer.asByteData();
+      final blockSize = data.getUint32(0, Endian.host);
+      final available = data.getUint64(24, Endian.host);
+      return blockSize * available;
+    } catch (_) {
+      return null;
+    } finally {
+      calloc.free(pathPtr);
+      calloc.free(buffer);
+    }
+  }
+
+  static final _statfs = DynamicLibrary.process()
+      .lookupFunction<Int32 Function(Pointer<Utf8>, Pointer<Uint8>), int Function(Pointer<Utf8>, Pointer<Uint8>)>(
+        'statfs',
+      );
 
   /// macOS: `df` (POSIX-Ausgabe in KiB) – Spalte "Available" des Laufwerks.
   static int? _freeBytesPosix(String path) {

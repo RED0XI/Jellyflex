@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import 'images.dart';
 import 'models.dart';
+import 'platform/device.dart';
 import '../l10n/strings.dart';
 import 'redact.dart';
 import 'version.dart';
@@ -148,6 +149,10 @@ class JellyfinApi {
 
   static String get deviceName {
     final host = Platform.localHostname.replaceAll(RegExp(r'[^A-Za-z0-9 _-]'), '');
+    // iOS gibt den eigenen Gerätenamen nicht mehr heraus – dann wenigstens die Geräteart.
+    if (Platform.isIOS) return isPhoneDevice ? 'iPhone' : 'iPad';
+    // Android nennt sich selbst nur "localhost".
+    if (Platform.isAndroid) return isTv ? 'Android TV' : 'Android';
     return host.isEmpty ? (Platform.isMacOS ? 'Mac' : 'Windows') : host;
   }
 
@@ -351,6 +356,16 @@ class JellyfinApi {
   });
 
   // --- Listen (Wiedergabelisten auf dem Server) ------------------------------
+
+  /// Bibliothek, zu der ein Titel gehört: der oberste Ordner unter seinen Vorfahren.
+  Future<String?> getLibraryId(String itemId) async {
+    final res = await dio.get('/Items/$itemId/Ancestors', queryParameters: {'userId': userId});
+    if (res.data is! List) return null;
+    for (final ancestor in (res.data as List).whereType<Map>()) {
+      if (ancestor['Type'] == 'CollectionFolder') return ancestor['Id'] as String?;
+    }
+    return null;
+  }
 
   Future<List<BaseItem>> getPlaylists() => _getItems('/Items', {
     'userId': userId,
@@ -658,6 +673,58 @@ class JellyfinApi {
           // Text-Untertitel als Datei nachladen, Bild-Untertitel einbrennen.
           'SubtitleProfiles': [
             for (final f in ['srt', 'subrip', 'ass', 'ssa', 'vtt', 'webvtt']) {'Format': f, 'Method': 'External'},
+            for (final f in ['pgssub', 'dvdsub', 'dvbsub', 'pgs']) {'Format': f, 'Method': 'Encode'},
+          ],
+        },
+      },
+    );
+    return PlaybackInfo((res.data as Map).cast<String, dynamic>());
+  }
+
+  /// HLS-Fassung für Apples eigenen Player (iOS: Bild-in-Bild, AirPlay). Passen Bild- und
+  /// Tonformat, packt der Server nur um statt umzurechnen – das kostet ihn kaum etwas.
+  /// Text-Untertitel kommen als WebVTT im Stream mit, Bild-Untertitel werden eingebrannt.
+  Future<PlaybackInfo> getApplePlaybackInfo(
+    String id, {
+    required String mediaSourceId,
+    int maxBitrate = 120000000,
+    int? audioIndex,
+    int? subtitleIndex,
+  }) async {
+    final res = await dio.post(
+      '/Items/$id/PlaybackInfo',
+      queryParameters: {'userId': userId},
+      data: {
+        'UserId': userId,
+        'MediaSourceId': mediaSourceId,
+        'MaxStreamingBitrate': maxBitrate,
+        'AudioStreamIndex': ?audioIndex,
+        'SubtitleStreamIndex': ?subtitleIndex,
+        'EnableDirectPlay': false,
+        'EnableDirectStream': false,
+        'EnableTranscoding': true,
+        'AllowVideoStreamCopy': true,
+        'AllowAudioStreamCopy': true,
+        'DeviceProfile': {
+          'Name': '$clientName (Apple)',
+          'MaxStreamingBitrate': maxBitrate,
+          'DirectPlayProfiles': <Object>[],
+          'TranscodingProfiles': [
+            {
+              // HEVC verlangt bei Apple fMP4-Abschnitte.
+              'Container': 'mp4',
+              'Type': 'Video',
+              'VideoCodec': 'hevc,h264',
+              'AudioCodec': 'aac,ac3,eac3,alac,mp3',
+              'Protocol': 'hls',
+              'Context': 'Streaming',
+              'MaxAudioChannels': '6',
+              'MinSegments': 1,
+              'BreakOnNonKeyFrames': true,
+            },
+          ],
+          'SubtitleProfiles': [
+            for (final f in ['srt', 'subrip', 'ass', 'ssa', 'vtt', 'webvtt']) {'Format': f, 'Method': 'Hls'},
             for (final f in ['pgssub', 'dvdsub', 'dvbsub', 'pgs']) {'Format': f, 'Method': 'Encode'},
           ],
         },

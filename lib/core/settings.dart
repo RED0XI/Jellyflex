@@ -12,6 +12,8 @@ import '../theme.dart';
 import 'themes.dart';
 import 'ui_sounds.dart';
 import 'platform/app_paths.dart';
+import 'power.dart';
+import 'subtitle_style.dart';
 
 /// Wählbare Sprachen für Ton und Untertitel (ISO 639-2, wie Jellyfin/mpv sie liefern).
 const settingsLanguages = ['ger', 'eng', 'jpn', 'fre', 'spa', 'ita', 'tur', 'kor', 'rus', 'por', 'chi'];
@@ -40,6 +42,9 @@ bool sameLanguage(String? a, String? b) {
   return ka != null && ka == languageKey(b);
 }
 
+/// Wählbare Sprungweiten (Sekunden) für Zurück/Vor im Player.
+const seekStepOptions = [5, 10, 15, 30, 60];
+
 /// Ambilight: aus, nur im Fenster oder auch im Vollbild.
 enum AmbilightMode { off, window, always }
 
@@ -50,8 +55,8 @@ class AppSettings {
     this.autoSkipIntro = false,
     this.nextEpisodeCountdown = true,
     this.episodeImagesInRows = true,
-    this.subtitleScale = 1.0,
-    this.subtitleBackground = false,
+    this.subtitleStyle = const SubtitleStyle(),
+    this.subtitleLibraries = const {},
     this.maxBitrate,
     this.bannerTrailers = true,
     this.appName,
@@ -67,6 +72,11 @@ class AppSettings {
     this.language = AppLanguage.en,
     this.themeId = 'midnight',
     this.soundEffects = true,
+    this.intro = true,
+    this.introSound = true,
+    this.seekBackSeconds = 10,
+    this.seekForwardSeconds = 10,
+    this.holdSpeed = 2.0,
     this.playerVolume = 100,
     this.downloadFolder,
     this.downloadFolderAsked = false,
@@ -82,7 +92,11 @@ class AppSettings {
     this.lastSeenVersion,
     this.setupDone = true,
     this.hoverPreview = true,
+    this.energySaver = EnergySaver.auto,
   });
+
+  /// Energiesparen: automatisch im Akkubetrieb, immer oder nie (siehe [Power]).
+  final EnergySaver energySaver;
 
   /// Zuletzt eingestellte Lautstärke im Player (0–100).
   final double playerVolume;
@@ -131,6 +145,20 @@ class AppSettings {
 
   /// Klänge bei "Überrasch mich".
   final bool soundEffects;
+
+  /// Kurzes Intro (animiertes Logo) beim Start der App.
+  final bool intro;
+
+  /// Klang zum Intro – eigener Schalter, unabhängig von [soundEffects].
+  final bool introSound;
+
+  /// So weit springen Zurück/Vor im Player (Knöpfe, Pfeiltasten, Doppeltipp, Fernbedienung).
+  final int seekBackSeconds;
+  final int seekForwardSeconds;
+
+  /// Bild gedrückt halten (Finger, Maus, OK auf der Fernbedienung): so schnell abspielen,
+  /// solange gehalten wird. 0 = aus.
+  final double holdSpeed;
 
   /// Farbschema (siehe lib/core/themes.dart).
   final String themeId;
@@ -189,11 +217,32 @@ class AppSettings {
   /// Bei "Weiterschauen" das Standbild der Folge statt des Serienbilds zeigen.
   final bool episodeImagesInRows;
 
-  /// Untertitelgröße (1.0 = normal).
-  final double subtitleScale;
+  /// Allgemeines Aussehen der Untertitel.
+  final SubtitleStyle subtitleStyle;
 
-  /// Untertitel auf halbtransparentem Kasten (besser lesbar).
-  final bool subtitleBackground;
+  /// Eigene Untertitel-Regeln einzelner Bibliotheken (nach Bibliotheks-ID).
+  final Map<String, LibrarySubtitles> subtitleLibraries;
+
+  /// Aussehen für einen Titel aus [libraryId]: das der Bibliothek, sonst das allgemeine.
+  SubtitleStyle subtitleStyleFor(String? libraryId) => subtitleLibraries[libraryId]?.style ?? subtitleStyle;
+
+  /// Untertitelsprache für einen Titel aus [libraryId]: die der Bibliothek, sonst die allgemeine.
+  String? subtitleLanguageFor(String? libraryId) => subtitleLibraries[libraryId]?.language ?? subtitleLanguage;
+
+  /// Eigene Sprache der Bibliothek (`null` = wie allgemein).
+  String? libraryLanguage(String? libraryId) => subtitleLibraries[libraryId]?.language;
+
+  /// Hat die Bibliothek ein eigenes Aussehen?
+  bool hasLibraryStyle(String? libraryId) => subtitleLibraries[libraryId]?.style != null;
+
+  /// Regeln einer Bibliothek setzen; ohne eigene Werte fällt der Eintrag ganz weg.
+  AppSettings withLibrarySubtitles(String libraryId, LibrarySubtitles rules) => copyWith(
+    subtitleLibraries: {
+      for (final e in subtitleLibraries.entries)
+        if (e.key != libraryId) e.key: e.value,
+      if (!rules.isEmpty) libraryId: rules,
+    },
+  );
 
   AppSettings copyWith({
     String? Function()? audioLanguage,
@@ -201,8 +250,8 @@ class AppSettings {
     bool? autoSkipIntro,
     bool? nextEpisodeCountdown,
     bool? episodeImagesInRows,
-    double? subtitleScale,
-    bool? subtitleBackground,
+    SubtitleStyle? subtitleStyle,
+    Map<String, LibrarySubtitles>? subtitleLibraries,
     int? Function()? maxBitrate,
     bool? bannerTrailers,
     String? Function()? appName,
@@ -218,6 +267,11 @@ class AppSettings {
     AppLanguage? language,
     String? themeId,
     bool? soundEffects,
+    bool? intro,
+    bool? introSound,
+    int? seekBackSeconds,
+    int? seekForwardSeconds,
+    double? holdSpeed,
     double? playerVolume,
     String? Function()? downloadFolder,
     bool? downloadFolderAsked,
@@ -233,14 +287,15 @@ class AppSettings {
     String? Function()? lastSeenVersion,
     bool? setupDone,
     bool? hoverPreview,
+    EnergySaver? energySaver,
   }) => AppSettings(
     audioLanguage: audioLanguage != null ? audioLanguage() : this.audioLanguage,
     subtitleLanguage: subtitleLanguage != null ? subtitleLanguage() : this.subtitleLanguage,
     autoSkipIntro: autoSkipIntro ?? this.autoSkipIntro,
     nextEpisodeCountdown: nextEpisodeCountdown ?? this.nextEpisodeCountdown,
     episodeImagesInRows: episodeImagesInRows ?? this.episodeImagesInRows,
-    subtitleScale: subtitleScale ?? this.subtitleScale,
-    subtitleBackground: subtitleBackground ?? this.subtitleBackground,
+    subtitleStyle: subtitleStyle ?? this.subtitleStyle,
+    subtitleLibraries: subtitleLibraries ?? this.subtitleLibraries,
     maxBitrate: maxBitrate != null ? maxBitrate() : this.maxBitrate,
     bannerTrailers: bannerTrailers ?? this.bannerTrailers,
     appName: appName != null ? appName() : this.appName,
@@ -256,6 +311,11 @@ class AppSettings {
     language: language ?? this.language,
     themeId: themeId ?? this.themeId,
     soundEffects: soundEffects ?? this.soundEffects,
+    intro: intro ?? this.intro,
+    introSound: introSound ?? this.introSound,
+    seekBackSeconds: seekBackSeconds ?? this.seekBackSeconds,
+    seekForwardSeconds: seekForwardSeconds ?? this.seekForwardSeconds,
+    holdSpeed: holdSpeed ?? this.holdSpeed,
     playerVolume: playerVolume ?? this.playerVolume,
     downloadFolder: downloadFolder != null ? downloadFolder() : this.downloadFolder,
     downloadFolderAsked: downloadFolderAsked ?? this.downloadFolderAsked,
@@ -271,6 +331,7 @@ class AppSettings {
     lastSeenVersion: lastSeenVersion != null ? lastSeenVersion() : this.lastSeenVersion,
     setupDone: setupDone ?? this.setupDone,
     hoverPreview: hoverPreview ?? this.hoverPreview,
+    energySaver: energySaver ?? this.energySaver,
   );
 
   Map<String, dynamic> toJson() => {
@@ -279,8 +340,8 @@ class AppSettings {
     'autoSkipIntro': autoSkipIntro,
     'nextEpisodeCountdown': nextEpisodeCountdown,
     'episodeImagesInRows': episodeImagesInRows,
-    'subtitleScale': subtitleScale,
-    'subtitleBackground': subtitleBackground,
+    'subtitleStyle': subtitleStyle.toJson(),
+    'subtitleLibraries': {for (final e in subtitleLibraries.entries) e.key: e.value.toJson()},
     'maxBitrate': maxBitrate,
     'bannerTrailers': bannerTrailers,
     'appName': appName,
@@ -296,6 +357,11 @@ class AppSettings {
     'language': language.name,
     'themeId': themeId,
     'soundEffects': soundEffects,
+    'intro': intro,
+    'introSound': introSound,
+    'seekBackSeconds': seekBackSeconds,
+    'seekForwardSeconds': seekForwardSeconds,
+    'holdSpeed': holdSpeed,
     'playerVolume': playerVolume,
     'downloadFolder': downloadFolder,
     'downloadFolderAsked': downloadFolderAsked,
@@ -311,6 +377,7 @@ class AppSettings {
     'lastSeenVersion': lastSeenVersion,
     'setupDone': setupDone,
     'hoverPreview': hoverPreview,
+    'energySaver': energySaver.name,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -319,8 +386,12 @@ class AppSettings {
     autoSkipIntro: json['autoSkipIntro'] as bool? ?? false,
     nextEpisodeCountdown: json['nextEpisodeCountdown'] as bool? ?? true,
     episodeImagesInRows: json['episodeImagesInRows'] as bool? ?? true,
-    subtitleScale: (json['subtitleScale'] as num?)?.toDouble() ?? 1.0,
-    subtitleBackground: json['subtitleBackground'] as bool? ?? false,
+    subtitleStyle: _subtitleStyleFromJson(json),
+    subtitleLibraries: {
+      if (json['subtitleLibraries'] is Map)
+        for (final e in (json['subtitleLibraries'] as Map).entries)
+          if (e.value is Map) '${e.key}': LibrarySubtitles.fromJson((e.value as Map).cast<String, dynamic>()),
+    },
     maxBitrate: (json['maxBitrate'] as num?)?.toInt(),
     bannerTrailers: json['bannerTrailers'] as bool? ?? true,
     appName: json['appName'] as String?,
@@ -336,6 +407,11 @@ class AppSettings {
     language: AppLanguage.values.asNameMap()[json['language']] ?? AppLanguage.en,
     themeId: json['themeId'] as String? ?? 'midnight',
     soundEffects: json['soundEffects'] as bool? ?? true,
+    intro: json['intro'] as bool? ?? true,
+    introSound: json['introSound'] as bool? ?? true,
+    seekBackSeconds: ((json['seekBackSeconds'] as num?)?.toInt() ?? 10).clamp(1, 600),
+    seekForwardSeconds: ((json['seekForwardSeconds'] as num?)?.toInt() ?? 10).clamp(1, 600),
+    holdSpeed: ((json['holdSpeed'] as num?)?.toDouble() ?? 2.0).clamp(0, 4).toDouble(),
     playerVolume: ((json['playerVolume'] as num?)?.toDouble() ?? 100).clamp(0, 100).toDouble(),
     downloadFolder: json['downloadFolder'] as String?,
     downloadFolderAsked: json['downloadFolderAsked'] as bool? ?? false,
@@ -352,6 +428,18 @@ class AppSettings {
     // Ältere Versionen kannten den Assistenten nicht – wer schon Einstellungen hat, ist eingerichtet.
     setupDone: json['setupDone'] as bool? ?? true,
     hoverPreview: json['hoverPreview'] as bool? ?? true,
+    energySaver: EnergySaver.values.asNameMap()[json['energySaver']] ?? EnergySaver.auto,
+  );
+}
+
+/// Ältere Versionen kannten nur Größe und Kasten – die bleiben beim Update erhalten.
+SubtitleStyle _subtitleStyleFromJson(Map<String, dynamic> json) {
+  if (json['subtitleStyle'] is Map) {
+    return SubtitleStyle.fromJson((json['subtitleStyle'] as Map).cast<String, dynamic>());
+  }
+  return SubtitleStyle(
+    scale: ((json['subtitleScale'] as num?)?.toDouble() ?? 1.0).clamp(SubtitleStyle.minScale, SubtitleStyle.maxScale),
+    edge: json['subtitleBackground'] == true ? SubtitleEdge.box : SubtitleEdge.outline,
   );
 }
 
@@ -398,6 +486,7 @@ class SettingsController extends Notifier<AppSettings> {
     appLayout = layoutById(s.layoutId);
     UiSounds.enabled = s.soundEffects;
     ImageDiskCache.instance.maxBytes = s.imageCacheMb * 1024 * 1024;
+    Power.mode = s.energySaver;
   }
 
   /// Aktuelle Einstellungen (auch dort lesbar, wo kein `ref` mehr verfügbar ist).
