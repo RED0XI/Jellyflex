@@ -70,7 +70,12 @@ void main() {
       File? shot;
       for (var i = 0; i < 40 && shot == null; i++) {
         await tester.pump(const Duration(milliseconds: 100));
-        shot = shots.listSync().whereType<File>().where((f) => f.path.endsWith('.png')).firstOrNull;
+        // Erst, wenn die Datei auch geschrieben ist – sie taucht schon vorher leer im Ordner auf.
+        shot = shots
+            .listSync()
+            .whereType<File>()
+            .where((f) => f.path.endsWith('.png') && f.lengthSync() > 8)
+            .firstOrNull;
       }
       expect(shot, isNotNull, reason: 'Bildschirmfoto gespeichert');
       final bytes = shot!.readAsBytesSync();
