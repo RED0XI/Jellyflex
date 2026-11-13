@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:jellyflex/core/downloads.dart';
+import 'package:jellyflex/core/item_library.dart';
 import 'package:jellyflex/core/secure_store.dart';
 import 'package:jellyflex/core/series_tracks.dart';
 import 'package:jellyflex/core/settings.dart';
@@ -17,6 +18,9 @@ SettingsController testSettings([Directory? dir, AppLanguage language = AppLangu
   // Auch Anmeldedaten (Konten, PIN) nur in einer Temp-Datei – nie im echten Speicher.
   SecureStore.instance = SecureStore.forFile(File('${folder.path}${Platform.pathSeparator}secure.bin'));
   SeriesTracks.instance = SeriesTracks.forFile(File('${folder.path}${Platform.pathSeparator}series_tracks.json'));
+  // Ebenso, welcher Titel zu welcher Bibliothek gehört – sonst landen die Titel des Demo-Servers
+  // in der echten item_libraries.json.
+  ItemLibraries.instance = ItemLibraries.forFile(File('${folder.path}${Platform.pathSeparator}item_libraries.json'));
   DownloadManager.testDirectory = folder;
   final file = File('${folder.path}${Platform.pathSeparator}settings.json');
   // "Was ist neu" schon gesehen und kein Intro – sonst läge beides in jedem Test über der App.

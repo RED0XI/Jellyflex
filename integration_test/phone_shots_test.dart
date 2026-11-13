@@ -29,6 +29,12 @@ void main() {
   MediaKit.ensureInitialized();
 
   testWidgets('Telefon-Bildschirmfotos', (tester) async {
+    // Nur auf dem Telefon bzw. im Simulator: Am Desktop baut die App das Desktop-Layout, das in
+    // den schmalen Rahmen nicht passt.
+    if (!Platform.isIOS && !Platform.isAndroid) {
+      markTestSkipped('Nur im iPhone-Simulator');
+      return;
+    }
     if (!await demoServerRunning()) return;
     final temp = Directory.systemTemp.createTempSync('jellyflex_phone_');
     // Im Simulator darf die App auch direkt in einen Ordner des Macs schreiben (--dart-define=SHOT_DIR=…).

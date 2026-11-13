@@ -29,9 +29,12 @@ $results = [System.Collections.Generic.List[object]]::new()
 
 function Invoke-TestRun([string]$name, [string[]]$arguments) {
     $out = & $flutter @arguments 2>&1 | Out-String
-    $passed = $out -match 'All tests passed'
+    # "All tests skipped": Mess- und Foto-Tests ohne ihre Vorgaben (EFF_PROFILE, SHOTS_PROFILE,
+    # iPhone-Simulator) überspringen sich selbst - kein Fehler.
+    $skipped = $out -match 'All tests skipped'
+    $passed = $skipped -or $out -match 'All tests passed'
     $summary = ($out -split "`n" | Where-Object { $_ -match 'All tests passed|Some tests failed|Expected:|Actual:' } | Select-Object -Last 3) -join ' | '
-    return [pscustomobject]@{ Test = $name; Ok = $passed; Info = $summary.Trim(); Output = $out }
+    return [pscustomobject]@{ Test = $name; Ok = $passed; Skipped = $skipped; Info = $summary.Trim(); Output = $out }
 }
 
 Write-Host '== Schnelle Tests (test/)'
@@ -57,8 +60,8 @@ if ($startedServer) { Stop-Process -Id $startedServer.Id -Force -ErrorAction Sil
 Write-Host ''
 Write-Host '==================== Ergebnis ===================='
 foreach ($r in $results) {
-    $mark = if ($r.Ok) { 'OK    ' } else { 'FEHLER' }
-    Write-Host ("{0}  {1,-22} {2}" -f $mark, $r.Test, $(if ($r.Ok) { '' } else { $r.Info }))
+    $mark = if ($r.Skipped) { '-     ' } elseif ($r.Ok) { 'OK    ' } else { 'FEHLER' }
+    Write-Host ("{0}  {1,-22} {2}" -f $mark, $r.Test, $(if ($r.Skipped) { '(übersprungen)' } elseif ($r.Ok) { '' } else { $r.Info }))
 }
 $failed = @($results | Where-Object { -not $_.Ok })
 Write-Host ("{0} von {1} bestanden" -f ($results.Count - $failed.Count), $results.Count)
