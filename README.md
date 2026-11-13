@@ -58,7 +58,8 @@ Applications to the Trash.
 **Watching**
 - **Scene preview on cards**: rest on a title and its card flips through scenes (images from your server, no video)
 - **Direct Play** of practically every format through mpv (HEVC, AV1, HDR, DTS/TrueHD, ASS/PGS subtitles)
-- Audio/subtitle choice from your Jellyfin settings; the language you pick is **remembered per series**
+- **Pick audio and subtitles on the details page** or in the player; the language you pick is **remembered per series**
+- **Search and load subtitles through your server** (e.g. the OpenSubtitles plugin) – sharp, clean subtitle rendering
 - **Skip intro/recap** (Media Segments, e.g. from the Intro Skipper plugin), **next episode** countdown
 - **Trickplay** previews while seeking, **chapters** with pictures (`C`) and a **Scenes** row on the details page
 - Quality limit (the server converts on the fly), playback speed, audio/subtitle delay
@@ -71,7 +72,8 @@ Applications to the Trash.
 **Browsing**
 - Home with rotating banner, Continue watching, Next up, New in …, Favorites – rows can be
   reordered and hidden
-- Details pages with backdrop slideshow, logo, ratings, seasons & episodes, cast, similar titles
+- Details pages with backdrop slideshow, logo, **IMDb/TMDB and Rotten Tomatoes ratings**, seasons & episodes, cast, similar titles
+- **Upcoming** calendar with the next episodes of your shows; **browse by genre** with a page per genre
 - **People pages**: photo, biography and everything with that person on your server
 - **Versions**: if a movie exists twice (e.g. 4K and 1080p), pick the version; badges show 4K, HDR/Dolby Vision, Atmos
 - Library grid with sorting and filters, **multi-select**, smart search (titles, episodes, people)
@@ -91,6 +93,7 @@ Applications to the Trash.
 - 6 **layouts** (Cinema, Couch, Library, Magazine, Minimal, Retro VHS) and 8 color **themes**
 - Your own app name and logo
 - Languages: English, German, French, Spanish, Turkish
+- Settings in clear sections with a search field
 - Extras: "Surprise me" slot machine, screensaver, seasonal touches, year in review, theme music
 
 ### Privacy & security
